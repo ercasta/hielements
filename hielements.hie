@@ -1,0 +1,207 @@
+## Hielements Self-Description
+## This file describes the structure of the Hielements project itself,
+## demonstrating the language's ability to model hierarchical software systems.
+
+import files
+
+## The Hielements project - a language for describing software structure
+element hielements:
+    scope root = files.folder_selector('.')
+    
+    ## Core library providing lexing, parsing, interpretation
+    element core:
+        scope src = files.folder_selector('crates/hielements-core/src')
+        
+        ## Lexer - tokenizes .hie source files using logos
+        element lexer:
+            scope module = files.file_selector('crates/hielements-core/src/lexer.rs')
+            
+            ## Token definitions for the language
+            element tokens:
+                ## Keywords: element, scope, connection_point, check, import, etc.
+                ## Punctuation: colon, equals, dot, comma, parens, brackets
+                ## Literals: strings, numbers, booleans
+                ## Indentation: INDENT/DEDENT for Python-style blocks
+            
+            ## Lexer state machine
+            element state:
+                ## Tracks indent stack for significant whitespace
+                ## Handles line positions for error reporting
+        
+        ## Parser - produces AST from token stream
+        element parser:
+            scope module = files.file_selector('crates/hielements-core/src/parser.rs')
+            
+            ## Recursive descent parser with error recovery
+            element parse_methods:
+                ## parse_import: handles 'import X' and 'from X import Y'
+                ## parse_element: recursive element declarations
+                ## parse_scope: scope = expression
+                ## parse_connection_point: connection_point = expression
+                ## parse_check: check expression
+                ## parse_expression: identifiers, member access, function calls
+        
+        ## AST - typed representation of parsed programs
+        element ast:
+            scope module = files.file_selector('crates/hielements-core/src/ast.rs')
+            
+            ## Program structure
+            element program_node:
+                ## imports: Vec<ImportStatement>
+                ## elements: Vec<Element>
+            
+            ## Element structure
+            element element_node:
+                ## name, doc_comment
+                ## scopes, connection_points, checks
+                ## children (nested elements)
+            
+            ## Expressions
+            element expression_node:
+                ## Identifier, MemberAccess, FunctionCall
+                ## String, Number, Boolean, List literals
+        
+        ## Interpreter - semantic validation and check execution
+        element interpreter:
+            scope module = files.file_selector('crates/hielements-core/src/interpreter.rs')
+            
+            ## Validation pipeline
+            element validator:
+                ## Validates imports against known libraries
+                ## Validates element structure recursively
+                ## Produces Diagnostics for errors/warnings
+            
+            ## Expression evaluator
+            element evaluator:
+                ## Evaluates scope expressions to Values
+                ## Resolves library function calls
+                ## Maintains scope environment (HashMap)
+            
+            ## Check runner
+            element check_runner:
+                ## Executes check expressions
+                ## Produces CheckOutput with pass/fail/error results
+        
+        ## Diagnostics - error reporting infrastructure
+        element diagnostics:
+            scope module = files.file_selector('crates/hielements-core/src/diagnostics.rs')
+            
+            ## Diagnostic types
+            element diagnostic_types:
+                ## Severity: Error, Warning, Info, Hint
+                ## Diagnostic: code, message, file, span, context, help
+            
+            ## Builder pattern for constructing diagnostics
+            element diagnostic_builder:
+                ## Fluent API: with_file(), with_span(), with_help()
+            
+            ## Output formats
+            element output_formats:
+                ## Human-readable (colorized terminal output)
+                ## JSON for tooling integration
+        
+        ## Standard Library
+        element stdlib:
+            scope src = files.folder_selector('crates/hielements-core/src/stdlib')
+            
+            ## Library trait and registry
+            element registry:
+                scope module = files.file_selector('crates/hielements-core/src/stdlib/mod.rs')
+                ## Library trait: name(), call(), check()
+                ## LibraryRegistry: HashMap of available libraries
+                ## Value enum: Null, Bool, Int, Float, String, List, Scope, ConnectionPoint
+            
+            ## Files library - file system operations
+            element files_library:
+                scope module = files.file_selector('crates/hielements-core/src/stdlib/files.rs')
+                
+                ## Selectors
+                element selectors:
+                    ## file_selector(path): single file scope
+                    ## folder_selector(path): directory contents
+                    ## glob_selector(pattern): pattern matching
+                
+                ## Checks
+                element checks:
+                    ## exists(scope, filename): file existence
+                    ## contains(scope, filename): containment
+                    ## no_files_matching(scope, pattern): absence check
+                    ## max_size(scope, bytes): size limit
+        
+        ## Span tracking for source locations
+        element span:
+            scope module = files.file_selector('crates/hielements-core/src/span.rs')
+            ## Position: line, column, offset
+            ## Span: start, end positions
+    
+    ## CLI - command-line interface
+    element cli:
+        scope src = files.folder_selector('crates/hielements-cli/src')
+        scope main = files.file_selector('crates/hielements-cli/src/main.rs')
+        
+        ## Commands
+        element commands:
+            ## check: validate syntax and semantics
+            element check_command:
+                ## Reads .hie file
+                ## Runs interpreter.validate()
+                ## Outputs diagnostics (human/JSON)
+            
+            ## run: execute checks against workspace
+            element run_command:
+                ## Validates then interpreter.run()
+                ## Reports check results with pass/fail/error
+                ## Supports --workspace and --dry-run flags
+            
+            ## parse: debug AST output
+            element parse_command:
+                ## Outputs JSON AST for debugging
+        
+        ## Output formatting
+        element formatting:
+            ## Colorized terminal output using 'colored' crate
+            ## Rust-style error format: error[CODE]: message
+            ## Source location arrows: --> file:line:col
+    
+    ## VS Code Extension - editor integration
+    element vscode_extension:
+        scope src = files.folder_selector('vscode-extension')
+        
+        ## Language configuration
+        element language_config:
+            scope config = files.file_selector('vscode-extension/language-configuration.json')
+            ## Comments, brackets, auto-closing pairs
+        
+        ## Syntax highlighting
+        element syntax:
+            scope syntaxes = files.folder_selector('vscode-extension/syntaxes')
+            ## TextMate grammar for .hie files
+        
+        ## Extension code
+        element extension:
+            scope main = files.file_selector('vscode-extension/src/extension.ts')
+            
+            ## Commands
+            element commands:
+                ## hielements.check: validate current file
+                ## hielements.run: run checks in workspace
+            
+            ## Process spawning
+            element process_runner:
+                ## Spawns hielements CLI
+                ## Captures stdout/stderr to output channel
+    
+    ## Documentation
+    element documentation:
+        scope docs = files.folder_selector('doc')
+        
+        element language_reference:
+            scope doc = files.file_selector('doc/language_reference.md')
+        
+        element technical_architecture:
+            scope doc = files.file_selector('doc/technical_architecture.md')
+    
+    ## Examples
+    element examples:
+        scope examples = files.folder_selector('examples')
+        ## minimal.hie, simple.hie, microservices.hie
