@@ -48,14 +48,21 @@ pub struct Interpreter {
 }
 
 impl Interpreter {
+    /// Create a new interpreter with built-in libraries only.
     pub fn new(workspace: impl Into<String>) -> Self {
+        let workspace_str = workspace.into();
         Self {
-            libraries: LibraryRegistry::new(),
-            workspace: workspace.into(),
+            libraries: LibraryRegistry::with_workspace(&workspace_str),
+            workspace: workspace_str,
             scopes: HashMap::new(),
             diagnostics: Diagnostics::new(),
             current_element_path: String::new(),
         }
+    }
+
+    /// Register an external library manually.
+    pub fn register_library(&mut self, library: Box<dyn super::stdlib::Library>) {
+        self.libraries.register(library);
     }
 
     /// Parse and validate a Hielements file.
@@ -371,7 +378,7 @@ impl Interpreter {
                 }
 
                 // Call the library function
-                if let Some(library) = self.libraries.get(&lib_name) {
+                if let Some(library) = self.libraries.get_mut(&lib_name) {
                     library.call(&func_name, args, &self.workspace).map_err(|e| {
                         Diagnostic::error(e.code, e.message)
                             .with_span(*span)
@@ -398,7 +405,7 @@ impl Interpreter {
             }
 
             // Call the library check function
-            if let Some(library) = self.libraries.get(&lib_name) {
+            if let Some(library) = self.libraries.get_mut(&lib_name) {
                 library.check(&func_name, args, &self.workspace).map_err(|e| {
                     Diagnostic::error(e.code, e.message)
                         .with_span(*span)

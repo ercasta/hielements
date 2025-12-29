@@ -602,7 +602,7 @@ impl Library for RustLibrary {
         "rust"
     }
 
-    fn call(&self, function: &str, args: Vec<Value>, workspace: &str) -> LibraryResult<Value> {
+    fn call(&mut self, function: &str, args: Vec<Value>, workspace: &str) -> LibraryResult<Value> {
         match function {
             "crate_selector" => {
                 let name = args.get(0)
@@ -650,7 +650,7 @@ impl Library for RustLibrary {
         }
     }
 
-    fn check(&self, function: &str, args: Vec<Value>, workspace: &str) -> LibraryResult<CheckResult> {
+    fn check(&mut self, function: &str, args: Vec<Value>, workspace: &str) -> LibraryResult<CheckResult> {
         match function {
             "struct_exists" => {
                 let name = args.get(0)

@@ -1,0 +1,26 @@
+# Hielements Configuration File
+#
+# This file configures external library plugins for the Hielements interpreter.
+# Place this file in your project root (next to your .hie files).
+
+# External Libraries
+# Each entry defines a library that can be imported in .hie files.
+# 
+# Format:
+#   [libraries]
+#   library_name = { executable = "path/to/executable", args = ["arg1", "arg2"] }
+#
+# Example:
+#   [libraries]
+#   sample = { executable = "python3", args = ["examples/plugins/sample_plugin.py"] }
+#
+# Then in your .hie file:
+#   import sample
+#   
+#   element mycomponent:
+#       scope src = sample.simple_selector('src')
+#       check sample.file_count_check(src, 100)
+
+[libraries]
+# Uncomment the following line to enable the sample plugin:
+# sample = { executable = "python3", args = ["examples/plugins/sample_plugin.py"] }
