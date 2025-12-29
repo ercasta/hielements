@@ -85,7 +85,100 @@ Hielements is a language for describing and enforcing software structure. The im
 
 ---
 
-### 2.3 External Tool Invocation Model
+### 2.3 Static Analysis Phase
+
+**Requirement:** Even though Hielements is interpreted, static checks for syntax and semantics must be performed before actual execution.
+
+#### Design Principles
+
+1. **Validation Before Execution:** All Hielements specifications undergo syntax and semantic validation before any rule execution
+2. **Deferred Execution:** The actual checks (invoking external tools, evaluating rules) are separate from validation
+3. **Machine and Human Readable Output:** Check results must be consumable by CI/CD pipelines and readable by developers
+
+#### Validation Phases
+
+| Phase | Description | Checks Performed |
+|-------|-------------|------------------|
+| **Lexical Analysis** | Tokenization | Invalid characters, malformed tokens |
+| **Syntax Validation** | Parse against grammar | Structure errors, missing delimiters |
+| **Semantic Analysis** | IR construction and validation | Undefined references, type mismatches, invalid scopes |
+| **Dependency Resolution** | External tool availability | Missing tools, invalid tool configurations |
+
+#### Execution Deferral Options
+
+To separate validation from actual execution, several approaches are possible:
+
+| Approach | Description | Pros | Cons |
+|----------|-------------|------|------|
+| **`--check` / `--validate` flag** | Runs only validation, no execution | Simple, explicit | Separate command invocation |
+| **`--dry-run` flag** | Validates and simulates execution without side effects | Shows execution plan | May not catch all runtime issues |
+| **Two-phase API** | `validate()` returns validated IR, `execute(ir)` runs it | Programmatic control, composable | More complex API |
+| **Validation-only mode (default)** | Default behavior is validate-only, `--execute` to run | Safe by default | Might confuse users expecting execution |
+
+**Recommendation:** Implement a **two-phase architecture** internally:
+1. **Phase 1: Validation** - Always runs, produces validated IR or errors
+2. **Phase 2: Execution** - Only runs if validation passes and execution is requested
+
+Expose this via CLI as:
+- `hielements check <spec>` - Validate only (default, fast feedback)
+- `hielements run <spec>` - Validate + Execute
+- `hielements run --dry-run <spec>` - Validate + Show execution plan without invoking external tools
+
+#### Check Output Formats
+
+Results must be provided in formats usable by both automated tools and humans:
+
+| Format | Use Case | Description |
+|--------|----------|-------------|
+| **Human-readable (default)** | Terminal output | Colored, formatted errors with source context |
+| **JSON** | CI/CD integration | Structured output for programmatic consumption |
+| **SARIF** | GitHub/GitLab integration | Static Analysis Results Interchange Format |
+| **JUnit XML** | CI test reporters | Compatible with most CI systems |
+| **Checkstyle XML** | Legacy CI integration | Wide tool support |
+
+```bash
+# Human-readable output (default)
+hielements check spec.hie
+
+# JSON output for scripting
+hielements check spec.hie --format json
+
+# SARIF for GitHub code scanning
+hielements check spec.hie --format sarif > results.sarif
+
+# Exit codes for CI/CD
+# 0 = success, 1 = validation errors, 2 = execution failures
+```
+
+**JSON Output Schema Example:**
+```json
+{
+  "version": "1.0",
+  "status": "error",
+  "errors": [
+    {
+      "severity": "error",
+      "code": "E001",
+      "message": "Undefined element 'orders'",
+      "file": "architecture.hie",
+      "line": 15,
+      "column": 10,
+      "context": "    uses orders.api"
+    }
+  ],
+  "warnings": [],
+  "summary": {
+    "total_errors": 1,
+    "total_warnings": 0
+  }
+}
+```
+
+**Note:** Output formatting is the responsibility of the CLI tool and CI integration tooling, not the core interpreter library. The interpreter exposes structured diagnostic objects that tools format as needed.
+
+---
+
+### 2.4 External Tool Invocation Model
 
 **Choice from Summary:** Actual scope and rules implementation is implemented using external software; Hielements provides a way to invoke external tools, passing parameters and getting the results.
 
@@ -122,7 +215,7 @@ Hielements is a language for describing and enforcing software structure. The im
 
 ---
 
-### 2.4 Intermediate Representation (IR)
+### 2.5 Intermediate Representation (IR)
 
 **Choice from Summary:** To allow a full-fledged implementation of the Language Server Protocol, consider using an intermediate representation within the interpreter.
 
@@ -187,12 +280,59 @@ Hielements is a language for describing and enforcing software structure. The im
 |--------|-------------|------|------|
 | **Embedded in Interpreter** | LSP server built into main binary | Single distribution, shared code | Larger binary, coupling |
 | **Separate Process** | LSP as separate binary communicating with interpreter | Clean separation, independent updates | IPC overhead, two binaries |
-| **Library Mode** | Interpreter as library used by LSP | Flexible, testable | API design effort |
+| **Library Mode** | Interpreter as library used by LSP server binary | Flexible, testable | API design effort |
 
-**Recommendation:** Library mode with the interpreter as a Rust library. The LSP binary links against it. This enables:
+**Recommendation:** Library mode with the interpreter as a Rust library. The LSP **server binary** links against it. This enables:
 - Unit testing of interpreter logic
 - Reuse in other tools (CI runners, etc.)
 - Clean API boundaries
+
+#### VSCode Integration Architecture
+
+**Important Clarification:** VSCode does **not** require a REST API for LSP integration. The LSP protocol uses **stdio** (standard input/output) or **socket** communication, not HTTP/REST.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        VSCode                                    │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │              Hielements Extension (TypeScript)            │   │
+│  │  - Uses vscode-languageclient library                     │   │
+│  │  - Spawns LSP server as child process                     │   │
+│  │  - Communicates via stdio (JSON-RPC)                      │   │
+│  └──────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+                              │ stdio (JSON-RPC)
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                  Hielements LSP Server Binary                    │
+│  - Standalone executable (hielements-lsp or hielements --lsp)   │
+│  - Built with tower-lsp crate                                   │
+│  - Links against interpreter library                             │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                  Interpreter Library (Rust)                      │
+│  - Parsing, validation, IR construction                          │
+│  - Exposes API for diagnostics, symbols, completions            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key Points:**
+- The interpreter is a **Rust library** (crate) that exposes APIs for parsing, validation, and analysis
+- The LSP server is a **standalone binary** that uses the interpreter library and implements the LSP protocol
+- VSCode extension **spawns this binary** and communicates via stdio using JSON-RPC (standard LSP protocol)
+- No REST API or HTTP server is needed—LSP uses stdio by default
+- The `vscode-languageclient` npm package handles all protocol details on the VSCode side
+
+**Distribution Options:**
+| Option | Description | Pros | Cons |
+|--------|-------------|------|------|
+| **Bundled binary** | LSP binary included in VSCode extension | Zero user setup | Larger extension, platform-specific builds |
+| **Separate install** | User installs LSP server independently | Smaller extension, shared binary | Extra setup step |
+| **Auto-download** | Extension downloads correct binary on install | Best UX, small extension | Requires hosted binaries, network dependency |
+
+**Recommendation:** Start with bundled binaries for each platform (Windows, macOS, Linux). Use the extension's `activate` function to locate and spawn the appropriate binary.
 
 #### LSP Features Priority
 
