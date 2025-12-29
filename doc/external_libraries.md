@@ -432,7 +432,7 @@ debug(f"Received request: {line}")
 Run the plugin manually to test:
 
 ```bash
-echo '{"jsonrpc":"2.0","method":"library.call","params":{"function":"test","args":[],"workspace":"."},"id":1}' | python3 my_plugin.py
+echo '{"jsonrpc":"2.0","method":"library.call","params":{"function":"test","args":[],"workspace":"."},"id":1}' | ./my-plugin
 ```
 
 ---

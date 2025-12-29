@@ -184,7 +184,8 @@ def main():
             response = handle_request(request)
             print(json.dumps(response), flush=True)
         except json.JSONDecodeError as e:
-            error = error_response(0, -32700, f"Parse error: {e}")
+            # Per JSON-RPC 2.0 spec, use null for id when it cannot be determined
+            error = error_response(None, -32700, f"Parse error: {e}")
             print(json.dumps(error), flush=True)
 
 

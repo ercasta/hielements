@@ -4,7 +4,7 @@
 //! via JSON-RPC over stdio.
 
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, Write};
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
 
@@ -161,13 +161,14 @@ impl ExternalLibrary {
         })?;
 
         // Read response from stdout
+        // Note: We read directly using BufRead trait on ChildStdout which doesn't have
+        // buffering issues since we're reading complete lines terminated by newlines.
         let stdout = process.stdout.as_mut().ok_or_else(|| {
             LibraryError::new("E504", "Failed to access stdout of external process")
         })?;
         
-        let mut reader = BufReader::new(stdout);
         let mut response_line = String::new();
-        reader.read_line(&mut response_line).map_err(|e| {
+        std::io::BufReader::new(stdout).read_line(&mut response_line).map_err(|e| {
             LibraryError::new("E505", format!("Failed to read from external process: {}", e))
         })?;
 
@@ -359,8 +360,26 @@ impl ExternalLibrary {
 impl Drop for ExternalLibrary {
     fn drop(&mut self) {
         if let Some(mut process) = self.process.take() {
-            // Try to terminate the process gracefully
+            // Close stdin to signal the process to exit gracefully
+            drop(process.stdin.take());
+            
+            // Wait briefly for graceful shutdown
+            use std::time::Duration;
+            match process.try_wait() {
+                Ok(Some(_)) => return, // Already exited
+                Ok(None) => {
+                    // Process still running, wait a bit
+                    std::thread::sleep(Duration::from_millis(100));
+                    if let Ok(Some(_)) = process.try_wait() {
+                        return; // Exited after closing stdin
+                    }
+                }
+                Err(_) => {}
+            }
+            
+            // Force kill if still running
             let _ = process.kill();
+            let _ = process.wait();
         }
     }
 }
