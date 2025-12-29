@@ -1,6 +1,7 @@
 //! Standard library modules for Hielements.
 
 pub mod files;
+pub mod rust;
 
 use std::collections::HashMap;
 
@@ -164,6 +165,7 @@ impl LibraryRegistry {
         };
         // Register built-in libraries
         registry.register(Box::new(files::FilesLibrary::new()));
+        registry.register(Box::new(rust::RustLibrary::new()));
         registry
     }
 

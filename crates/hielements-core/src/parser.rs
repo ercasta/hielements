@@ -36,8 +36,8 @@ impl<'a> Parser<'a> {
         let mut imports = Vec::new();
         let mut elements = Vec::new();
 
-        // Skip leading newlines
-        self.skip_newlines();
+        // Skip leading newlines and doc comments
+        self.skip_newlines_and_comments();
 
         // Parse imports
         while self.check(TokenKind::Import) || self.check(TokenKind::From) {
@@ -48,7 +48,7 @@ impl<'a> Parser<'a> {
                     self.recover_to_newline();
                 }
             }
-            self.skip_newlines();
+            self.skip_newlines_and_comments();
         }
 
         // Parse top-level elements
@@ -522,6 +522,12 @@ impl<'a> Parser<'a> {
 
     fn skip_newlines(&mut self) {
         while self.check(TokenKind::Newline) {
+            self.advance();
+        }
+    }
+
+    fn skip_newlines_and_comments(&mut self) {
+        while self.check(TokenKind::Newline) || self.check(TokenKind::DocComment) {
             self.advance();
         }
     }

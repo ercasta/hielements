@@ -3,205 +3,240 @@
 ## demonstrating the language's ability to model hierarchical software systems.
 
 import files
+import rust
 
 ## The Hielements project - a language for describing software structure
 element hielements:
     scope root = files.folder_selector('.')
     
+    check files.exists(root, 'Cargo.toml')
+    check files.exists(root, 'README.md')
+    check files.exists(root, 'LICENSE')
+    
     ## Core library providing lexing, parsing, interpretation
     element core:
         scope src = files.folder_selector('crates/hielements-core/src')
+        scope crate = rust.crate_selector('hielements-core')
+        
+        check files.exists(src, 'lib.rs')
         
         ## Lexer - tokenizes .hie source files using logos
         element lexer:
-            scope module = files.file_selector('crates/hielements-core/src/lexer.rs')
+            scope module = rust.module_selector('lexer')
+            
+            check rust.struct_exists('Lexer')
+            check rust.enum_exists('TokenKind')
+            check rust.has_tests(module)
+            check rust.has_docs(module)
             
             ## Token definitions for the language
             element tokens:
-                ## Keywords: element, scope, connection_point, check, import, etc.
-                ## Punctuation: colon, equals, dot, comma, parens, brackets
-                ## Literals: strings, numbers, booleans
-                ## Indentation: INDENT/DEDENT for Python-style blocks
+                scope enum = rust.enum_selector('TokenKind')
+                check rust.enum_exists('TokenKind')
+                ## Keywords: Element, Scope, ConnectionPoint, Check, Import, From
+                ## Punctuation: Colon, Equals, Dot, Comma, LParen, RParen, LBracket, RBracket
+                ## Literals: String, Number, True, False
+                ## Indentation: Indent, Dedent, Newline
             
             ## Lexer state machine
             element state:
+                scope lexer = rust.struct_selector('Lexer')
                 ## Tracks indent stack for significant whitespace
                 ## Handles line positions for error reporting
         
         ## Parser - produces AST from token stream
         element parser:
-            scope module = files.file_selector('crates/hielements-core/src/parser.rs')
+            scope module = rust.module_selector('parser')
+            
+            check rust.struct_exists('Parser')
+            check rust.function_exists('parse')
+            check rust.has_tests(module)
             
             ## Recursive descent parser with error recovery
             element parse_methods:
-                ## parse_import: handles 'import X' and 'from X import Y'
-                ## parse_element: recursive element declarations
-                ## parse_scope: scope = expression
-                ## parse_connection_point: connection_point = expression
-                ## parse_check: check expression
-                ## parse_expression: identifiers, member access, function calls
+                check rust.function_exists('parse_import')
+                check rust.function_exists('parse_element')
+                check rust.function_exists('parse_scope')
+                check rust.function_exists('parse_check')
+                check rust.function_exists('parse_expression')
         
         ## AST - typed representation of parsed programs
         element ast:
-            scope module = files.file_selector('crates/hielements-core/src/ast.rs')
+            scope module = rust.module_selector('ast')
             
             ## Program structure
             element program_node:
-                ## imports: Vec<ImportStatement>
-                ## elements: Vec<Element>
+                check rust.struct_exists('Program')
             
             ## Element structure
             element element_node:
-                ## name, doc_comment
-                ## scopes, connection_points, checks
-                ## children (nested elements)
+                check rust.struct_exists('Element')
             
             ## Expressions
             element expression_node:
-                ## Identifier, MemberAccess, FunctionCall
-                ## String, Number, Boolean, List literals
+                check rust.enum_exists('Expression')
         
         ## Interpreter - semantic validation and check execution
         element interpreter:
-            scope module = files.file_selector('crates/hielements-core/src/interpreter.rs')
+            scope module = rust.module_selector('interpreter')
+            
+            check rust.struct_exists('Interpreter')
+            check rust.function_exists('validate')
+            check rust.function_exists('run')
             
             ## Validation pipeline
             element validator:
-                ## Validates imports against known libraries
-                ## Validates element structure recursively
-                ## Produces Diagnostics for errors/warnings
+                check rust.function_exists('validate_semantics')
+                check rust.function_exists('validate_element')
             
             ## Expression evaluator
             element evaluator:
-                ## Evaluates scope expressions to Values
-                ## Resolves library function calls
-                ## Maintains scope environment (HashMap)
+                check rust.function_exists('evaluate_expression')
             
             ## Check runner
             element check_runner:
-                ## Executes check expressions
-                ## Produces CheckOutput with pass/fail/error results
+                check rust.function_exists('run_check')
         
         ## Diagnostics - error reporting infrastructure
         element diagnostics:
-            scope module = files.file_selector('crates/hielements-core/src/diagnostics.rs')
+            scope module = rust.module_selector('diagnostics')
             
-            ## Diagnostic types
-            element diagnostic_types:
-                ## Severity: Error, Warning, Info, Hint
-                ## Diagnostic: code, message, file, span, context, help
-            
-            ## Builder pattern for constructing diagnostics
-            element diagnostic_builder:
-                ## Fluent API: with_file(), with_span(), with_help()
-            
-            ## Output formats
-            element output_formats:
-                ## Human-readable (colorized terminal output)
-                ## JSON for tooling integration
+            check rust.struct_exists('Diagnostic')
+            check rust.struct_exists('Diagnostics')
+            check rust.enum_exists('DiagnosticSeverity')
         
         ## Standard Library
         element stdlib:
-            scope src = files.folder_selector('crates/hielements-core/src/stdlib')
+            scope stdlib_src = files.folder_selector('crates/hielements-core/src/stdlib')
+            
+            check files.exists(stdlib_src, 'mod.rs')
+            check files.exists(stdlib_src, 'files.rs')
+            check files.exists(stdlib_src, 'rust.rs')
             
             ## Library trait and registry
             element registry:
-                scope module = files.file_selector('crates/hielements-core/src/stdlib/mod.rs')
-                ## Library trait: name(), call(), check()
-                ## LibraryRegistry: HashMap of available libraries
-                ## Value enum: Null, Bool, Int, Float, String, List, Scope, ConnectionPoint
+                scope module = rust.module_selector('stdlib')
+                
+                check rust.trait_exists('Library')
+                check rust.struct_exists('LibraryRegistry')
+                check rust.enum_exists('Value')
+                check rust.enum_exists('CheckResult')
             
             ## Files library - file system operations
             element files_library:
-                scope module = files.file_selector('crates/hielements-core/src/stdlib/files.rs')
+                scope files_module = files.file_selector('crates/hielements-core/src/stdlib/files.rs')
+                
+                check rust.struct_exists('FilesLibrary')
+                check rust.implements('FilesLibrary', 'Library')
+                check rust.has_tests(files_module)
                 
                 ## Selectors
                 element selectors:
-                    ## file_selector(path): single file scope
-                    ## folder_selector(path): directory contents
-                    ## glob_selector(pattern): pattern matching
+                    check rust.function_exists('file_selector')
+                    check rust.function_exists('folder_selector')
+                    check rust.function_exists('glob_selector')
                 
                 ## Checks
                 element checks:
-                    ## exists(scope, filename): file existence
-                    ## contains(scope, filename): containment
-                    ## no_files_matching(scope, pattern): absence check
-                    ## max_size(scope, bytes): size limit
+                    check rust.function_exists('check_exists')
+                    check rust.function_exists('check_contains')
+                    check rust.function_exists('check_no_files_matching')
+                    check rust.function_exists('check_max_size')
+            
+            ## Rust library - Rust code analysis
+            element rust_library:
+                scope rust_module = files.file_selector('crates/hielements-core/src/stdlib/rust.rs')
+                
+                check rust.struct_exists('RustLibrary')
+                check rust.implements('RustLibrary', 'Library')
+                check rust.has_tests(rust_module)
+                
+                ## Selectors
+                element selectors:
+                    check rust.function_exists('crate_selector')
+                    check rust.function_exists('module_selector')
+                    check rust.function_exists('struct_selector')
+                    check rust.function_exists('enum_selector')
+                    check rust.function_exists('function_selector')
+                    check rust.function_exists('trait_selector')
+                    check rust.function_exists('impl_selector')
+                
+                ## Checks
+                element checks:
+                    check rust.function_exists('check_struct_exists')
+                    check rust.function_exists('check_enum_exists')
+                    check rust.function_exists('check_function_exists')
+                    check rust.function_exists('check_trait_exists')
+                    check rust.function_exists('check_impl_exists')
+                    check rust.function_exists('check_implements')
+                    check rust.function_exists('check_has_derive')
+                    check rust.function_exists('check_has_docs')
+                    check rust.function_exists('check_has_tests')
         
         ## Span tracking for source locations
         element span:
-            scope module = files.file_selector('crates/hielements-core/src/span.rs')
-            ## Position: line, column, offset
-            ## Span: start, end positions
+            scope module = rust.module_selector('span')
+            
+            check rust.struct_exists('Position')
+            check rust.struct_exists('Span')
     
     ## CLI - command-line interface
     element cli:
-        scope src = files.folder_selector('crates/hielements-cli/src')
+        scope cli_src = files.folder_selector('crates/hielements-cli/src')
         scope main = files.file_selector('crates/hielements-cli/src/main.rs')
         
-        ## Commands
+        check files.exists(cli_src, 'main.rs')
+        check rust.function_exists('main')
+        check rust.struct_exists('Cli')
+        check rust.enum_exists('Commands')
+        
+        ## Commands (enum variants in Commands enum)
         element commands:
             ## check: validate syntax and semantics
             element check_command:
-                ## Reads .hie file
-                ## Runs interpreter.validate()
-                ## Outputs diagnostics (human/JSON)
+                check rust.function_exists('cmd_check')
             
             ## run: execute checks against workspace
             element run_command:
-                ## Validates then interpreter.run()
-                ## Reports check results with pass/fail/error
-                ## Supports --workspace and --dry-run flags
+                check rust.function_exists('cmd_run')
             
             ## parse: debug AST output
             element parse_command:
-                ## Outputs JSON AST for debugging
-        
-        ## Output formatting
-        element formatting:
-            ## Colorized terminal output using 'colored' crate
-            ## Rust-style error format: error[CODE]: message
-            ## Source location arrows: --> file:line:col
+                check rust.function_exists('cmd_parse')
     
     ## VS Code Extension - editor integration
     element vscode_extension:
-        scope src = files.folder_selector('vscode-extension')
+        scope ext_src = files.folder_selector('vscode-extension')
+        
+        check files.exists(ext_src, 'package.json')
         
         ## Language configuration
         element language_config:
             scope config = files.file_selector('vscode-extension/language-configuration.json')
-            ## Comments, brackets, auto-closing pairs
+            check files.exists(ext_src, 'language-configuration.json')
         
         ## Syntax highlighting
         element syntax:
             scope syntaxes = files.folder_selector('vscode-extension/syntaxes')
-            ## TextMate grammar for .hie files
+            check files.exists(syntaxes, 'hielements.tmLanguage.json')
         
         ## Extension code
         element extension:
             scope main = files.file_selector('vscode-extension/src/extension.ts')
-            
-            ## Commands
-            element commands:
-                ## hielements.check: validate current file
-                ## hielements.run: run checks in workspace
-            
-            ## Process spawning
-            element process_runner:
-                ## Spawns hielements CLI
-                ## Captures stdout/stderr to output channel
+            check files.exists(ext_src, 'src/extension.ts')
     
     ## Documentation
     element documentation:
         scope docs = files.folder_selector('doc')
         
-        element language_reference:
-            scope doc = files.file_selector('doc/language_reference.md')
-        
-        element technical_architecture:
-            scope doc = files.file_selector('doc/technical_architecture.md')
+        check files.exists(docs, 'language_reference.md')
+        check files.exists(docs, 'technical_architecture.md')
+        check files.exists(docs, 'summary.md')
     
     ## Examples
     element examples:
         scope examples = files.folder_selector('examples')
-        ## minimal.hie, simple.hie, microservices.hie
+        
+        check files.exists(examples, 'minimal.hie')
+        check files.exists(examples, 'simple.hie')
+        check files.exists(examples, 'microservices.hie')
