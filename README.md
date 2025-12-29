@@ -1,5 +1,7 @@
 # Hielements
 
+> ⚠️ **Alpha / Experimental** — This project is in early development. The language syntax, APIs, and tooling may change significantly. Use at your own risk and expect breaking changes.
+
 **A language to describe and enforce software architecture.**
 
 Hielements helps you define, document, and enforce the logical structure of your software systems. Unlike traditional architecture documentation that becomes stale, Hielements specifications are formally checked against your actual code—ensuring your architecture stays aligned with reality.
