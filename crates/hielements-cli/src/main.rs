@@ -10,7 +10,7 @@ use clap::{Parser, Subcommand};
 use colored::Colorize;
 use hielements_core::diagnostics::{DiagnosticSeverity, DiagnosticsOutput};
 use hielements_core::stdlib::CheckResult;
-use hielements_core::Interpreter;
+use hielements_core::{Interpreter, RunOptions};
 
 #[derive(Parser)]
 #[command(name = "hielements")]
@@ -48,6 +48,18 @@ enum Commands {
         /// Dry run - show what would be checked without running
         #[arg(long)]
         dry_run: bool,
+
+        /// Verbose mode - show progress as each check runs
+        #[arg(short, long)]
+        verbose: bool,
+
+        /// Filter checks by element path pattern (e.g., "core.lexer" or "stdlib")
+        #[arg(long)]
+        filter: Option<String>,
+
+        /// Limit the number of checks to run
+        #[arg(long)]
+        limit: Option<usize>,
     },
 
     /// Parse a file and print the AST (for debugging)
@@ -62,8 +74,8 @@ fn main() -> ExitCode {
 
     match cli.command {
         Commands::Check { file, format } => cmd_check(&file, &format),
-        Commands::Run { file, workspace, format, dry_run } => {
-            cmd_run(&file, workspace.as_deref(), &format, dry_run)
+        Commands::Run { file, workspace, format, dry_run, verbose, filter, limit } => {
+            cmd_run(&file, workspace.as_deref(), &format, dry_run, verbose, filter.as_deref(), limit)
         }
         Commands::Parse { file } => cmd_parse(&file),
     }
@@ -169,7 +181,7 @@ fn cmd_check(file: &str, format: &str) -> ExitCode {
     }
 }
 
-fn cmd_run(file: &str, workspace: Option<&str>, format: &str, dry_run: bool) -> ExitCode {
+fn cmd_run(file: &str, workspace: Option<&str>, format: &str, dry_run: bool, verbose: bool, filter: Option<&str>, limit: Option<usize>) -> ExitCode {
     let source = match fs::read_to_string(file) {
         Ok(s) => s,
         Err(e) => {
@@ -181,8 +193,24 @@ fn cmd_run(file: &str, workspace: Option<&str>, format: &str, dry_run: bool) -> 
     // Determine workspace directory
     let workspace_dir = workspace
         .map(|w| w.to_string())
-        .or_else(|| Path::new(file).parent().map(|p| p.to_string_lossy().to_string()))
+        .or_else(|| {
+            Path::new(file).parent()
+                .and_then(|p| {
+                    let s = p.to_string_lossy().to_string();
+                    if s.is_empty() { None } else { Some(s) }
+                })
+        })
         .unwrap_or_else(|| ".".to_string());
+
+    if verbose {
+        eprintln!("[verbose] Workspace directory: {}", workspace_dir);
+        if let Some(f) = filter {
+            eprintln!("[verbose] Filter: {}", f);
+        }
+        if let Some(l) = limit {
+            eprintln!("[verbose] Limit: {} checks", l);
+        }
+    }
 
     let mut interpreter = Interpreter::new(&workspace_dir);
     let (program, diagnostics) = interpreter.validate(&source, file);
@@ -230,8 +258,13 @@ fn cmd_run(file: &str, workspace: Option<&str>, format: &str, dry_run: bool) -> 
         return ExitCode::SUCCESS;
     }
 
-    // Run the checks
-    let output = interpreter.run(&program);
+    // Run the checks with options
+    let run_options = RunOptions {
+        filter: filter.map(|s| s.to_string()),
+        limit,
+        verbose,
+    };
+    let output = interpreter.run_with_options(&program, &run_options);
 
     match format {
         "json" => {
@@ -289,8 +322,13 @@ fn cmd_run(file: &str, workspace: Option<&str>, format: &str, dry_run: bool) -> 
             }
 
             println!();
+            let skipped_str = if output.skipped > 0 {
+                format!(", {} skipped", output.skipped)
+            } else {
+                String::new()
+            };
             println!(
-                "{}: {} total, {} passed, {} failed, {} errors",
+                "{}: {} total, {} passed, {} failed, {} errors{}",
                 "Summary".bold(),
                 output.total,
                 output.passed.to_string().green(),
@@ -303,7 +341,8 @@ fn cmd_run(file: &str, workspace: Option<&str>, format: &str, dry_run: bool) -> 
                     output.errors.to_string().yellow().to_string()
                 } else {
                     output.errors.to_string()
-                }
+                },
+                skipped_str
             );
         }
     }

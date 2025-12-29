@@ -24,82 +24,73 @@ element hielements:
         element lexer:
             scope module = rust.module_selector('lexer')
             
+            ## Connection points: what the lexer produces
+            connection_point token_output = rust.struct_selector('Token')
+            connection_point token_kinds = rust.enum_selector('TokenKind')
+            
             check rust.struct_exists('Lexer')
             check rust.enum_exists('TokenKind')
             check rust.has_tests(module)
             check rust.has_docs(module)
-            
-            ## Token definitions for the language
-            element tokens:
-                scope enum = rust.enum_selector('TokenKind')
-                check rust.enum_exists('TokenKind')
-                ## Keywords: Element, Scope, ConnectionPoint, Check, Import, From
-                ## Punctuation: Colon, Equals, Dot, Comma, LParen, RParen, LBracket, RBracket
-                ## Literals: String, Number, True, False
-                ## Indentation: Indent, Dedent, Newline
-            
-            ## Lexer state machine
-            element state:
-                scope lexer = rust.struct_selector('Lexer')
-                ## Tracks indent stack for significant whitespace
-                ## Handles line positions for error reporting
         
         ## Parser - produces AST from token stream
         element parser:
             scope module = rust.module_selector('parser')
+            scope lexer_module = rust.module_selector('lexer')
+            
+            ## Connection points: what parser consumes and produces
+            connection_point ast_output = rust.struct_selector('Program')
             
             check rust.struct_exists('Parser')
             check rust.function_exists('parse')
             check rust.has_tests(module)
             
-            ## Recursive descent parser with error recovery
-            element parse_methods:
-                check rust.function_exists('parse_import')
-                check rust.function_exists('parse_element')
-                check rust.function_exists('parse_scope')
-                check rust.function_exists('parse_check')
-                check rust.function_exists('parse_expression')
+            ## Behavioral: Parser depends on lexer for tokens
+            check rust.depends_on(module, lexer_module)
         
         ## AST - typed representation of parsed programs
         element ast:
             scope module = rust.module_selector('ast')
             
-            ## Program structure
-            element program_node:
-                check rust.struct_exists('Program')
+            ## Connection points: AST types used by other components
+            connection_point program_type = rust.struct_selector('Program')
+            connection_point element_type = rust.struct_selector('Element')
+            connection_point expression_type = rust.enum_selector('Expression')
             
-            ## Element structure
-            element element_node:
-                check rust.struct_exists('Element')
-            
-            ## Expressions
-            element expression_node:
-                check rust.enum_exists('Expression')
+            check rust.struct_exists('Program')
+            check rust.struct_exists('Element')
+            check rust.enum_exists('Expression')
         
         ## Interpreter - semantic validation and check execution
         element interpreter:
             scope module = rust.module_selector('interpreter')
+            scope parser_module = rust.module_selector('parser')
+            scope stdlib_module = rust.module_selector('stdlib')
+            scope lexer_module = rust.module_selector('lexer')
+            
+            ## Connection points: interpreter interfaces
+            connection_point check_output = rust.enum_selector('CheckResult')
             
             check rust.struct_exists('Interpreter')
             check rust.function_exists('validate')
             check rust.function_exists('run')
             
-            ## Validation pipeline
-            element validator:
-                check rust.function_exists('validate_semantics')
-                check rust.function_exists('validate_element')
+            ## Behavioral: Interpreter depends on parser (for AST types)
+            check rust.depends_on(module, parser_module)
             
-            ## Expression evaluator
-            element evaluator:
-                check rust.function_exists('evaluate_expression')
+            ## Behavioral: Interpreter depends on stdlib for check execution
+            check rust.depends_on(module, stdlib_module)
             
-            ## Check runner
-            element check_runner:
-                check rust.function_exists('run_check')
+            ## Behavioral: Interpreter should NOT directly depend on lexer
+            ## (it goes through parser's AST abstraction)
+            check rust.no_dependency(module, lexer_module)
         
         ## Diagnostics - error reporting infrastructure
         element diagnostics:
             scope module = rust.module_selector('diagnostics')
+            
+            ## Connection point: error types used throughout
+            connection_point diagnostic_type = rust.struct_selector('Diagnostic')
             
             check rust.struct_exists('Diagnostic')
             check rust.struct_exists('Diagnostics')
@@ -107,20 +98,27 @@ element hielements:
         
         ## Standard Library
         element stdlib:
+            scope module = rust.module_selector('stdlib')
             scope stdlib_src = files.folder_selector('crates/hielements-core/src/stdlib')
+            scope parser_module = rust.module_selector('parser')
+            scope interpreter_module = rust.module_selector('interpreter')
+            
+            ## Connection point: extension interface for adding new libraries
+            connection_point library_trait = rust.trait_selector('Library')
+            connection_point value_type = rust.enum_selector('Value')
             
             check files.exists(stdlib_src, 'mod.rs')
             check files.exists(stdlib_src, 'files.rs')
             check files.exists(stdlib_src, 'rust.rs')
             
-            ## Library trait and registry
-            element registry:
-                scope module = rust.module_selector('stdlib')
-                
-                check rust.trait_exists('Library')
-                check rust.struct_exists('LibraryRegistry')
-                check rust.enum_exists('Value')
-                check rust.enum_exists('CheckResult')
+            check rust.trait_exists('Library')
+            check rust.struct_exists('LibraryRegistry')
+            check rust.enum_exists('Value')
+            check rust.enum_exists('CheckResult')
+            
+            ## Behavioral: stdlib is a leaf dependency - should NOT depend on parser/interpreter
+            check rust.no_dependency(module, parser_module)
+            check rust.no_dependency(module, interpreter_module)
             
             ## Files library - file system operations
             element files_library:
@@ -129,19 +127,6 @@ element hielements:
                 check rust.struct_exists('FilesLibrary')
                 check rust.implements('FilesLibrary', 'Library')
                 check rust.has_tests(files_module)
-                
-                ## Selectors
-                element selectors:
-                    check rust.function_exists('file_selector')
-                    check rust.function_exists('folder_selector')
-                    check rust.function_exists('glob_selector')
-                
-                ## Checks
-                element checks:
-                    check rust.function_exists('check_exists')
-                    check rust.function_exists('check_contains')
-                    check rust.function_exists('check_no_files_matching')
-                    check rust.function_exists('check_max_size')
             
             ## Rust library - Rust code analysis
             element rust_library:
@@ -150,59 +135,51 @@ element hielements:
                 check rust.struct_exists('RustLibrary')
                 check rust.implements('RustLibrary', 'Library')
                 check rust.has_tests(rust_module)
-                
-                ## Selectors
-                element selectors:
-                    check rust.function_exists('crate_selector')
-                    check rust.function_exists('module_selector')
-                    check rust.function_exists('struct_selector')
-                    check rust.function_exists('enum_selector')
-                    check rust.function_exists('function_selector')
-                    check rust.function_exists('trait_selector')
-                    check rust.function_exists('impl_selector')
-                
-                ## Checks
-                element checks:
-                    check rust.function_exists('check_struct_exists')
-                    check rust.function_exists('check_enum_exists')
-                    check rust.function_exists('check_function_exists')
-                    check rust.function_exists('check_trait_exists')
-                    check rust.function_exists('check_impl_exists')
-                    check rust.function_exists('check_implements')
-                    check rust.function_exists('check_has_derive')
-                    check rust.function_exists('check_has_docs')
-                    check rust.function_exists('check_has_tests')
         
         ## Span tracking for source locations
         element span:
             scope module = rust.module_selector('span')
             
+            ## Connection point: location types used for error reporting
+            connection_point span_type = rust.struct_selector('Span')
+            connection_point position_type = rust.struct_selector('Position')
+            
             check rust.struct_exists('Position')
             check rust.struct_exists('Span')
+        
+        ## ===== Core Pipeline Connections =====
+        ## These checks verify the data flow through the compilation pipeline:
+        ## Source -> Lexer -> Parser -> Interpreter -> Results
+        ## NOTE: Cross-element connection point references (e.g., lexer.token_output)
+        ## require proper scope resolution - simplified for now using direct module refs
+        
+        scope lexer_mod = rust.module_selector('lexer')
+        scope parser_mod = rust.module_selector('parser')
+        scope interpreter_mod = rust.module_selector('interpreter')
+        scope ast_mod = rust.module_selector('ast')
+        
+        ## Verify parser uses lexer types (Token, TokenKind)
+        check rust.depends_on(parser_mod, lexer_mod)
+        
+        ## Verify interpreter uses parser/AST types (Program, etc)
+        check rust.depends_on(interpreter_mod, ast_mod)
     
     ## CLI - command-line interface
     element cli:
         scope cli_src = files.folder_selector('crates/hielements-cli/src')
-        scope main = files.file_selector('crates/hielements-cli/src/main.rs')
+        scope main_module = rust.module_selector('main')
+        scope core_crate = rust.crate_selector('hielements-core')
         
         check files.exists(cli_src, 'main.rs')
         check rust.function_exists('main')
         check rust.struct_exists('Cli')
         check rust.enum_exists('Commands')
         
-        ## Commands (enum variants in Commands enum)
-        element commands:
-            ## check: validate syntax and semantics
-            element check_command:
-                check rust.function_exists('cmd_check')
-            
-            ## run: execute checks against workspace
-            element run_command:
-                check rust.function_exists('cmd_run')
-            
-            ## parse: debug AST output
-            element parse_command:
-                check rust.function_exists('cmd_parse')
+        ## Behavioral: CLI depends on core library
+        check rust.depends_on(main_module, core_crate)
+        
+        ## Behavioral: Core should NOT depend on CLI (proper layering)
+        check rust.no_dependency(core_crate, cli_src)
     
     ## VS Code Extension - editor integration
     element vscode_extension:

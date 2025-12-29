@@ -4,12 +4,47 @@
 //! Uses simple regex-based parsing for common Rust constructs.
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use glob::glob;
 use walkdir::WalkDir;
 
 use super::{CheckResult, Library, LibraryError, LibraryResult, Scope, ScopeKind, Value};
+
+/// Directories to exclude when scanning for Rust files.
+const EXCLUDED_DIRS: &[&str] = &["target", ".git", "node_modules", ".cargo", "vendor"];
+
+/// Check if a directory name should be excluded from scanning.
+fn is_excluded_dir(name: &str) -> bool {
+    EXCLUDED_DIRS.contains(&name)
+}
+
+/// Walk a directory and collect all .rs files, skipping excluded directories.
+/// This is much more efficient than glob because it skips entire directory trees.
+fn find_rust_files(base_path: &str) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    
+    let walker = WalkDir::new(base_path)
+        .into_iter()
+        .filter_entry(|e| {
+            // Skip excluded directories entirely (don't descend into them)
+            if e.file_type().is_dir() {
+                if let Some(name) = e.file_name().to_str() {
+                    return !is_excluded_dir(name);
+                }
+            }
+            true
+        });
+    
+    for entry in walker.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if path.extension().map(|e| e == "rs").unwrap_or(false) {
+            files.push(path.to_path_buf());
+        }
+    }
+    
+    files
+}
 
 /// The Rust library.
 pub struct RustLibrary;
@@ -80,27 +115,19 @@ impl RustLibrary {
     fn module_selector(&self, module_path: &str, workspace: &str) -> LibraryResult<Value> {
         // Convert module path to file path patterns
         let parts: Vec<&str> = module_path.split("::").collect();
-        let mut possible_paths = Vec::new();
-        
-        // Try various patterns for finding the module
         let last_part = parts.last().unwrap_or(&"");
-        possible_paths.push(format!("{}/**/{}.rs", workspace, last_part));
-        possible_paths.push(format!("{}/**/{}/mod.rs", workspace, last_part));
-        
-        if parts.len() > 1 {
-            let path_str = parts.join("/");
-            possible_paths.push(format!("{}/**/{}.rs", workspace, path_str));
-            possible_paths.push(format!("{}/**/{}/mod.rs", workspace, path_str));
-        }
         
         let scope = Scope::new(ScopeKind::File(module_path.to_string()));
         let mut found_paths = Vec::new();
         
-        for pattern in &possible_paths {
-            if let Ok(entries) = glob(pattern) {
-                for entry in entries.filter_map(|e| e.ok()) {
-                    found_paths.push(entry.to_string_lossy().to_string());
-                }
+        // Use efficient WalkDir-based search
+        for path in find_rust_files(workspace) {
+            let path_str = path.to_string_lossy();
+            let file_stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+            
+            // Check if this file matches the module name
+            if file_stem == *last_part || (file_stem == "mod" && path_str.contains(last_part)) {
+                found_paths.push(path_str.to_string());
             }
         }
         
@@ -113,7 +140,6 @@ impl RustLibrary {
 
     /// Select a Rust struct by name.
     fn struct_selector(&self, struct_name: &str, workspace: &str) -> LibraryResult<Value> {
-        let pattern = format!("{}/**/*.rs", workspace);
         let scope = Scope::new(ScopeKind::File(format!("struct:{}", struct_name)));
         let mut found_paths = Vec::new();
         
@@ -121,18 +147,16 @@ impl RustLibrary {
         let struct_pattern = format!(r"(pub\s+)?struct\s+{}(\s*[<{{(;]|\s)", struct_name);
         let re = regex::Regex::new(&struct_pattern).ok();
         
-        if let Ok(entries) = glob(&pattern) {
-            for entry in entries.filter_map(|e| e.ok()) {
-                if let Ok(content) = fs::read_to_string(&entry) {
-                    if let Some(ref re) = re {
-                        if re.is_match(&content) {
-                            found_paths.push(entry.to_string_lossy().to_string());
-                        }
-                    } else {
-                        // Fallback to simple string matching
-                        if content.contains(&format!("struct {}", struct_name)) {
-                            found_paths.push(entry.to_string_lossy().to_string());
-                        }
+        for entry in find_rust_files(workspace) {
+            if let Ok(content) = fs::read_to_string(&entry) {
+                if let Some(ref re) = re {
+                    if re.is_match(&content) {
+                        found_paths.push(entry.to_string_lossy().to_string());
+                    }
+                } else {
+                    // Fallback to simple string matching
+                    if content.contains(&format!("struct {}", struct_name)) {
+                        found_paths.push(entry.to_string_lossy().to_string());
                     }
                 }
             }
@@ -143,18 +167,15 @@ impl RustLibrary {
 
     /// Select a Rust enum by name.
     fn enum_selector(&self, enum_name: &str, workspace: &str) -> LibraryResult<Value> {
-        let pattern = format!("{}/**/*.rs", workspace);
         let scope = Scope::new(ScopeKind::File(format!("enum:{}", enum_name)));
         let mut found_paths = Vec::new();
         
-        if let Ok(entries) = glob(&pattern) {
-            for entry in entries.filter_map(|e| e.ok()) {
-                if let Ok(content) = fs::read_to_string(&entry) {
-                    if content.contains(&format!("enum {}", enum_name)) 
-                        || content.contains(&format!("enum {} ", enum_name))
-                        || content.contains(&format!("pub enum {}", enum_name)) {
-                        found_paths.push(entry.to_string_lossy().to_string());
-                    }
+        for entry in find_rust_files(workspace) {
+            if let Ok(content) = fs::read_to_string(&entry) {
+                if content.contains(&format!("enum {}", enum_name)) 
+                    || content.contains(&format!("enum {} ", enum_name))
+                    || content.contains(&format!("pub enum {}", enum_name)) {
+                    found_paths.push(entry.to_string_lossy().to_string());
                 }
             }
         }
@@ -164,18 +185,15 @@ impl RustLibrary {
 
     /// Select a Rust function/method by name.
     fn function_selector(&self, func_name: &str, workspace: &str) -> LibraryResult<Value> {
-        let pattern = format!("{}/**/*.rs", workspace);
         let scope = Scope::new(ScopeKind::File(format!("fn:{}", func_name)));
         let mut found_paths = Vec::new();
         
-        if let Ok(entries) = glob(&pattern) {
-            for entry in entries.filter_map(|e| e.ok()) {
-                if let Ok(content) = fs::read_to_string(&entry) {
-                    if content.contains(&format!("fn {}", func_name)) 
-                        || content.contains(&format!("fn {}(", func_name))
-                        || content.contains(&format!("fn {}<", func_name)) {
-                        found_paths.push(entry.to_string_lossy().to_string());
-                    }
+        for entry in find_rust_files(workspace) {
+            if let Ok(content) = fs::read_to_string(&entry) {
+                if content.contains(&format!("fn {}", func_name)) 
+                    || content.contains(&format!("fn {}(", func_name))
+                    || content.contains(&format!("fn {}<", func_name)) {
+                    found_paths.push(entry.to_string_lossy().to_string());
                 }
             }
         }
@@ -185,17 +203,14 @@ impl RustLibrary {
 
     /// Select a Rust trait by name.
     fn trait_selector(&self, trait_name: &str, workspace: &str) -> LibraryResult<Value> {
-        let pattern = format!("{}/**/*.rs", workspace);
         let scope = Scope::new(ScopeKind::File(format!("trait:{}", trait_name)));
         let mut found_paths = Vec::new();
         
-        if let Ok(entries) = glob(&pattern) {
-            for entry in entries.filter_map(|e| e.ok()) {
-                if let Ok(content) = fs::read_to_string(&entry) {
-                    if content.contains(&format!("trait {}", trait_name))
-                        || content.contains(&format!("pub trait {}", trait_name)) {
-                        found_paths.push(entry.to_string_lossy().to_string());
-                    }
+        for entry in find_rust_files(workspace) {
+            if let Ok(content) = fs::read_to_string(&entry) {
+                if content.contains(&format!("trait {}", trait_name))
+                    || content.contains(&format!("pub trait {}", trait_name)) {
+                    found_paths.push(entry.to_string_lossy().to_string());
                 }
             }
         }
@@ -205,17 +220,14 @@ impl RustLibrary {
 
     /// Select a Rust impl block.
     fn impl_selector(&self, type_name: &str, workspace: &str) -> LibraryResult<Value> {
-        let pattern = format!("{}/**/*.rs", workspace);
         let scope = Scope::new(ScopeKind::File(format!("impl:{}", type_name)));
         let mut found_paths = Vec::new();
         
-        if let Ok(entries) = glob(&pattern) {
-            for entry in entries.filter_map(|e| e.ok()) {
-                if let Ok(content) = fs::read_to_string(&entry) {
-                    if content.contains(&format!("impl {}", type_name))
-                        || content.contains(&format!("impl<") ) && content.contains(&format!("> {}", type_name)) {
-                        found_paths.push(entry.to_string_lossy().to_string());
-                    }
+        for entry in find_rust_files(workspace) {
+            if let Ok(content) = fs::read_to_string(&entry) {
+                if content.contains(&format!("impl {}", type_name))
+                    || content.contains(&format!("impl<") ) && content.contains(&format!("> {}", type_name)) {
+                    found_paths.push(entry.to_string_lossy().to_string());
                 }
             }
         }
@@ -224,7 +236,6 @@ impl RustLibrary {
     }
 
     // Check functions
-
     /// Check that a struct exists.
     fn check_struct_exists(&self, struct_name: &str, workspace: &str) -> CheckResult {
         if let Ok(Value::Scope(scope)) = self.struct_selector(struct_name, workspace) {
@@ -292,17 +303,13 @@ impl RustLibrary {
 
     /// Check that a type implements a trait.
     fn check_implements(&self, type_name: &str, trait_name: &str, workspace: &str) -> CheckResult {
-        let pattern = format!("{}/**/*.rs", workspace);
-        
-        if let Ok(entries) = glob(&pattern) {
-            for entry in entries.filter_map(|e| e.ok()) {
-                if let Ok(content) = fs::read_to_string(&entry) {
-                    // Look for impl Trait for Type patterns
-                    if content.contains(&format!("impl {} for {}", trait_name, type_name))
-                        || content.contains(&format!("impl<") ) 
-                            && content.contains(&format!("> {} for {}", trait_name, type_name)) {
-                        return CheckResult::Pass;
-                    }
+        for entry in find_rust_files(workspace) {
+            if let Ok(content) = fs::read_to_string(&entry) {
+                // Look for impl Trait for Type patterns
+                if content.contains(&format!("impl {} for {}", trait_name, type_name))
+                    || content.contains(&format!("impl<") ) 
+                        && content.contains(&format!("> {} for {}", trait_name, type_name)) {
+                    return CheckResult::Pass;
                 }
             }
         }
@@ -363,6 +370,230 @@ impl RustLibrary {
         }
         
         CheckResult::Fail("No tests found".to_string())
+    }
+
+    // ========== Behavioral / Dependency Checks ==========
+
+    /// Extract module name from a file path (e.g., "lexer" from ".../lexer.rs").
+    fn extract_module_name(path: &str) -> Option<String> {
+        let path = Path::new(path);
+        let stem = path.file_stem()?.to_str()?;
+        if stem == "mod" {
+            // For mod.rs, get the parent folder name
+            path.parent()?.file_name()?.to_str().map(|s| s.to_string())
+        } else {
+            Some(stem.to_string())
+        }
+    }
+
+    /// Check if scope_a depends on (uses types/modules from) scope_b.
+    /// This checks for `use` statements, `mod` declarations, and direct type references.
+    fn check_depends_on(&self, scope_a: &Scope, scope_b: &Scope, _workspace: &str) -> CheckResult {
+        // Get module names from scope_b
+        let mut target_modules: Vec<String> = Vec::new();
+        for path in &scope_b.paths {
+            if let Some(module_name) = Self::extract_module_name(path) {
+                target_modules.push(module_name);
+            }
+        }
+        
+        // Also check the scope kind for hints
+        if let ScopeKind::File(ref name) = scope_b.kind {
+            // Extract last part of module path (e.g., "lexer" from "lexer" or "stdlib::files")
+            if let Some(last) = name.split("::").last() {
+                if !target_modules.contains(&last.to_string()) {
+                    target_modules.push(last.to_string());
+                }
+            }
+        }
+        
+        if target_modules.is_empty() {
+            return CheckResult::Error("Could not determine target module names".to_string());
+        }
+
+        // Check if any file in scope_a references modules from scope_b
+        if scope_a.paths.is_empty() {
+            return CheckResult::Error(format!("Source scope has no paths"));
+        }
+        
+        for path_a in &scope_a.paths {
+            if let Ok(content) = fs::read_to_string(path_a) {
+                for target in &target_modules {
+                    // Check for various dependency patterns:
+                    // - use crate::module::
+                    // - use crate::module;
+                    // - use crate::module::{
+                    // - use super::module
+                    // - mod module;
+                    // - module::Type
+                    // - crate::module::
+                    // - mod module;
+                    // - module::Type
+                    // - crate::module::
+                    let patterns = [
+                        format!("use crate::{}", target),
+                        format!("use super::{}", target),
+                        format!("mod {};", target),
+                        format!("{}::", target),
+                        format!("crate::{}::", target),
+                        format!("super::{}::", target),
+                        format!("use {}::", target),
+                    ];
+                    
+                    for pattern in &patterns {
+                        if content.contains(pattern) {
+                            return CheckResult::Pass;
+                        }
+                    }
+                }
+            } else {
+                return CheckResult::Error(format!("Could not read file: {}", path_a));
+            }
+        }
+        
+        let target_names = target_modules.join(", ");
+        CheckResult::Fail(format!(
+            "No dependency found: source does not use '{}'", 
+            target_names
+        ))
+    }
+
+    /// Check that scope_a does NOT depend on scope_b.
+    /// This is the inverse of depends_on - verifies architectural boundaries.
+    fn check_no_dependency(&self, scope_a: &Scope, scope_b: &Scope, workspace: &str) -> CheckResult {
+        match self.check_depends_on(scope_a, scope_b, workspace) {
+            CheckResult::Pass => {
+                // If depends_on passes, that means there IS a dependency - which we don't want
+                CheckResult::Fail("Forbidden dependency detected".to_string())
+            }
+            CheckResult::Fail(_) => {
+                // If depends_on fails, there's no dependency - which is what we want
+                CheckResult::Pass
+            }
+            CheckResult::Error(e) => CheckResult::Error(e),
+        }
+    }
+
+    /// Extract the primary type from a scope (struct, enum, or trait name).
+    fn extract_primary_type(&self, scope: &Scope) -> Option<String> {
+        // Check scope kind for type hints
+        if let ScopeKind::File(ref name) = scope.kind {
+            // Handle "struct:Name", "enum:Name", "trait:Name" patterns
+            if let Some(type_name) = name.strip_prefix("struct:") {
+                return Some(type_name.to_string());
+            }
+            if let Some(type_name) = name.strip_prefix("enum:") {
+                return Some(type_name.to_string());
+            }
+            if let Some(type_name) = name.strip_prefix("trait:") {
+                return Some(type_name.to_string());
+            }
+        }
+        
+        // Try to extract from file content
+        for path in &scope.paths {
+            if let Ok(content) = fs::read_to_string(path) {
+                // Look for pub struct/enum/type declarations
+                let re_struct = regex::Regex::new(r"pub\s+struct\s+(\w+)").ok();
+                let re_enum = regex::Regex::new(r"pub\s+enum\s+(\w+)").ok();
+                
+                if let Some(re) = re_struct {
+                    if let Some(caps) = re.captures(&content) {
+                        return caps.get(1).map(|m| m.as_str().to_string());
+                    }
+                }
+                if let Some(re) = re_enum {
+                    if let Some(caps) = re.captures(&content) {
+                        return caps.get(1).map(|m| m.as_str().to_string());
+                    }
+                }
+            }
+        }
+        
+        None
+    }
+
+    /// Check that the output type from scope_a can connect to the input of scope_b.
+    /// This verifies that the types at the interface boundaries are compatible.
+    fn check_pipeline_connects(&self, output_scope: &Scope, input_scope: &Scope, workspace: &str) -> CheckResult {
+        // Get the output type from the first scope
+        let output_type = match self.extract_primary_type(output_scope) {
+            Some(t) => t,
+            None => return CheckResult::Error("Could not determine output type".to_string()),
+        };
+        
+        // Check if input scope's files reference the output type
+        for path in &input_scope.paths {
+            if let Ok(content) = fs::read_to_string(path) {
+                // Check if the input module uses/references the output type
+                if content.contains(&output_type) {
+                    return CheckResult::Pass;
+                }
+            }
+        }
+        
+        // Also check workspace-wide if the consumer module uses the producer type
+        for entry in find_rust_files(workspace) {
+            // Check if this file is related to the input scope
+            let entry_str = entry.to_string_lossy();
+            let is_input_related = input_scope.paths.iter().any(|p| {
+                // Check if paths share the same module
+                let p_module = Self::extract_module_name(p);
+                let e_module = Self::extract_module_name(&entry_str);
+                p_module.is_some() && p_module == e_module
+            });
+            
+            if is_input_related {
+                if let Ok(content) = fs::read_to_string(&entry) {
+                    if content.contains(&output_type) {
+                        return CheckResult::Pass;
+                    }
+                }
+            }
+        }
+        
+        CheckResult::Fail(format!(
+            "Pipeline not connected: '{}' is not used by input scope",
+            output_type
+        ))
+    }
+
+    /// Check that two scopes have compatible types (one uses the other's types).
+    fn check_type_compatible(&self, scope_a: &Scope, scope_b: &Scope, _workspace: &str) -> CheckResult {
+        let type_a = self.extract_primary_type(scope_a);
+        let type_b = self.extract_primary_type(scope_b);
+        
+        match (type_a, type_b) {
+            (Some(a), Some(b)) => {
+                // Same type is always compatible
+                if a == b {
+                    return CheckResult::Pass;
+                }
+                
+                // Check if type_a is used where type_b is expected in any file
+                // For now, check if they're referenced together
+                for path in &scope_b.paths {
+                    if let Ok(content) = fs::read_to_string(path) {
+                        if content.contains(&a) {
+                            return CheckResult::Pass;
+                        }
+                    }
+                }
+                
+                // Also check the reverse
+                for path in &scope_a.paths {
+                    if let Ok(content) = fs::read_to_string(path) {
+                        if content.contains(&b) {
+                            return CheckResult::Pass;
+                        }
+                    }
+                }
+                
+                CheckResult::Fail(format!("Types '{}' and '{}' are not compatible", a, b))
+            }
+            (None, _) => CheckResult::Error("Could not determine type from first scope".to_string()),
+            (_, None) => CheckResult::Error("Could not determine type from second scope".to_string()),
+        }
     }
 }
 
@@ -489,6 +720,43 @@ impl Library for RustLibrary {
                     .and_then(|v| v.as_scope())
                     .ok_or_else(|| LibraryError::new("E322", "has_tests requires a scope"))?;
                 Ok(self.check_has_tests(scope, workspace))
+            }
+            // Behavioral / Dependency checks
+            "depends_on" => {
+                let scope_a = args.get(0)
+                    .and_then(|v| v.as_scope())
+                    .ok_or_else(|| LibraryError::new("E323", "depends_on requires a source scope as first argument"))?;
+                let scope_b = args.get(1)
+                    .and_then(|v| v.as_scope())
+                    .ok_or_else(|| LibraryError::new("E324", "depends_on requires a target scope as second argument"))?;
+                Ok(self.check_depends_on(scope_a, scope_b, workspace))
+            }
+            "no_dependency" => {
+                let scope_a = args.get(0)
+                    .and_then(|v| v.as_scope())
+                    .ok_or_else(|| LibraryError::new("E325", "no_dependency requires a source scope as first argument"))?;
+                let scope_b = args.get(1)
+                    .and_then(|v| v.as_scope())
+                    .ok_or_else(|| LibraryError::new("E326", "no_dependency requires a target scope as second argument"))?;
+                Ok(self.check_no_dependency(scope_a, scope_b, workspace))
+            }
+            "pipeline_connects" => {
+                let output_scope = args.get(0)
+                    .and_then(|v| v.as_scope())
+                    .ok_or_else(|| LibraryError::new("E327", "pipeline_connects requires an output scope as first argument"))?;
+                let input_scope = args.get(1)
+                    .and_then(|v| v.as_scope())
+                    .ok_or_else(|| LibraryError::new("E328", "pipeline_connects requires an input scope as second argument"))?;
+                Ok(self.check_pipeline_connects(output_scope, input_scope, workspace))
+            }
+            "type_compatible" => {
+                let scope_a = args.get(0)
+                    .and_then(|v| v.as_scope())
+                    .ok_or_else(|| LibraryError::new("E329", "type_compatible requires a scope as first argument"))?;
+                let scope_b = args.get(1)
+                    .and_then(|v| v.as_scope())
+                    .ok_or_else(|| LibraryError::new("E330", "type_compatible requires a scope as second argument"))?;
+                Ok(self.check_type_compatible(scope_a, scope_b, workspace))
             }
             _ => Err(LibraryError::new("E399", format!("Unknown check: rust.{}", function)))
         }

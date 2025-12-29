@@ -15,6 +15,7 @@ pub struct CheckOutput {
     pub failed: usize,
     pub errors: usize,
     pub results: Vec<SingleCheckResult>,
+    pub skipped: usize,
 }
 
 /// Result of a single check.
@@ -25,12 +26,25 @@ pub struct SingleCheckResult {
     pub result: CheckResult,
 }
 
+/// Options for running checks.
+#[derive(Debug, Clone, Default)]
+pub struct RunOptions {
+    /// Filter checks by element path pattern
+    pub filter: Option<String>,
+    /// Limit the number of checks to run
+    pub limit: Option<usize>,
+    /// Callback for progress reporting (element_path, check_expr, is_starting)
+    pub verbose: bool,
+}
+
 /// The Hielements interpreter.
 pub struct Interpreter {
     libraries: LibraryRegistry,
     workspace: String,
     scopes: HashMap<String, Value>,
     diagnostics: Diagnostics,
+    /// Current element path for scope resolution context
+    current_element_path: String,
 }
 
 impl Interpreter {
@@ -40,6 +54,7 @@ impl Interpreter {
             workspace: workspace.into(),
             scopes: HashMap::new(),
             diagnostics: Diagnostics::new(),
+            current_element_path: String::new(),
         }
     }
 
@@ -47,6 +62,7 @@ impl Interpreter {
     pub fn validate(&mut self, source: &str, file_path: &str) -> (Option<Program>, Diagnostics) {
         let parser = Parser::new(source, file_path);
         let (program, mut diagnostics) = parser.parse();
+
 
         if let Some(ref prog) = program {
             // Perform semantic validation
@@ -143,12 +159,18 @@ impl Interpreter {
 
     /// Run all checks in a program.
     pub fn run(&mut self, program: &Program) -> CheckOutput {
+        self.run_with_options(program, &RunOptions::default())
+    }
+
+    /// Run all checks in a program with options.
+    pub fn run_with_options(&mut self, program: &Program, options: &RunOptions) -> CheckOutput {
         let mut output = CheckOutput {
             total: 0,
             passed: 0,
             failed: 0,
             errors: 0,
             results: Vec::new(),
+            skipped: 0,
         };
 
         // Process imports (for now, we just use built-in libraries)
@@ -156,26 +178,53 @@ impl Interpreter {
 
         // Run checks for each element
         for element in &program.elements {
-            self.run_element(element, &[], &mut output);
+            self.run_element_with_options(element, &[], &mut output, options);
         }
 
         output
     }
 
-    /// Run checks for an element.
-    fn run_element(&mut self, element: &Element, path: &[String], output: &mut CheckOutput) {
+    /// Run checks for an element with options.
+    fn run_element_with_options(&mut self, element: &Element, path: &[String], output: &mut CheckOutput, options: &RunOptions) {
         let mut current_path = path.to_vec();
         current_path.push(element.name.name.clone());
         let path_str = current_path.join(".");
+        
+        // Set current element path for scope resolution context
+        self.current_element_path = path_str.clone();
 
-        // Evaluate and store scopes
+        // Check if we've hit the limit
+        if let Some(limit) = options.limit {
+            if output.results.len() >= limit {
+                return;
+            }
+        }
+
+        // Check filter
+        let matches_filter = if let Some(ref filter) = options.filter {
+            path_str.contains(filter)
+        } else {
+            true
+        };
+
+        // Evaluate and store scopes (always do this to ensure scope resolution works)
         for scope in &element.scopes {
             let scope_name = format!("{}.{}", path_str, scope.name.name);
+            if options.verbose {
+                eprintln!("[verbose] Evaluating scope: {}", scope_name);
+            }
             match self.evaluate_expression(&scope.expression) {
                 Ok(value) => {
+                    if options.verbose {
+                        eprintln!("[verbose]   -> resolved {} paths", 
+                            if let Value::Scope(ref s) = value { s.paths.len() } else { 0 });
+                    }
                     self.scopes.insert(scope_name, value);
                 }
                 Err(e) => {
+                    if options.verbose {
+                        eprintln!("[verbose]   -> ERROR: {}", e.message);
+                    }
                     self.diagnostics.push(e);
                 }
             }
@@ -183,11 +232,39 @@ impl Interpreter {
 
         // Run checks
         for check in &element.checks {
-            output.total += 1;
+            // Check limit again
+            if let Some(limit) = options.limit {
+                if output.results.len() >= limit {
+                    output.skipped += 1;
+                    continue;
+                }
+            }
+
             let check_expr = self.expression_to_string(&check.expression);
+
+            // Skip if doesn't match filter
+            if !matches_filter {
+                output.skipped += 1;
+                continue;
+            }
+
+            output.total += 1;
+
+            if options.verbose {
+                eprint!("[verbose] Running: {} :: {} ... ", path_str, check_expr);
+                use std::io::Write;
+                let _ = std::io::stderr().flush();
+            }
 
             match self.run_check(&check.expression) {
                 Ok(result) => {
+                    if options.verbose {
+                        match &result {
+                            CheckResult::Pass => eprintln!("PASS"),
+                            CheckResult::Fail(msg) => eprintln!("FAIL: {}", msg),
+                            CheckResult::Error(msg) => eprintln!("ERROR: {}", msg),
+                        }
+                    }
                     match &result {
                         CheckResult::Pass => output.passed += 1,
                         CheckResult::Fail(_) => output.failed += 1,
@@ -200,6 +277,9 @@ impl Interpreter {
                     });
                 }
                 Err(e) => {
+                    if options.verbose {
+                        eprintln!("ERROR: {}", e.message);
+                    }
                     output.errors += 1;
                     output.results.push(SingleCheckResult {
                         element_path: path_str.clone(),
@@ -212,7 +292,7 @@ impl Interpreter {
 
         // Process children
         for child in &element.children {
-            self.run_element(child, &current_path, output);
+            self.run_element_with_options(child, &current_path, output, options);
         }
     }
 
@@ -236,9 +316,20 @@ impl Interpreter {
                 Ok(Value::List(values))
             }
             Expression::Identifier(id) => {
-                // Look up in scopes
+                // Look up in scopes with priority for current element's scopes
+                // First try to find in current element's path (e.g., "hielements.core.parser.module")
+                let current_scope_key = format!("{}.{}", self.current_element_path, id.name);
+                if let Some(value) = self.scopes.get(&current_scope_key) {
+                    return Ok(value.clone());
+                }
+                
+                // Then try exact suffix match, prioritizing closer scopes
+                // The key is "parent.name", so we check if it ends with ".name"
+                let lookup_suffix = format!(".{}", id.name);
                 for (name, value) in &self.scopes {
-                    if name.ends_with(&id.name) {
+                    // Exact suffix match: "parent.module" ends with ".module"
+                    // But NOT "parent.lexer_module" for lookup of "module"
+                    if name.ends_with(&lookup_suffix) || name == &id.name {
                         return Ok(value.clone());
                     }
                 }
@@ -377,7 +468,7 @@ element test:
     scope src = files.folder_selector('src')
 "#;
         let mut interpreter = Interpreter::new(".");
-        let (program, diagnostics) = interpreter.validate(source, "test.hie");
+        let (program, _diagnostics) = interpreter.validate(source, "test.hie");
         
         assert!(program.is_some());
         // Should have warning about 'files' library (though it exists)
@@ -397,7 +488,7 @@ element test:
     check files.exists(src, 'main.py')
 "#;
         let mut interpreter = Interpreter::new(dir.path().to_str().unwrap());
-        let (program, diagnostics) = interpreter.validate(source, "test.hie");
+        let (program, _diagnostics) = interpreter.validate(source, "test.hie");
         
         assert!(program.is_some());
         let output = interpreter.run(&program.unwrap());

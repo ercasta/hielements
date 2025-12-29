@@ -13,7 +13,7 @@ pub mod stdlib;
 
 pub use ast::*;
 pub use diagnostics::{Diagnostic, DiagnosticSeverity, Diagnostics};
-pub use interpreter::Interpreter;
+pub use interpreter::{Interpreter, RunOptions};
 pub use lexer::{Lexer, Token, TokenKind};
 pub use parser::Parser;
 pub use span::Span;
