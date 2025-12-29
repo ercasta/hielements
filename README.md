@@ -328,3 +328,27 @@ Linters check code quality and style within a single file or module. Hielements 
 ---
 
 **Build software that stays true to its design. Start with Hielements.**
+
+---
+
+## Self-Describing Architecture
+
+Hielements literally documents and checks itself — how cool is that?! The repository is driven by a living specification written in `hielements.hie`, and we continuously validate that spec during AI-assisted coding sessions (and in CI) so architectural drift gets caught early.
+
+Peek at the live self-description: [hielements.hie](hielements.hie)
+
+```hielements
+# Live excerpt from hielements.hie
+element hielements_repo:
+    # sanity checks that run as part of validation
+    check files.exists('README.md')
+    check struct_exists('Interpreter')
+```
+
+Want to see it in action? Run:
+
+```bash
+hielements check hielements.hie
+```
+
+We use this feedback loop to keep the code, docs, and architecture in sync — and it makes AI-assisted development far more reliable and trustworthy!
