@@ -169,7 +169,7 @@ impl Library for FilesLibrary {
         "files"
     }
 
-    fn call(&self, function: &str, args: Vec<Value>, workspace: &str) -> LibraryResult<Value> {
+    fn call(&mut self, function: &str, args: Vec<Value>, workspace: &str) -> LibraryResult<Value> {
         match function {
             "file_selector" => {
                 let path = args.get(0)
@@ -193,7 +193,7 @@ impl Library for FilesLibrary {
         }
     }
 
-    fn check(&self, function: &str, args: Vec<Value>, workspace: &str) -> LibraryResult<CheckResult> {
+    fn check(&mut self, function: &str, args: Vec<Value>, workspace: &str) -> LibraryResult<CheckResult> {
         match function {
             "exists" => {
                 let scope = args.get(0)

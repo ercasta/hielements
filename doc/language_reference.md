@@ -527,8 +527,35 @@ The following libraries are built-in:
 | Library | Description |
 |---------|-------------|
 | `files` | File and folder operations |
-| `python` | Python code analysis |
-| `docker` | Dockerfile analysis |
+| `rust` | Rust code analysis |
+
+### 8.5 External Libraries (Plugins)
+
+Hielements supports user-defined libraries through external processes. External libraries are configured in a `hielements.toml` file in your workspace root.
+
+#### Configuration
+
+Create a `hielements.toml` file:
+
+```toml
+[libraries]
+mylibrary = { executable = "path/to/my-plugin", args = [] }
+python_checks = { executable = "python3", args = ["scripts/python_checks.py"] }
+```
+
+Then use in your .hie files:
+
+```hielements
+import mylibrary
+
+element mycomponent:
+    scope src = mylibrary.custom_selector('src')
+    check mylibrary.custom_check(src)
+```
+
+#### Protocol
+
+External libraries communicate via JSON-RPC 2.0 over stdin/stdout. See the [External Library Plugin Guide](external_libraries.md) for details on implementing custom plugins.
 
 ---
 

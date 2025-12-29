@@ -1,9 +1,13 @@
 //! Standard library modules for Hielements.
 
+pub mod external;
 pub mod files;
 pub mod rust;
 
 use std::collections::HashMap;
+use std::path::Path;
+
+pub use external::{ExternalLibrary, ExternalLibraryConfig, load_external_libraries, load_workspace_libraries};
 
 /// Result type for library function calls.
 pub type LibraryResult<T> = Result<T, LibraryError>;
@@ -141,15 +145,19 @@ impl CheckResult {
 }
 
 /// Trait for library modules.
+/// 
+/// Libraries provide selectors (via `call`) and checks (via `check`).
+/// Both methods take `&mut self` to support libraries that need to manage state,
+/// such as external process libraries that maintain a subprocess connection.
 pub trait Library {
     /// Get the library name.
     fn name(&self) -> &str;
 
-    /// Call a function in the library.
-    fn call(&self, function: &str, args: Vec<Value>, workspace: &str) -> LibraryResult<Value>;
+    /// Call a function in the library (typically a selector).
+    fn call(&mut self, function: &str, args: Vec<Value>, workspace: &str) -> LibraryResult<Value>;
 
     /// Execute a check function.
-    fn check(&self, function: &str, args: Vec<Value>, workspace: &str) -> LibraryResult<CheckResult>;
+    fn check(&mut self, function: &str, args: Vec<Value>, workspace: &str) -> LibraryResult<CheckResult>;
 }
 
 /// Registry of available libraries.
@@ -159,6 +167,7 @@ pub struct LibraryRegistry {
 }
 
 impl LibraryRegistry {
+    /// Create a new registry with built-in libraries.
     pub fn new() -> Self {
         let mut registry = Self {
             libraries: HashMap::new(),
@@ -169,11 +178,49 @@ impl LibraryRegistry {
         registry
     }
 
+    /// Create a new registry and load external libraries from a workspace.
+    pub fn with_workspace(workspace: &str) -> Self {
+        let mut registry = Self::new();
+        registry.load_from_workspace(workspace);
+        registry
+    }
+
+    /// Register a library.
     pub fn register(&mut self, library: Box<dyn Library>) {
         self.libraries.insert(library.name().to_string(), library);
     }
 
+    /// Get an immutable reference to a library.
     pub fn get(&self, name: &str) -> Option<&dyn Library> {
         self.libraries.get(name).map(|b| b.as_ref())
+    }
+
+    /// Get a mutable reference to a library.
+    pub fn get_mut(&mut self, name: &str) -> Option<&mut Box<dyn Library>> {
+        self.libraries.get_mut(name)
+    }
+
+    /// Load external libraries from a workspace configuration file.
+    /// 
+    /// Looks for `hielements.toml` in the workspace root.
+    pub fn load_from_workspace(&mut self, workspace: &str) {
+        let config_path = Path::new(workspace).join("hielements.toml");
+        if config_path.exists() {
+            if let Ok(libs) = load_external_libraries(&config_path) {
+                for lib in libs {
+                    self.register(Box::new(lib));
+                }
+            }
+        }
+    }
+
+    /// Check if a library is registered.
+    pub fn has(&self, name: &str) -> bool {
+        self.libraries.contains_key(name)
+    }
+
+    /// Get the names of all registered libraries.
+    pub fn names(&self) -> Vec<&str> {
+        self.libraries.keys().map(|s| s.as_str()).collect()
     }
 }

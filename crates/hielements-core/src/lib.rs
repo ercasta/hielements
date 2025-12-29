@@ -17,3 +17,4 @@ pub use interpreter::{Interpreter, RunOptions};
 pub use lexer::{Lexer, Token, TokenKind};
 pub use parser::Parser;
 pub use span::Span;
+pub use stdlib::{ExternalLibrary, ExternalLibraryConfig, Library, LibraryRegistry};

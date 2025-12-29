@@ -135,6 +135,16 @@ element hielements:
                 check rust.struct_exists('RustLibrary')
                 check rust.implements('RustLibrary', 'Library')
                 check rust.has_tests(rust_module)
+            
+            ## External library support - allows user-defined plugins
+            element external:
+                scope external_module = files.file_selector('crates/hielements-core/src/stdlib/external.rs')
+                
+                check files.exists(stdlib_src, 'external.rs')
+                check rust.struct_exists('ExternalLibrary')
+                check rust.implements('ExternalLibrary', 'Library')
+                check rust.struct_exists('ExternalLibraryConfig')
+                check rust.function_exists('load_external_libraries')
         
         ## Span tracking for source locations
         element span:
@@ -209,6 +219,7 @@ element hielements:
         check files.exists(docs, 'language_reference.md')
         check files.exists(docs, 'technical_architecture.md')
         check files.exists(docs, 'summary.md')
+        check files.exists(docs, 'external_libraries.md')
     
     ## Examples
     element examples:
@@ -217,3 +228,4 @@ element hielements:
         check files.exists(examples, 'minimal.hie')
         check files.exists(examples, 'simple.hie')
         check files.exists(examples, 'microservices.hie')
+        check files.exists(examples, 'plugin_example.hie')

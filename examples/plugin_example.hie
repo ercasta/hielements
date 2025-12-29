@@ -1,0 +1,25 @@
+# Example using an external plugin library
+#
+# This example demonstrates how to use user-defined libraries (plugins) with Hielements.
+#
+# To use this example:
+# 1. Enable the sample plugin in examples/hielements.toml
+# 2. Run: hielements run examples/plugin_example.hie --workspace examples
+
+import sample
+import files
+
+## Plugin Example
+## Demonstrates using an external library for custom selectors and checks.
+element plugin_example:
+    ## Use the sample plugin's selector
+    scope src = sample.simple_selector('plugins')
+    
+    ## Use the sample plugin's check functions
+    check sample.always_pass()
+    check sample.file_count_check(src, 10)
+    
+    ## Mix with built-in library
+    element builtin_example:
+        scope docs = files.folder_selector('.')
+        check files.exists(docs, 'hielements.toml')
