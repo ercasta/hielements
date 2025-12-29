@@ -1,0 +1,33 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/hielements-core",
+    "crates/hielements-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Hielements Contributors"]
+license = "MIT"
+repository = "https://github.com/hielements/hielements"
+description = "A language for describing and enforcing software structure"
+
+[workspace.dependencies]
+# Core dependencies
+thiserror = "1.0"
+miette = { version = "7.0", features = ["fancy"] }
+logos = "0.14"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# CLI dependencies
+clap = { version = "4.4", features = ["derive"] }
+colored = "2.1"
+
+# File handling
+glob = "0.3"
+walkdir = "2.4"
+
+# Testing
+insta = "1.34"

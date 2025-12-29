@@ -1,0 +1,82 @@
+{
+  "name": "hielements",
+  "displayName": "Hielements",
+  "description": "Language support for Hielements - a language for describing and enforcing software structure",
+  "version": "0.1.0",
+  "publisher": "hielements",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters"
+  ],
+  "keywords": [
+    "hielements",
+    "architecture",
+    "software structure",
+    "static analysis"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hielements/hielements"
+  },
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "hielements",
+        "aliases": [
+          "Hielements",
+          "hie"
+        ],
+        "extensions": [
+          ".hie"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "hielements",
+        "scopeName": "source.hielements",
+        "path": "./syntaxes/hielements.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "hielements.check",
+        "title": "Hielements: Check Current File"
+      },
+      {
+        "command": "hielements.run",
+        "title": "Hielements: Run Checks"
+      }
+    ],
+    "configuration": {
+      "title": "Hielements",
+      "properties": {
+        "hielements.executable": {
+          "type": "string",
+          "default": "hielements",
+          "description": "Path to the hielements executable"
+        },
+        "hielements.workspace": {
+          "type": "string",
+          "default": "",
+          "description": "Workspace directory for running checks (defaults to VS Code workspace root)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.80.0",
+    "typescript": "^5.0.0"
+  }
+}

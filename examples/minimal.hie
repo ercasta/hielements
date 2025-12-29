@@ -1,0 +1,4 @@
+import files
+
+element test:
+    scope src = files.folder_selector('src')

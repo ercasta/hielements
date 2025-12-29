@@ -1,0 +1,22 @@
+# A simple example demonstrating Hielements syntax
+import files
+
+## Example Service
+## This element demonstrates the basic structure of a Hielements specification.
+element example_service:
+    # Define the source code scope
+    scope src = files.folder_selector('src')
+    
+    # Define configuration scope
+    scope config = files.file_selector('config.yaml')
+    
+    # Checks to enforce
+    check files.exists(src, 'main.py')
+    check files.exists(src, '__init__.py')
+    check files.no_files_matching(src, '*.pyc')
+    check files.no_files_matching(src, '__pycache__')
+    
+    # Nested element for tests
+    element tests:
+        scope test_src = files.folder_selector('tests')
+        check files.exists(test_src, 'test_main.py')

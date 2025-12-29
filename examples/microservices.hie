@@ -1,0 +1,41 @@
+# Microservices architecture example
+import files
+
+## E-Commerce Platform
+## A microservices architecture with multiple services.
+element ecommerce_platform:
+    
+    ## Orders Service
+    ## Handles order creation and management.
+    element orders_service:
+        scope src = files.folder_selector('services/orders/src')
+        scope dockerfile = files.file_selector('services/orders/Dockerfile')
+        
+        check files.exists(src, 'main.py')
+        check files.exists(src, 'models.py')
+        check files.exists(src, 'api.py')
+    
+    ## Inventory Service
+    ## Manages product inventory.
+    element inventory_service:
+        scope src = files.folder_selector('services/inventory/src')
+        scope dockerfile = files.file_selector('services/inventory/Dockerfile')
+        
+        check files.exists(src, 'main.py')
+        check files.exists(src, 'models.py')
+    
+    ## Payments Service
+    ## Processes payments.
+    element payments_service:
+        scope src = files.folder_selector('services/payments/src')
+        scope dockerfile = files.file_selector('services/payments/Dockerfile')
+        
+        check files.exists(src, 'main.py')
+        check files.exists(src, 'processors.py')
+    
+    # Shared infrastructure
+    element shared:
+        scope libs = files.folder_selector('shared/libs')
+        scope protos = files.folder_selector('shared/protos')
+        
+        check files.exists(libs, '__init__.py')
