@@ -1,8 +1,15 @@
 # WASM Plugins Guide
 
-**Status**: 🚧 Infrastructure Ready - Full Implementation Coming Soon
+**Status**: 🚧 Infrastructure Ready - Runtime Integration in Progress
 
-This guide explains the planned WebAssembly (WASM) plugin support for Hielements. WASM plugins provide strong security sandboxing and near-native performance for library extensions.
+This guide explains the WebAssembly (WASM) plugin support for Hielements. WASM plugins provide strong security sandboxing and near-native performance for library extensions.
+
+**Current Implementation Status:**
+- ✅ Configuration parsing and type system complete
+- ✅ Plugin loading infrastructure in place
+- ✅ Error handling and user feedback working
+- 🚧 Wasmtime runtime integration in progress
+- 📋 Full execution support planned
 
 ---
 
@@ -78,12 +85,13 @@ WASM plugins use the same protocol as external process plugins (JSON-RPC style) 
 
 ### ✅ Implemented
 
-- **Configuration format**: `hielements.toml` supports WASM plugin entries
-- **Type system**: `LibraryType::Wasm` enum variant
+- **Configuration format**: `hielements.toml` fully supports WASM plugin entries
+- **Type system**: `LibraryType::Wasm` enum variant complete
 - **Library interface**: `WasmLibrary` struct implements `Library` trait
-- **Type inference**: Automatic detection from `.wasm` file extension
-- **Loading logic**: Parse and load WASM libraries from config
+- **Type inference**: Automatic detection from `.wasm` file extension working
+- **Loading logic**: Parse and load WASM libraries from config files
 - **Error messages**: Clear feedback when WASM features are used
+- **Configuration validation**: Proper error handling for malformed configs
 
 ### 🚧 In Progress
 
@@ -91,6 +99,7 @@ WASM plugins use the same protocol as external process plugins (JSON-RPC style) 
 - **FFI protocol**: Memory management between host and WASM
 - **WASI support**: Controlled filesystem and stdio access
 - **Resource limits**: Memory and execution time constraints
+- **Function execution**: Actual WASM function call implementation
 
 ### 📋 Planned
 

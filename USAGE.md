@@ -377,6 +377,236 @@ See [External Library Plugin Guide](doc/external_libraries.md).
 5. **Use**: Import and use in your `.hie` files
 6. **Iterate**: Refine based on usage
 
+### Sharing and Distributing Libraries
+
+Once you've created a custom library, you can share it with others in several ways:
+
+#### 1. Distribute as Source Code
+
+The simplest approach for external process plugins written in interpreted languages:
+
+```bash
+# Share your Python plugin
+my-hielements-library/
+├── README.md              # Usage instructions
+├── mylibrary.py          # Plugin implementation
+├── requirements.txt      # Python dependencies (if any)
+└── hielements.toml.example  # Example configuration
+```
+
+**Usage for consumers:**
+```toml
+# Add to their hielements.toml
+[libraries]
+mylibrary = { executable = "python3", args = ["path/to/mylibrary.py"] }
+```
+
+**Best for:**
+- Quick prototyping and iteration
+- Python, JavaScript, or other scripting languages
+- Internal team sharing
+
+#### 2. Package as Executable Binary
+
+Compile your plugin to a native executable for easy distribution:
+
+```bash
+# For Go plugins
+go build -o mylibrary-plugin ./cmd/plugin
+
+# For Rust plugins
+cargo build --release
+cp target/release/mylibrary-plugin ./dist/
+
+# For Python plugins using PyInstaller
+pyinstaller --onefile mylibrary.py
+```
+
+**Distribution:**
+- Provide platform-specific binaries (Linux, macOS, Windows)
+- Users download and reference the executable path
+
+```toml
+[libraries]
+mylibrary = { executable = "./bin/mylibrary-plugin" }
+```
+
+**Best for:**
+- Production use
+- Performance-critical plugins
+- Compiled languages (Go, Rust, C++)
+- External distribution
+
+#### 3. Publish to Package Registries
+
+Leverage existing package ecosystems:
+
+**Python (PyPI):**
+```bash
+# Package structure
+my-hielements-lib/
+├── setup.py
+├── mylibrary/
+│   ├── __init__.py
+│   └── plugin.py
+└── README.md
+
+# Publish
+python setup.py sdist bdist_wheel
+twine upload dist/*
+
+# Users install
+pip install mylibrary-hielements
+```
+
+**npm (for Node.js plugins):**
+```bash
+# Publish
+npm publish
+
+# Users install
+npm install -g mylibrary-hielements
+```
+
+**Configuration:**
+```toml
+[libraries]
+# Python package installed via pip
+mylibrary = { executable = "python3", args = ["-m", "mylibrary.plugin"] }
+
+# Node.js package installed via npm
+jslibrary = { executable = "npx", args = ["jslibrary-hielements"] }
+```
+
+**Best for:**
+- Public open-source libraries
+- Community contributions
+- Automatic dependency management
+
+#### 4. Distribute as WASM Module (Future)
+
+**Note**: WASM plugin infrastructure is ready, but runtime integration is in progress.
+
+When fully available, WASM provides the best distribution experience:
+
+```bash
+# Build Rust plugin to WASM
+cargo build --target wasm32-unknown-unknown --release
+cp target/wasm32-unknown-unknown/release/mylibrary.wasm ./dist/
+```
+
+**Distribution:**
+- Single `.wasm` file works on all platforms (Linux, macOS, Windows)
+- No dependencies to install
+- Strong security sandboxing
+
+```toml
+[libraries]
+mylibrary = { path = "mylibrary.wasm" }
+```
+
+**Best for:**
+- Cross-platform distribution (when available)
+- Security-sensitive plugins
+- Performance-critical operations
+- Easy deployment (single file)
+
+See [WASM Plugins Guide](doc/wasm_plugins.md) for current status and roadmap.
+
+#### 5. Share via Git Repository
+
+Host your library in a Git repository:
+
+```bash
+# Library repository structure
+my-hielements-library/
+├── README.md
+├── src/
+│   └── plugin.py (or plugin.go, plugin.rs, etc.)
+├── tests/
+│   └── test_plugin.py
+├── hielements.toml.example
+└── LICENSE
+```
+
+**Users can:**
+- Clone the repository
+- Add as a git submodule
+- Reference from their project
+
+```bash
+# Clone to project
+git clone https://github.com/username/my-hielements-library libs/mylibrary
+
+# Or add as submodule
+git submodule add https://github.com/username/my-hielements-library libs/mylibrary
+```
+
+```toml
+[libraries]
+mylibrary = { executable = "python3", args = ["libs/mylibrary/src/plugin.py"] }
+```
+
+**Best for:**
+- Open-source projects
+- Version control
+- Collaborative development
+- Private organization libraries
+
+### Library Documentation Best Practices
+
+When sharing libraries, include:
+
+1. **README with clear usage instructions**
+   - Installation steps
+   - Configuration examples
+   - Available functions and checks
+   - Example `.hie` usage
+
+2. **Configuration template**
+   - Provide `hielements.toml.example`
+   - Show all configuration options
+   - Include security considerations
+
+3. **Function reference**
+   - Document all selector functions
+   - Document all check functions
+   - Parameter types and return values
+   - Example usage for each function
+
+4. **Examples**
+   - Provide sample `.hie` files
+   - Show common use cases
+   - Include test cases
+
+5. **Version compatibility**
+   - Specify Hielements version requirements
+   - Document breaking changes
+   - Maintain a changelog
+
+### Example Library Repository
+
+```
+mylibrary-hielements/
+├── README.md                    # Main documentation
+├── CHANGELOG.md                 # Version history
+├── LICENSE                      # License information
+├── src/
+│   └── mylibrary_plugin.py     # Plugin implementation
+├── tests/
+│   ├── test_plugin.py          # Unit tests
+│   └── fixtures/               # Test fixtures
+├── examples/
+│   ├── basic_usage.hie         # Simple example
+│   ├── advanced_usage.hie      # Advanced features
+│   └── hielements.toml         # Example configuration
+├── docs/
+│   ├── installation.md         # Installation guide
+│   ├── api.md                  # API reference
+│   └── troubleshooting.md      # Common issues
+└── requirements.txt            # Dependencies (if Python)
+```
+
 ---
 
 ## Best Practices

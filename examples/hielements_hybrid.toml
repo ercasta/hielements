@@ -1,8 +1,8 @@
 # Hielements Hybrid Plugin Configuration
 #
 # This configuration demonstrates the hybrid extensibility model:
-# - External process plugins for flexibility
-# - WASM plugins for security and performance (infrastructure ready)
+# - External process plugins for flexibility (Production Ready)
+# - WASM plugins for security and performance (Infrastructure Ready)
 #
 # Place this file as hielements.toml in your project root.
 
@@ -28,14 +28,15 @@ sample = {
 
 
 # ============================================================================
-# WASM Plugins (Infrastructure Ready - Full Implementation Coming Soon)
+# WASM Plugins (Infrastructure Ready - Runtime Integration in Progress)
 # ============================================================================
 # These plugins run in a sandboxed WebAssembly runtime.
 # Use for: strong security, performance, easy distribution.
 #
-# Note: Infrastructure is in place (configuration, type system, loading logic)
-# but full wasmtime runtime integration is still in progress.
-# Configured WASM plugins will load but return "not yet implemented" errors.
+# Note: Configuration infrastructure is complete and working (config parsing,
+# type system, loading logic). Runtime execution via wasmtime is in progress.
+# Configured WASM plugins will load but return "not yet implemented" errors
+# when called until runtime integration is complete.
 
 # TypeScript analyzer (hypothetical example)
 # typescript = {
