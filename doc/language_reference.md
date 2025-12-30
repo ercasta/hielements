@@ -276,7 +276,7 @@ Connection points expose interfaces, APIs, or dependencies that other elements c
 ### 5.1 Syntax
 
 ```
-connection_point_declaration ::= 'connection_point' identifier [':' type_name] '=' expression
+connection_point_declaration ::= 'connection_point' identifier (':' type_name)? '=' expression
 ```
 
 ### 5.2 Basic Connection Points

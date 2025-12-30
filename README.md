@@ -84,9 +84,9 @@ Define architectural patterns once and reuse them across your codebase:
 ```hielements
 template compiler:
     element lexer:
-        connection_point tokens
+        connection_point tokens: TokenStream
     element parser:
-        connection_point ast
+        connection_point ast: AbstractSyntaxTree
     check compiler.lexer.tokens.compatible_with(compiler.parser.input)
 
 element python_compiler implements compiler:
@@ -95,6 +95,24 @@ element python_compiler implements compiler:
 ```
 
 Templates ensure consistency across similar components, making architectural patterns explicit and enforceable.
+
+### 🔒 Type-Safe Connection Points
+
+Explicit type annotations enable correct integration across multiple libraries and languages:
+
+```hielements
+element api_service:
+    # Basic types
+    connection_point port: integer = docker.exposed_port(dockerfile)
+    connection_point api_url: string = config.get_url()
+    connection_point ssl_enabled: boolean = config.get_flag('ssl')
+    
+    # Custom types for domain-specific interfaces
+    connection_point handler: HttpHandler = python.public_functions(module)
+    connection_point db_conn: DatabaseConnection = python.class_selector(module, 'Database')
+```
+
+Types are optional, maintaining backward compatibility while providing additional safety and documentation.
 
 ### 🎯 Cross-Technology Elements
 
