@@ -40,6 +40,6 @@
 # Uncomment the following line to enable the sample plugin:
 # sample = { executable = "python3", args = ["examples/plugins/sample_plugin.py"] }
 
-# WASM plugins (infrastructure in place, full implementation coming soon)
-# Note: WASM support requires wasmtime runtime integration
+# WASM plugins (infrastructure ready, runtime integration in progress)
+# Note: Configuration is fully functional. Runtime execution via wasmtime is in progress.
 # typescript = { type = "wasm", path = "lib/typescript.wasm" }
