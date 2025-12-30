@@ -141,34 +141,68 @@ impl WasmLibrary {
         // Handle tagged values
         if let serde_json::Value::Object(obj) = &json {
             if let Some(s) = obj.get("String") {
-                return Ok(Value::String(s.as_str().unwrap_or_default().to_string()));
+                return s.as_str()
+                    .map(|s| Value::String(s.to_string()))
+                    .ok_or_else(|| LibraryError::new(
+                        "E615",
+                        format!("String value is not a string: {:?}", s)
+                    ));
             }
             if let Some(i) = obj.get("Int") {
-                return Ok(Value::Int(i.as_i64().unwrap_or(0)));
+                return i.as_i64()
+                    .map(Value::Int)
+                    .ok_or_else(|| LibraryError::new(
+                        "E615",
+                        format!("Int value is not an integer: {:?}", i)
+                    ));
             }
             if let Some(f) = obj.get("Float") {
-                return Ok(Value::Float(f.as_f64().unwrap_or(0.0)));
+                return f.as_f64()
+                    .map(Value::Float)
+                    .ok_or_else(|| LibraryError::new(
+                        "E615",
+                        format!("Float value is not a float: {:?}", f)
+                    ));
             }
             if let Some(scope_obj) = obj.get("Scope") {
                 if let serde_json::Value::Object(scope) = scope_obj {
                     let kind = if let Some(kind_obj) = scope.get("kind") {
                         if let serde_json::Value::Object(k) = kind_obj {
                             if let Some(s) = k.get("File") {
-                                super::ScopeKind::File(s.as_str().unwrap_or_default().to_string())
+                                let path = s.as_str().ok_or_else(|| LibraryError::new(
+                                    "E615",
+                                    "File kind path is not a string"
+                                ))?;
+                                super::ScopeKind::File(path.to_string())
                             } else if let Some(s) = k.get("Folder") {
-                                super::ScopeKind::Folder(
-                                    s.as_str().unwrap_or_default().to_string(),
-                                )
+                                let path = s.as_str().ok_or_else(|| LibraryError::new(
+                                    "E615",
+                                    "Folder kind path is not a string"
+                                ))?;
+                                super::ScopeKind::Folder(path.to_string())
                             } else if let Some(s) = k.get("Glob") {
-                                super::ScopeKind::Glob(s.as_str().unwrap_or_default().to_string())
+                                let path = s.as_str().ok_or_else(|| LibraryError::new(
+                                    "E615",
+                                    "Glob kind path is not a string"
+                                ))?;
+                                super::ScopeKind::Glob(path.to_string())
                             } else {
-                                super::ScopeKind::File(String::new())
+                                return Err(LibraryError::new(
+                                    "E615",
+                                    "Unknown scope kind"
+                                ));
                             }
                         } else {
-                            super::ScopeKind::File(String::new())
+                            return Err(LibraryError::new(
+                                "E615",
+                                "Scope kind is not an object"
+                            ));
                         }
                     } else {
-                        super::ScopeKind::File(String::new())
+                        return Err(LibraryError::new(
+                            "E615",
+                            "Scope missing kind field"
+                        ));
                     };
 
                     let paths = scope

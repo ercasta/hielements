@@ -36,18 +36,7 @@ pub struct HielementsConfig {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum LibraryConfigEntry {
-    /// External process library
-    External {
-        /// Path to the executable
-        executable: String,
-        /// Optional arguments to pass to the executable
-        #[serde(default)]
-        args: Vec<String>,
-        /// Optional type field (defaults to "external")
-        #[serde(default)]
-        r#type: String,
-    },
-    /// WASM library
+    /// WASM library (checked first since it has required 'type' field)
     Wasm {
         /// Type discriminator (must be "wasm")
         r#type: String,
@@ -57,6 +46,37 @@ pub enum LibraryConfigEntry {
         #[serde(default)]
         capabilities: super::wasm::WasmCapabilities,
     },
+    /// External process library (default, no type field required)
+    External {
+        /// Path to the executable
+        executable: String,
+        /// Optional arguments to pass to the executable
+        #[serde(default)]
+        args: Vec<String>,
+    },
+}
+
+impl LibraryConfigEntry {
+    /// Validate the configuration entry after deserialization.
+    pub fn validate(&self) -> Result<(), String> {
+        match self {
+            LibraryConfigEntry::Wasm { r#type, path, .. } => {
+                if r#type != "wasm" {
+                    return Err(format!("Invalid type '{}' for WASM library, expected 'wasm'", r#type));
+                }
+                if path.is_empty() {
+                    return Err("WASM library path cannot be empty".to_string());
+                }
+                Ok(())
+            }
+            LibraryConfigEntry::External { executable, .. } => {
+                if executable.is_empty() {
+                    return Err("External library executable cannot be empty".to_string());
+                }
+                Ok(())
+            }
+        }
+    }
 }
 
 /// Legacy entry format (for backward compatibility)
@@ -457,8 +477,13 @@ pub fn load_external_libraries(config_path: &Path) -> LibraryResult<Vec<External
 
     let mut libraries = Vec::new();
     for (name, entry) in config.libraries {
+        // Validate entry
+        if let Err(e) = entry.validate() {
+            return Err(LibraryError::new("E512", format!("Invalid library configuration for '{}': {}", name, e)));
+        }
+        
         match entry {
-            LibraryConfigEntry::External { executable, args, .. } => {
+            LibraryConfigEntry::External { executable, args } => {
                 libraries.push(ExternalLibrary::new(ExternalLibraryConfig {
                     name,
                     executable,

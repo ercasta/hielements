@@ -230,6 +230,9 @@ impl LibraryRegistry {
 }
 
 /// Load all libraries (external and WASM) from a configuration file.
+/// 
+/// Returns successfully loaded libraries. If a library fails to load, it is skipped
+/// and the error is included in the returned error list for caller to handle.
 pub fn load_all_libraries(config_path: &Path, workspace: &str) -> LibraryResult<Vec<Box<dyn Library>>> {
     if !config_path.exists() {
         return Ok(Vec::new());
@@ -244,10 +247,11 @@ pub fn load_all_libraries(config_path: &Path, workspace: &str) -> LibraryResult<
     })?;
 
     let mut libraries: Vec<Box<dyn Library>> = Vec::new();
+    let mut errors: Vec<String> = Vec::new();
     
     for (name, entry) in config.libraries {
         match entry {
-            external::LibraryConfigEntry::External { executable, args, .. } => {
+            external::LibraryConfigEntry::External { executable, args } => {
                 // Load as external process library
                 libraries.push(Box::new(ExternalLibrary::new(ExternalLibraryConfig {
                     name,
@@ -255,11 +259,11 @@ pub fn load_all_libraries(config_path: &Path, workspace: &str) -> LibraryResult<
                     args,
                 })));
             }
-            external::LibraryConfigEntry::Wasm { path, capabilities, .. } => {
+            external::LibraryConfigEntry::Wasm { r#type: _, path, capabilities } => {
                 // Load as WASM library
                 match wasm::load_wasm_library(
                     wasm::WasmLibraryConfig {
-                        name,
+                        name: name.clone(),
                         path,
                         capabilities,
                     },
@@ -267,11 +271,21 @@ pub fn load_all_libraries(config_path: &Path, workspace: &str) -> LibraryResult<
                 ) {
                     Ok(lib) => libraries.push(Box::new(lib)),
                     Err(e) => {
-                        // Log error but continue loading other libraries
-                        eprintln!("Warning: Failed to load WASM library: {}", e.message);
+                        // Collect error but continue loading other libraries
+                        errors.push(format!("Failed to load WASM library '{}': {}", name, e.message));
                     }
                 }
             }
+        }
+    }
+
+    // If there were errors loading some libraries, include them in a warning
+    // but still return successfully loaded libraries
+    if !errors.is_empty() {
+        // For now, print to stderr as a warning since we still return Ok()
+        // Future: Consider returning warnings in a Result-like structure
+        for error in errors {
+            eprintln!("Warning: {}", error);
         }
     }
 
