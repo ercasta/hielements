@@ -1,0 +1,48 @@
+# Example using a WASM plugin library
+#
+# This example demonstrates how to use WebAssembly plugins with Hielements.
+# WASM plugins provide sandboxed execution with near-native performance.
+#
+# To use this example:
+# 1. Build the WASM plugin: cd examples/plugins/wasm-sample && cargo build --target wasm32-unknown-unknown --release
+# 2. Update examples/hielements.toml to enable the wasm_sample plugin
+# 3. Run: hielements run examples/wasm_example.hie --workspace examples
+
+import wasm_sample
+import files
+
+## WASM Plugin Example
+## Demonstrates using a WebAssembly library for custom selectors and checks.
+element wasm_example:
+    ## Use the WASM plugin's selector
+    ## This runs in a sandboxed environment with no file system access
+    scope src = wasm_sample.simple_selector('plugins')
+    
+    ## Use the WASM plugin's check functions
+    ## These execute at near-native speed without IPC overhead
+    check wasm_sample.always_pass()
+    check wasm_sample.check_scope_size(src, 100)
+    
+    ## WASM plugins can be mixed with external process plugins
+    element mixed_example:
+        scope docs = files.folder_selector('.')
+        check files.exists(docs, 'hielements.toml')
+        
+        ## Use WASM for performance-critical checks
+        check wasm_sample.always_pass()
+
+## Benefits of WASM plugins:
+## - Security: Sandboxed execution, no system access by default
+## - Performance: Near-native speed, no process spawning overhead
+## - Portability: Single .wasm file works on all platforms
+## - Distribution: Easy to version control and share
+##
+## Use WASM for:
+## - Performance-critical checks
+## - Portable plugins that need to work everywhere
+## - Plugins that don't need file system access
+##
+## Use external processes for:
+## - Maximum flexibility
+## - Existing tools written in any language
+## - Plugins that need full system access

@@ -29,10 +29,46 @@ pub struct ExternalLibraryConfig {
 pub struct HielementsConfig {
     /// External library configurations
     #[serde(default)]
-    pub libraries: HashMap<String, ExternalLibraryConfigEntry>,
+    pub libraries: HashMap<String, LibraryConfigEntry>,
 }
 
-/// Entry in the libraries configuration
+/// Type of library plugin
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum LibraryType {
+    /// External process plugin (JSON-RPC over stdio)
+    External,
+    /// WASM plugin (sandboxed WebAssembly)
+    Wasm,
+}
+
+/// Unified entry in the libraries configuration
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum LibraryConfigEntry {
+    /// External process configuration
+    External {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        r#type: Option<LibraryType>,
+        executable: String,
+        #[serde(default)]
+        args: Vec<String>,
+    },
+    /// WASM configuration
+    Wasm {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        r#type: Option<LibraryType>,
+        path: String,
+    },
+    /// Legacy format (backward compatible)
+    Legacy {
+        executable: String,
+        #[serde(default)]
+        args: Vec<String>,
+    },
+}
+
+/// Backward compatible external library config entry
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ExternalLibraryConfigEntry {
     /// Path to the executable
@@ -430,11 +466,20 @@ pub fn load_external_libraries(config_path: &Path) -> LibraryResult<Vec<External
 
     let mut libraries = Vec::new();
     for (name, entry) in config.libraries {
-        libraries.push(ExternalLibrary::new(ExternalLibraryConfig {
-            name,
-            executable: entry.executable,
-            args: entry.args,
-        }));
+        match entry {
+            LibraryConfigEntry::External { executable, args, .. } |
+            LibraryConfigEntry::Legacy { executable, args } => {
+                libraries.push(ExternalLibrary::new(ExternalLibraryConfig {
+                    name,
+                    executable,
+                    args,
+                }));
+            }
+            LibraryConfigEntry::Wasm { .. } => {
+                // Skip WASM libraries in this function
+                // They are handled by load_library function
+            }
+        }
     }
 
     Ok(libraries)
@@ -445,6 +490,29 @@ pub fn load_external_libraries(config_path: &Path) -> LibraryResult<Vec<External
 pub fn load_workspace_libraries(workspace: &str) -> LibraryResult<Vec<ExternalLibrary>> {
     let config_path = Path::new(workspace).join("hielements.toml");
     load_external_libraries(&config_path)
+}
+
+/// Unified library loading that returns a Box<dyn Library>.
+/// Determines library type and loads appropriately.
+pub fn load_library(name: String, entry: LibraryConfigEntry) -> LibraryResult<Box<dyn super::Library>> {
+    match entry {
+        LibraryConfigEntry::External { executable, args, .. } |
+        LibraryConfigEntry::Legacy { executable, args } => {
+            let lib = ExternalLibrary::new(ExternalLibraryConfig {
+                name,
+                executable,
+                args,
+            });
+            Ok(Box::new(lib))
+        }
+        LibraryConfigEntry::Wasm { path, .. } => {
+            let lib = super::wasm::load_wasm_library(super::wasm::WasmLibraryConfig {
+                name,
+                path,
+            })?;
+            Ok(Box::new(lib))
+        }
+    }
 }
 
 #[cfg(test)]

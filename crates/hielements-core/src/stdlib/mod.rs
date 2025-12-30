@@ -3,11 +3,13 @@
 pub mod external;
 pub mod files;
 pub mod rust;
+pub mod wasm;
 
 use std::collections::HashMap;
 use std::path::Path;
 
 pub use external::{ExternalLibrary, ExternalLibraryConfig, load_external_libraries, load_workspace_libraries};
+pub use wasm::{WasmLibrary, WasmLibraryConfig, load_wasm_library, load_wasm_library_from_path};
 
 /// Result type for library function calls.
 pub type LibraryResult<T> = Result<T, LibraryError>;
@@ -200,15 +202,21 @@ impl LibraryRegistry {
         self.libraries.get_mut(name)
     }
 
-    /// Load external libraries from a workspace configuration file.
+    /// Load libraries (both external and WASM) from a workspace configuration file.
     /// 
     /// Looks for `hielements.toml` in the workspace root.
     pub fn load_from_workspace(&mut self, workspace: &str) {
         let config_path = Path::new(workspace).join("hielements.toml");
         if config_path.exists() {
-            if let Ok(libs) = load_external_libraries(&config_path) {
-                for lib in libs {
-                    self.register(Box::new(lib));
+            // Load configuration
+            if let Ok(content) = std::fs::read_to_string(&config_path) {
+                if let Ok(config) = toml::from_str::<external::HielementsConfig>(&content) {
+                    // Load each library using the unified loader
+                    for (name, entry) in config.libraries {
+                        if let Ok(lib) = external::load_library(name, entry) {
+                            self.register(lib);
+                        }
+                    }
                 }
             }
         }

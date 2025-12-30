@@ -1,43 +1,195 @@
 # External Library Plugin Guide
 
-This guide explains how to create custom libraries (plugins) for Hielements. External libraries allow you to extend Hielements with your own selectors and checks, supporting any programming language or technology.
+This guide explains how to create custom libraries (plugins) for Hielements. Hielements supports two types of plugins:
+
+1. **WASM Plugins** - Sandboxed, portable, high-performance WebAssembly modules
+2. **External Process Plugins** - Flexible programs that communicate via JSON-RPC
+
+Choose WASM for security and performance, or external processes for maximum flexibility.
 
 ---
 
 ## Table of Contents
 
 1. [Overview](#1-overview)
-2. [Configuration](#2-configuration)
-3. [Protocol Specification](#3-protocol-specification)
-4. [Implementing a Plugin](#4-implementing-a-plugin)
-5. [Example: Python Plugin](#5-example-python-plugin)
-6. [Best Practices](#6-best-practices)
-7. [Troubleshooting](#7-troubleshooting)
+2. [WASM Plugins](#2-wasm-plugins)
+3. [External Process Plugins](#3-external-process-plugins)
+4. [Configuration](#4-configuration)
+5. [Best Practices](#5-best-practices)
+6. [Troubleshooting](#6-troubleshooting)
 
 ---
 
 ## 1. Overview
 
-External libraries are standalone programs that communicate with the Hielements interpreter via JSON-RPC 2.0 over stdin/stdout. This design provides:
+Hielements supports two plugin architectures, each with different tradeoffs:
 
-- **Language Independence**: Write plugins in Python, JavaScript, Go, or any language
-- **Security**: Process isolation between plugins and the interpreter
+### WASM Plugins
+
+WebAssembly plugins run in a sandboxed environment with near-native performance.
+
+**Benefits:**
+- **Security**: Strong sandboxing, no system access by default
+- **Performance**: Near-native speed, no IPC overhead
+- **Portability**: Single .wasm file works on all platforms
+- **Size**: Typically 10-50 KB compiled
+- **Distribution**: Easy to version control and share
+
+**Limitations:**
+- Limited file system access (requires WASI configuration)
+- Must be compiled to WASM (Rust, C, C++, AssemblyScript, Go)
+- More complex to debug than scripts
+
+**Use WASM for:**
+- Performance-critical checks
+- Portable plugins that work everywhere
+- Plugins that don't need system access
+- Production deployments
+
+### External Process Plugins
+
+External plugins are standalone programs that communicate via JSON-RPC 2.0 over stdin/stdout.
+
+**Benefits:**
+- **Language Independence**: Write in Python, JavaScript, Go, or any language
 - **Flexibility**: Leverage existing analysis tools and libraries
-- **Simplicity**: Simple text-based protocol
+- **Simplicity**: No compilation needed for scripts
+- **Debugging**: Use standard debugging tools
+
+**Limitations:**
+- Process spawning overhead
+- IPC latency for each call
+- Requires managing external dependencies
+
+**Use External Processes for:**
+- Maximum flexibility
+- Existing tools in any language
+- Plugins that need full system access
+- Development and prototyping
+
+---
+
+## 2. WASM Plugins
+
+### Building a WASM Plugin
+
+WASM plugins are compiled from languages like Rust, C, C++, or AssemblyScript.
+
+#### Example: Rust WASM Plugin
+
+**Cargo.toml:**
+```toml
+[package]
+name = "my-plugin"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+```
+
+**src/lib.rs:**
+```rust
+use serde_json::{json, Value};
+use std::alloc::{alloc, Layout};
+
+#[no_mangle]
+pub extern "C" fn allocate(size: i32) -> *mut u8 {
+    let layout = Layout::from_size_align(size as usize, 1).unwrap();
+    unsafe { alloc(layout) }
+}
+
+#[no_mangle]
+pub extern "C" fn library_call(ptr: *const u8, len: i32) -> (i32, i32) {
+    // Parse input JSON
+    let input = unsafe {
+        std::slice::from_raw_parts(ptr, len as usize)
+    };
+    let request: Value = serde_json::from_slice(input).unwrap();
+    
+    // Handle the call
+    let result = match request["function"].as_str() {
+        Some("my_selector") => {
+            json!({
+                "Scope": {
+                    "kind": {"Folder": "src"},
+                    "paths": ["/path/to/src"],
+                    "resolved": true
+                }
+            })
+        }
+        _ => json!({"Error": "Unknown function"})
+    };
+    
+    // Return result as (ptr, len)
+    let result_str = result.to_string();
+    let bytes = result_str.as_bytes();
+    let ptr = allocate(bytes.len() as i32);
+    unsafe {
+        std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
+    }
+    (ptr as i32, bytes.len() as i32)
+}
+
+#[no_mangle]
+pub extern "C" fn library_check(ptr: *const u8, len: i32) -> (i32, i32) {
+    // Similar to library_call but returns CheckResult
+    // ...
+}
+```
+
+#### Building
+
+```bash
+# Add WASM target
+rustup target add wasm32-unknown-unknown
+
+# Build the plugin
+cargo build --target wasm32-unknown-unknown --release
+
+# Output: target/wasm32-unknown-unknown/release/my_plugin.wasm
+```
+
+### WASM Plugin Interface
+
+WASM plugins must export three functions:
+
+1. **`allocate(size: i32) -> *mut u8`** - Allocate memory for input/output
+2. **`library_call(ptr: *const u8, len: i32) -> (i32, i32)`** - Handle selectors
+3. **`library_check(ptr: *const u8, len: i32) -> (i32, i32)`** - Handle checks
+
+Input and output are JSON strings serialized to memory.
+
+### WASM Configuration
+
+Add to `hielements.toml`:
+
+```toml
+[libraries]
+# Explicit WASM type
+my_plugin = { type = "wasm", path = "plugins/my_plugin.wasm" }
+
+# Auto-detected (by .wasm extension)
+another = { path = "plugins/another.wasm" }
+```
+
+---
+
+## 3. External Process Plugins
 
 ### How It Works
 
 1. You configure external libraries in `hielements.toml`
 2. When a library is imported, Hielements spawns the plugin process
-3. The interpreter sends JSON-RPC requests to the plugin
-4. The plugin responds with results (scopes, check outcomes)
+3. The interpreter sends JSON-RPC requests to the plugin via stdin
+4. The plugin responds with results via stdout
 5. The process stays running for subsequent calls
 
----
-
-## 2. Configuration
-
-### Configuration File
+### Configuration
 
 Create a `hielements.toml` file in your workspace root:
 
@@ -49,16 +201,18 @@ mylib = { executable = "path/to/mylib" }
 # Plugin with arguments
 python_checks = { executable = "python3", args = ["scripts/checks.py"] }
 
-# Plugin with multiple arguments
-custom = { executable = "./plugins/custom", args = ["--workspace", "--verbose"] }
+# Explicit external type (optional)
+custom = { type = "external", executable = "./plugins/custom", args = ["--workspace"] }
 ```
 
 ### Configuration Options
 
 | Option | Type | Required | Description |
 |--------|------|----------|-------------|
-| `executable` | String | Yes | Path to the plugin executable |
+| `type` | String | No | "external" or "wasm" (auto-detected if omitted) |
+| `executable` | String | Yes* | Path to the plugin executable (*for external) |
 | `args` | Array | No | Command-line arguments to pass |
+| `path` | String | Yes* | Path to WASM file (*for WASM) |
 
 ### Path Resolution
 
@@ -67,7 +221,7 @@ custom = { executable = "./plugins/custom", args = ["--workspace", "--verbose"] 
 
 ---
 
-## 3. Protocol Specification
+## 4. Configuration
 
 External libraries use JSON-RPC 2.0 over stdio. Each request is a single JSON line, and each response is a single JSON line.
 

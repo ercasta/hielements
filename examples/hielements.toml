@@ -9,18 +9,28 @@
 # Format:
 #   [libraries]
 #   library_name = { executable = "path/to/executable", args = ["arg1", "arg2"] }
+#   wasm_library = { type = "wasm", path = "path/to/library.wasm" }
 #
-# Example:
-#   [libraries]
-#   sample = { executable = "python3", args = ["examples/plugins/sample_plugin.py"] }
-#
-# Then in your .hie file:
-#   import sample
-#   
-#   element mycomponent:
-#       scope src = sample.simple_selector('src')
-#       check sample.file_count_check(src, 100)
+# Examples:
 
 [libraries]
+# External process plugin (JSON-RPC over stdio)
 # Uncomment the following line to enable the sample plugin:
 # sample = { executable = "python3", args = ["examples/plugins/sample_plugin.py"] }
+
+# WASM plugin (sandboxed, portable, high-performance)
+# Build first: cd examples/plugins/wasm-sample && cargo build --target wasm32-unknown-unknown --release
+# Then uncomment:
+# wasm_sample = { type = "wasm", path = "examples/plugins/wasm-sample/target/wasm32-unknown-unknown/release/wasm_sample.wasm" }
+
+# Auto-detection based on file extension (.wasm files are automatically detected as WASM)
+# wasm_sample = { path = "examples/plugins/wasm-sample/target/wasm32-unknown-unknown/release/wasm_sample.wasm" }
+
+# Use in .hie files:
+#   import sample          # External process plugin
+#   import wasm_sample     # WASM plugin
+#   
+#   element mycomponent:
+#       scope src = sample.simple_selector('src')              # External
+#       check wasm_sample.always_pass()                        # WASM
+#       check sample.file_count_check(src, 100)                # External
