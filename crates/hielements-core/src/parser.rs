@@ -433,6 +433,15 @@ impl<'a> Parser<'a> {
         let start_span = self.current_span();
         self.expect(TokenKind::ConnectionPoint)?;
         let name = self.parse_identifier()?;
+        
+        // Parse optional type annotation: `: <type>`
+        let type_annotation = if self.check(TokenKind::Colon) {
+            self.advance();
+            Some(self.parse_type_annotation()?)
+        } else {
+            None
+        };
+        
         self.expect(TokenKind::Equals)?;
         let expression = self.parse_expression()?;
         self.expect_newline()?;
@@ -440,6 +449,7 @@ impl<'a> Parser<'a> {
 
         Ok(ConnectionPointDeclaration {
             name,
+            type_annotation,
             expression,
             span: start_span.merge(&end_span),
         })
@@ -456,6 +466,17 @@ impl<'a> Parser<'a> {
         Ok(CheckDeclaration {
             expression,
             span: start_span.merge(&end_span),
+        })
+    }
+
+    /// Parse a type annotation.
+    fn parse_type_annotation(&mut self) -> Result<TypeAnnotation, Diagnostic> {
+        let type_name = self.parse_identifier()?;
+        let span = type_name.span;
+        
+        Ok(TypeAnnotation {
+            type_name,
+            span,
         })
     }
 
@@ -888,5 +909,86 @@ element service:
         assert_eq!(program.templates[0].scopes.len(), 1);
         assert_eq!(program.templates[0].elements.len(), 1);
         assert_eq!(program.templates[0].checks.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_connection_point_with_type() {
+        let source = r#"element api_service:
+    connection_point port: integer = docker.exposed_port(dockerfile)
+    connection_point url: string = config.get_api_url()
+    connection_point enabled: boolean = config.get_flag('api_enabled')
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.elements.len(), 1);
+        let element = &program.elements[0];
+        assert_eq!(element.connection_points.len(), 3);
+        
+        // Check first connection point with type
+        assert_eq!(element.connection_points[0].name.name, "port");
+        assert!(element.connection_points[0].type_annotation.is_some());
+        assert_eq!(element.connection_points[0].type_annotation.as_ref().unwrap().type_name.name, "integer");
+        
+        // Check second connection point with type
+        assert_eq!(element.connection_points[1].name.name, "url");
+        assert!(element.connection_points[1].type_annotation.is_some());
+        assert_eq!(element.connection_points[1].type_annotation.as_ref().unwrap().type_name.name, "string");
+        
+        // Check third connection point with type
+        assert_eq!(element.connection_points[2].name.name, "enabled");
+        assert!(element.connection_points[2].type_annotation.is_some());
+        assert_eq!(element.connection_points[2].type_annotation.as_ref().unwrap().type_name.name, "boolean");
+    }
+
+    #[test]
+    fn test_parse_connection_point_without_type() {
+        let source = r#"element api_service:
+    connection_point endpoint = python.public_functions(module)
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.elements.len(), 1);
+        let element = &program.elements[0];
+        assert_eq!(element.connection_points.len(), 1);
+        
+        // Check connection point without type annotation
+        assert_eq!(element.connection_points[0].name.name, "endpoint");
+        assert!(element.connection_points[0].type_annotation.is_none());
+    }
+
+    #[test]
+    fn test_parse_connection_point_with_custom_type() {
+        let source = r#"template compiler:
+    element lexer:
+        connection_point tokens: TokenStream = rust.struct_selector('Token')
+    element parser:
+        connection_point ast: AbstractSyntaxTree = rust.struct_selector('Program')
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.templates.len(), 1);
+        let template = &program.templates[0];
+        assert_eq!(template.elements.len(), 2);
+        
+        // Check lexer connection point with custom type
+        let lexer = &template.elements[0];
+        assert_eq!(lexer.connection_points[0].name.name, "tokens");
+        assert!(lexer.connection_points[0].type_annotation.is_some());
+        assert_eq!(lexer.connection_points[0].type_annotation.as_ref().unwrap().type_name.name, "TokenStream");
+        
+        // Check parser connection point with custom type
+        let parser_elem = &template.elements[1];
+        assert_eq!(parser_elem.connection_points[0].name.name, "ast");
+        assert!(parser_elem.connection_points[0].type_annotation.is_some());
+        assert_eq!(parser_elem.connection_points[0].type_annotation.as_ref().unwrap().type_name.name, "AbstractSyntaxTree");
     }
 }

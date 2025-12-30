@@ -276,7 +276,7 @@ Connection points expose interfaces, APIs, or dependencies that other elements c
 ### 5.1 Syntax
 
 ```
-connection_point_declaration ::= 'connection_point' identifier '=' expression
+connection_point_declaration ::= 'connection_point' identifier [':' type_name] '=' expression
 ```
 
 ### 5.2 Basic Connection Points
@@ -285,14 +285,69 @@ connection_point_declaration ::= 'connection_point' identifier '=' expression
 element api_server:
     scope module = python.module_selector('api')
     
-    # Expose the public API functions
+    # Expose the public API functions (untyped)
     connection_point rest_api = python.public_functions(module)
     
-    # Expose the main entry point
+    # Expose the main entry point (untyped)
     connection_point main = python.function_selector(module, 'main')
 ```
 
-### 5.3 Using Connection Points
+### 5.3 Connection Point Type Annotations
+
+Connection points can have explicit type annotations to ensure type safety across libraries and languages:
+
+```hielements
+element api_server:
+    scope module = python.module_selector('api')
+    scope dockerfile = docker.file_selector('Dockerfile')
+    
+    # Basic type annotations
+    connection_point port: integer = docker.exposed_port(dockerfile)
+    connection_point api_url: string = python.get_api_url(module)
+    connection_point ssl_enabled: boolean = config.get_flag('ssl')
+    connection_point timeout: float = config.get_timeout()
+    
+    # Custom type annotations
+    connection_point rest_api: HttpHandler = python.public_functions(module)
+    connection_point db_conn: DatabaseConnection = python.class_selector(module, 'Database')
+```
+
+#### Basic Types
+
+| Type | Description | Example Values |
+|------|-------------|----------------|
+| `string` | Text data | `"api/v1"`, `"localhost"` |
+| `integer` | Whole numbers | `8080`, `443`, `-1` |
+| `float` | Decimal numbers | `3.14`, `0.5`, `-2.718` |
+| `boolean` | True/false | `true`, `false` |
+
+#### Custom Types
+
+Custom types are user-defined type names that can represent:
+- Type aliases for basic types (e.g., `Port`, `Url`)
+- Complex structures from code (e.g., `TokenStream`, `HttpHandler`)
+- Library-defined types specific to a domain
+
+```hielements
+# Custom type example
+template compiler:
+    element lexer:
+        connection_point tokens: TokenStream = rust.struct_selector('Token')
+    
+    element parser:
+        connection_point ast: AbstractSyntaxTree = rust.struct_selector('Program')
+```
+
+#### Type Inference
+
+When type annotation is omitted, the connection point is untyped (backward compatible):
+
+```hielements
+# Untyped connection point (backward compatible)
+connection_point legacy = python.public_functions(module)
+```
+
+### 5.4 Using Connection Points
 
 Connection points are used in checks to verify relationships:
 
@@ -300,7 +355,7 @@ Connection points are used in checks to verify relationships:
 element orders_service:
     element api:
         scope module = python.module_selector('orders.api')
-        connection_point handlers = python.public_functions(module)
+        connection_point handlers: HttpHandler = python.public_functions(module)
     
     element docker:
         scope dockerfile = docker.file_selector('orders.dockerfile')
@@ -309,7 +364,7 @@ element orders_service:
         check docker.entry_point(dockerfile, api.handlers)
 ```
 
-### 5.4 Connection Point Types
+### 5.5 Connection Point Types
 
 Different libraries expose different types of connection points:
 
@@ -322,12 +377,14 @@ Different libraries expose different types of connection points:
 | `docker` | `volumes` | Mounted volumes |
 | `files` | `path` | Filesystem path |
 
-### 5.5 Connection Point Semantics
+### 5.6 Connection Point Semantics
 
 - Connection points are **computed** from scopes
 - They can be **referenced** across element boundaries using dot notation
 - Connection points enable **dependency checking** between elements
 - They provide **documentation** of element interfaces
+- **Type annotations** are optional and provide additional type safety
+- **Type checking** occurs at specification validation time (when implemented)
 
 ---
 
@@ -974,7 +1031,7 @@ qualified_identifier ::= identifier ('.' identifier)+
 
 (* Declarations *)
 scope_declaration           ::= 'scope' identifier '=' expression NEWLINE
-connection_point_declaration ::= 'connection_point' identifier '=' expression NEWLINE
+connection_point_declaration ::= 'connection_point' identifier (':' identifier)? '=' expression NEWLINE
 check_declaration           ::= 'check' function_call NEWLINE
 
 (* Expressions *)

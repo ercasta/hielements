@@ -12,13 +12,13 @@ template compiler:
     ## Responsible for tokenizing source code
     element lexer:
         scope module = rust.module_selector('lexer')
-        connection_point tokens = rust.function_selector(module, 'tokenize')
+        connection_point tokens: TokenStream = rust.function_selector(module, 'tokenize')
     
     ## Parser component
     ## Responsible for producing an abstract syntax tree
     element parser:
         scope module = rust.module_selector('parser')
-        connection_point ast = rust.function_selector(module, 'parse')
+        connection_point ast: AbstractSyntaxTree = rust.function_selector(module, 'parse')
     
     ## Ensure lexer output is compatible with parser input
     check compiler.lexer.tokens.compatible_with(compiler.parser.input)
