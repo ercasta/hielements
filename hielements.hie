@@ -239,6 +239,8 @@ element hielements:
         check files.exists(docs, 'technical_architecture.md')
         check files.exists(docs, 'summary.md')
         check files.exists(docs, 'external_libraries.md')
+        check files.exists(docs, 'wasm_plugins.md')
+        check files.exists(docs, 'related_work.md')
     
     ## Examples
     element examples:
@@ -248,8 +250,11 @@ element hielements:
         check files.exists(examples, 'simple.hie')
         check files.exists(examples, 'microservices.hie')
         check files.exists(examples, 'plugin_example.hie')
+        check files.exists(examples, 'hybrid_plugins.hie')
         check files.exists(examples, 'template_compiler.hie')
         check files.exists(examples, 'template_microservice.hie')
+        check files.exists(examples, 'hielements.toml')
+        check files.exists(examples, 'hielements_hybrid.toml')
     
     ## CI/CD and automation
     element cicd:
