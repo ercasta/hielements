@@ -236,3 +236,15 @@ element hielements:
         check files.exists(examples, 'plugin_example.hie')
         check files.exists(examples, 'template_compiler.hie')
         check files.exists(examples, 'template_microservice.hie')
+    
+    ## CI/CD and automation
+    element cicd:
+        scope github_dir = files.folder_selector('.github')
+        scope workflows = files.folder_selector('.github/workflows')
+        
+        ## GitHub Actions workflows
+        check files.exists(workflows, 'ci.yml')
+        check files.exists(workflows, 'codeql.yml')
+        
+        ## Dependabot configuration
+        check files.exists(github_dir, 'dependabot.yml')
