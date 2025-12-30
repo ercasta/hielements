@@ -161,7 +161,12 @@ check files.matches_pattern(config, '*.yaml')
 
 ### 🧩 Extensible via Libraries
 
-Built-in support for Python, Docker, and files/folders. Add support for any language by creating Hielements libraries.
+Built-in support for Python, Docker, and files/folders. Extend with custom libraries using:
+
+- **External Process Plugins**: Write plugins in any language (Python, JS, Go, etc.) via JSON-RPC
+- **WASM Plugins** (coming soon): Sandboxed, near-native performance for security-critical use cases
+
+The hybrid approach balances **flexibility** (external tools when needed) with **security** (WASM sandboxing for untrusted code).
 
 Learn how to create custom libraries in the [Usage Guide](USAGE.md#creating-custom-libraries) or [External Libraries Guide](doc/external_libraries.md).
 

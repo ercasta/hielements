@@ -6,16 +6,31 @@
 # External Libraries
 # Each entry defines a library that can be imported in .hie files.
 # 
+# Supports two types of plugins:
+#   1. External process plugins (JSON-RPC over stdio)
+#   2. WASM plugins (sandboxed, near-native performance)
+#
 # Format:
 #   [libraries]
+#   # External process plugin
 #   library_name = { executable = "path/to/executable", args = ["arg1", "arg2"] }
+#   # or shorthand when no args:
+#   library_name = { executable = "path/to/executable" }
+#   
+#   # WASM plugin (explicit type)
+#   library_name = { type = "wasm", path = "path/to/plugin.wasm" }
+#   # or inferred from .wasm extension:
+#   library_name = { path = "path/to/plugin.wasm" }
 #
 # Example:
 #   [libraries]
 #   sample = { executable = "python3", args = ["examples/plugins/sample_plugin.py"] }
+#   typescript = { type = "wasm", path = "lib/typescript.wasm" }
+#   docker = { path = "lib/docker.wasm" }  # .wasm extension implies type="wasm"
 #
 # Then in your .hie file:
 #   import sample
+#   import typescript
 #   
 #   element mycomponent:
 #       scope src = sample.simple_selector('src')
@@ -24,3 +39,7 @@
 [libraries]
 # Uncomment the following line to enable the sample plugin:
 # sample = { executable = "python3", args = ["examples/plugins/sample_plugin.py"] }
+
+# WASM plugins (infrastructure in place, full implementation coming soon)
+# Note: WASM support requires wasmtime runtime integration
+# typescript = { type = "wasm", path = "lib/typescript.wasm" }

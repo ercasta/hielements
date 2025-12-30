@@ -7,16 +7,27 @@ This guide explains how to create custom libraries (plugins) for Hielements. Ext
 ## Table of Contents
 
 1. [Overview](#1-overview)
-2. [Configuration](#2-configuration)
-3. [Protocol Specification](#3-protocol-specification)
-4. [Implementing a Plugin](#4-implementing-a-plugin)
-5. [Example: Python Plugin](#5-example-python-plugin)
-6. [Best Practices](#6-best-practices)
-7. [Troubleshooting](#7-troubleshooting)
+2. [Plugin Types](#2-plugin-types)
+3. [Configuration](#3-configuration)
+4. [Protocol Specification](#4-protocol-specification)
+5. [Implementing an External Process Plugin](#5-implementing-an-external-process-plugin)
+6. [Example: Python Plugin](#6-example-python-plugin)
+7. [WASM Plugins (Coming Soon)](#7-wasm-plugins-coming-soon)
+8. [Best Practices](#8-best-practices)
+9. [Troubleshooting](#9-troubleshooting)
 
 ---
 
 ## 1. Overview
+
+Hielements supports multiple plugin architectures to balance flexibility, security, and performance:
+
+1. **External Process Plugins** - Communicate via JSON-RPC 2.0 over stdin/stdout
+2. **WASM Plugins** - Sandboxed WebAssembly modules (infrastructure in place, full implementation coming soon)
+
+This guide focuses on external process plugins, which are fully implemented and production-ready.
+
+### External Process Plugins
 
 External libraries are standalone programs that communicate with the Hielements interpreter via JSON-RPC 2.0 over stdin/stdout. This design provides:
 
@@ -24,6 +35,7 @@ External libraries are standalone programs that communicate with the Hielements 
 - **Security**: Process isolation between plugins and the interpreter
 - **Flexibility**: Leverage existing analysis tools and libraries
 - **Simplicity**: Simple text-based protocol
+- **Easy Integration**: Wrap existing tools without modification
 
 ### How It Works
 
@@ -35,7 +47,32 @@ External libraries are standalone programs that communicate with the Hielements 
 
 ---
 
-## 2. Configuration
+## 2. Plugin Types
+
+Hielements supports two types of plugins, configured in `hielements.toml`:
+
+| Type | Configuration | Status | Use When |
+|------|--------------|--------|----------|
+| **External Process** | `executable` | ✅ Production Ready | Maximum flexibility, existing tools, language of choice |
+| **WASM** | `path` (`.wasm` file) | 🚧 Infrastructure Ready | Strong sandboxing required, performance-critical (coming soon) |
+
+### Choosing a Plugin Type
+
+**Use External Process plugins when:**
+- You want to write plugins in Python, JavaScript, Go, etc.
+- You need to leverage existing analysis tools
+- You want the simplest development experience
+- You need filesystem or network access
+
+**Use WASM plugins when (future):**
+- You need strong security sandboxing
+- Performance is critical (near-native speed)
+- You want easy distribution (single .wasm file)
+- You can work within WASM's constraints
+
+---
+
+## 3. Configuration
 
 ### Configuration File
 
@@ -43,22 +80,39 @@ Create a `hielements.toml` file in your workspace root:
 
 ```toml
 [libraries]
-# Basic plugin
-mylib = { executable = "path/to/mylib" }
+# External process plugin (explicit type)
+mylib = { type = "external", executable = "path/to/mylib" }
 
-# Plugin with arguments
+# External process plugin (inferred from 'executable' field)
 python_checks = { executable = "python3", args = ["scripts/checks.py"] }
 
 # Plugin with multiple arguments
 custom = { executable = "./plugins/custom", args = ["--workspace", "--verbose"] }
+
+# WASM plugin (explicit type - infrastructure ready, full implementation coming)
+typescript = { type = "wasm", path = "lib/typescript.wasm" }
+
+# WASM plugin (inferred from .wasm extension)
+docker = { path = "lib/docker.wasm" }
 ```
 
 ### Configuration Options
 
 | Option | Type | Required | Description |
 |--------|------|----------|-------------|
-| `executable` | String | Yes | Path to the plugin executable |
-| `args` | Array | No | Command-line arguments to pass |
+| `type` | String | No | Plugin type: "external" or "wasm". If omitted, inferred from other fields. |
+| `executable` | String | For external | Path to the plugin executable |
+| `path` | String | For WASM | Path to the WASM file (`.wasm` extension) |
+| `args` | Array | No | Command-line arguments (external plugins only) |
+
+### Type Inference Rules
+
+The `type` field is optional. Hielements infers the plugin type as follows:
+
+1. If `type` is specified explicitly, use it
+2. If `path` ends with `.wasm`, infer `type = "wasm"`
+3. If `executable` is specified, infer `type = "external"`
+4. If `path` is specified but not `.wasm`, infer `type = "external"`
 
 ### Path Resolution
 
@@ -67,7 +121,7 @@ custom = { executable = "./plugins/custom", args = ["--workspace", "--verbose"] 
 
 ---
 
-## 3. Protocol Specification
+## 4. Protocol Specification
 
 External libraries use JSON-RPC 2.0 over stdio. Each request is a single JSON line, and each response is a single JSON line.
 
@@ -392,7 +446,99 @@ if __name__ == "__main__":
 
 ---
 
-## 7. Troubleshooting
+## 7. WASM Plugins (Coming Soon)
+
+### Overview
+
+WASM (WebAssembly) plugin support provides a safer, more performant alternative to external process plugins. The infrastructure is in place, with full implementation planned for a future release.
+
+### Benefits of WASM Plugins
+
+| Benefit | Description |
+|---------|-------------|
+| **Strong Sandboxing** | WASM provides capability-based security - plugins can only access what you explicitly allow |
+| **Near-Native Performance** | WASM executes at near-native speed, much faster than interpreted languages |
+| **Portable** | Single `.wasm` file works on all platforms (Linux, macOS, Windows) |
+| **Small Size** | WASM binaries are typically smaller than equivalent native code |
+| **Easy Distribution** | Share plugins as single files, no installation needed |
+
+### Current Status
+
+**✅ Ready:**
+- Configuration format supports WASM plugins
+- `LibraryType::Wasm` enum variant
+- `WasmLibrary` struct with `Library` trait implementation
+- Type inference from `.wasm` file extension
+- Loading logic from `hielements.toml`
+
+**🚧 In Progress:**
+- Wasmtime runtime integration
+- WASM FFI protocol for library calls and checks
+- Memory management between host and WASM
+- WASI permissions configuration
+
+**📋 Planned:**
+- Example WASM plugin in Rust
+- Build tooling for compiling plugins
+- Complete documentation for writing WASM plugins
+- Performance benchmarks vs external processes
+
+### Configuration (When Available)
+
+```toml
+[libraries]
+# Explicit WASM type
+typescript = { type = "wasm", path = "lib/typescript.wasm" }
+
+# Inferred from .wasm extension
+golang = { path = "lib/golang_analyzer.wasm" }
+docker = { path = "plugins/docker.wasm" }
+```
+
+### WASM Plugin Interface (Planned)
+
+WASM plugins will export these functions:
+
+```rust
+// Allocate memory for input (returns pointer)
+#[no_mangle]
+pub extern "C" fn alloc(size: i32) -> *mut u8;
+
+// Handle library calls (receives JSON, returns JSON)
+#[no_mangle]
+pub extern "C" fn library_call(input_ptr: i32, input_len: i32) -> (i32, i32); // returns (result_ptr, result_len)
+
+// Handle library checks (receives JSON, returns JSON)
+#[no_mangle]
+pub extern "C" fn library_check(input_ptr: i32, input_len: i32) -> (i32, i32);
+```
+
+JSON format will be the same as external process plugins for consistency.
+
+### Writing WASM Plugins
+
+Languages that can compile to WASM:
+- **Rust** (best support via `wasm32-unknown-unknown` target)
+- **AssemblyScript** (TypeScript-like language for WASM)
+- **C/C++** (via Emscripten or clang)
+- **Go** (via TinyGo)
+- **Many others** with varying levels of support
+
+A complete WASM plugin guide will be provided when full support is available.
+
+### Migration Path
+
+External process plugins will continue to work indefinitely. When WASM support is ready:
+1. Decide which plugins benefit from WASM (performance, sandboxing)
+2. Rewrite or compile those plugins to WASM
+3. Update `hielements.toml` configuration
+4. Keep other plugins as external processes
+
+No breaking changes to the plugin API are planned.
+
+---
+
+## 8. Troubleshooting
 
 ### Common Issues
 

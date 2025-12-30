@@ -1,0 +1,147 @@
+# Hielements Hybrid Plugin Configuration
+#
+# This configuration demonstrates the hybrid extensibility model:
+# - External process plugins for flexibility
+# - WASM plugins for security and performance (infrastructure ready)
+#
+# Place this file as hielements.toml in your project root.
+
+[libraries]
+# ============================================================================
+# External Process Plugins (Production Ready)
+# ============================================================================
+# These plugins run as separate processes and communicate via JSON-RPC.
+# Use for: maximum flexibility, existing tools, any language.
+
+# Sample Python plugin (demonstrates external process model)
+sample = { 
+    type = "external",
+    executable = "python3", 
+    args = ["examples/plugins/sample_plugin.py"] 
+}
+
+# Shorthand syntax (type inferred from 'executable' field)
+# custom_python = { executable = "python3", args = ["path/to/plugin.py"] }
+
+# Native executable plugin
+# native_analyzer = { executable = "./tools/analyzer", args = ["--verbose"] }
+
+
+# ============================================================================
+# WASM Plugins (Infrastructure Ready - Full Implementation Coming Soon)
+# ============================================================================
+# These plugins run in a sandboxed WebAssembly runtime.
+# Use for: strong security, performance, easy distribution.
+#
+# Note: Infrastructure is in place (configuration, type system, loading logic)
+# but full wasmtime runtime integration is still in progress.
+# Configured WASM plugins will load but return "not yet implemented" errors.
+
+# TypeScript analyzer (hypothetical example)
+# typescript = {
+#     type = "wasm",
+#     path = "lib/typescript_analyzer.wasm"
+# }
+
+# Go analyzer (type inferred from .wasm extension)
+# golang = { path = "lib/golang_analyzer.wasm" }
+
+# Docker configuration checker
+# docker = { path = "lib/docker_checker.wasm" }
+
+
+# ============================================================================
+# Hybrid Strategy
+# ============================================================================
+# You can use both types together:
+#
+# 1. External process for rapid development and existing tools
+# 2. WASM for performance-critical or security-sensitive plugins
+#
+# Example:
+#   [libraries]
+#   # Flexible: wrap existing Python tool
+#   python_linter = { executable = "python3", args = ["tools/lint.py"] }
+#   
+#   # Secure: untrusted community plugin
+#   community_analyzer = { path = "plugins/community.wasm" }
+#   
+#   # Fast: called on every file
+#   syntax_checker = { path = "plugins/syntax.wasm" }
+
+
+# ============================================================================
+# Configuration Options Reference
+# ============================================================================
+#
+# External Process Plugin:
+#   type = "external"          # Optional, inferred from 'executable'
+#   executable = "path"        # Required: path to executable
+#   args = ["arg1", "arg2"]    # Optional: command-line arguments
+#
+# WASM Plugin:
+#   type = "wasm"              # Optional, inferred from .wasm extension
+#   path = "file.wasm"         # Required: path to WASM file
+#
+# Type Inference Rules:
+#   - If 'type' specified explicitly, use it
+#   - If 'path' ends with .wasm, infer type = "wasm"
+#   - If 'executable' specified, infer type = "external"
+#   - If 'path' specified but not .wasm, infer type = "external"
+
+
+# ============================================================================
+# Security Comparison
+# ============================================================================
+#
+# External Process Plugins:
+#   ✅ Process isolation (separate OS process)
+#   ⚠️ Full user permissions (can access any file/network)
+#   ⚠️ Trust model: must trust plugin completely
+#   ✅ Can leverage existing security tools (AppArmor, SELinux)
+#
+# WASM Plugins:
+#   ✅ Memory isolation (sandboxed runtime)
+#   ✅ No default permissions (capability-based security)
+#   ✅ Filesystem access limited to workspace (when granted)
+#   ✅ No network access unless explicitly allowed
+#   ✅ Trust model: trust but verify with sandboxing
+#   ✅ Resource limits (memory, execution time) enforced
+
+
+# ============================================================================
+# Performance Characteristics
+# ============================================================================
+#
+# External Process:
+#   - Startup: ~10-50ms per plugin
+#   - Function call: ~1ms (IPC overhead)
+#   - Memory: ~5-50MB per plugin
+#   - Good for: Infrequent calls, existing tools
+#
+# WASM (estimated):
+#   - Startup: ~1-2ms (loaded once, reused)
+#   - Function call: ~0.1ms (direct memory)
+#   - Memory: ~1-5MB per plugin
+#   - Good for: Frequent calls, performance-critical
+
+
+# ============================================================================
+# Migration Path
+# ============================================================================
+#
+# No breaking changes when WASM support is fully implemented.
+# Migration steps:
+#
+# 1. Existing external plugins continue to work
+# 2. Identify plugins that benefit from WASM:
+#    - Called frequently (performance matters)
+#    - Handle untrusted input (security matters)
+#    - Need easy distribution
+# 3. Rewrite/compile those plugins to WASM
+# 4. Update this config file
+# 5. No changes needed to .hie files
+#
+# Example migration:
+#   Before: typescript = { executable = "node", args = ["plugin.js"] }
+#   After:  typescript = { path = "lib/typescript.wasm" }

@@ -1,0 +1,90 @@
+# Example: Hybrid Plugin Architecture
+#
+# This example demonstrates using both external process plugins and WASM plugins
+# in the same Hielements project, showcasing the hybrid extensibility model.
+#
+# External process plugins: Maximum flexibility, any language
+# WASM plugins: Strong sandboxing, near-native performance
+#
+# To use this example:
+# 1. Configure plugins in examples/hielements_hybrid.toml
+# 2. Run: hielements check examples/hybrid_plugins.hie --workspace examples
+
+import sample
+import files
+
+## Hybrid Plugin Architecture Example
+## Demonstrates using both external and WASM plugins together
+element hybrid_example:
+    ## Use external process plugin (Python)
+    ## Good for: rapid development, existing tools, interpreted languages
+    scope python_src = sample.simple_selector('plugins')
+    
+    ## Use WASM plugin (when available)
+    ## Good for: performance, security, easy distribution
+    ## Note: WASM support is infrastructure-ready but not fully implemented yet
+    # scope typescript_src = typescript.module_selector('src')
+    
+    ## Check using external plugin
+    check sample.always_pass()
+    check sample.file_count_check(python_src, 10)
+    
+    ## Check using WASM plugin (when available)
+    # check typescript.has_types(typescript_src)
+    
+    ## Mix with built-in library
+    element documentation:
+        scope docs = files.folder_selector('.')
+        check files.exists(docs, 'hielements.toml')
+        check files.exists(docs, 'README.md')
+
+## Plugin Selection Strategy
+## This example shows when to choose each plugin type:
+element plugin_strategy:
+    ## External process plugins - Use when:
+    ## - Wrapping existing tools (no rewrite needed)
+    ## - Using interpreted languages (Python, Node.js, Ruby)
+    ## - Need full filesystem/network access
+    ## - Rapid prototyping and development
+    
+    ## WASM plugins - Use when:
+    ## - Performance is critical (called frequently)
+    ## - Strong security needed (untrusted code)
+    ## - Easy distribution important (single .wasm file)
+    ## - Cross-platform support required
+
+## Security Comparison
+element security_model:
+    ## External Process Plugin Security:
+    ## - Process isolation (separate OS process)
+    ## - Runs with full user permissions
+    ## - Can access any file or network resource
+    ## - Trust model: trust the plugin completely
+    
+    ## WASM Plugin Security (when available):
+    ## - Memory isolation (sandboxed runtime)
+    ## - No default permissions
+    ## - Filesystem access limited to workspace (if granted)
+    ## - No network access unless explicitly allowed
+    ## - Trust model: trust but verify
+
+## Performance Characteristics
+element performance_notes:
+    ## External Process:
+    ## - Startup overhead: ~10-50ms per plugin
+    ## - IPC overhead: ~1ms per function call
+    ## - Good for: infrequent calls, existing tools
+    
+    ## WASM (when available):
+    ## - Startup overhead: ~1-2ms (loaded once, reused)
+    ## - Call overhead: ~0.1ms (direct memory access)
+    ## - Good for: frequent calls, performance-critical code
+
+## Migration Path
+## Existing external plugins continue to work indefinitely
+## When WASM support is fully available:
+## 1. Identify plugins that benefit from WASM (performance/security)
+## 2. Rewrite or compile those plugins to WASM
+## 3. Update hielements.toml configuration
+## 4. Keep other plugins as external processes
+## No breaking changes to .hie files or plugin API

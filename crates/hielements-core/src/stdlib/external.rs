@@ -32,14 +32,78 @@ pub struct HielementsConfig {
     pub libraries: HashMap<String, ExternalLibraryConfigEntry>,
 }
 
+/// Library type enumeration
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum LibraryType {
+    /// External process plugin (JSON-RPC over stdio)
+    External,
+    /// WebAssembly sandboxed plugin
+    Wasm,
+}
+
 /// Entry in the libraries configuration
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ExternalLibraryConfigEntry {
-    /// Path to the executable
-    pub executable: String,
-    /// Optional arguments to pass to the executable
+    /// Type of library (external or wasm). If not specified, inferred from other fields.
+    #[serde(default)]
+    pub r#type: Option<LibraryType>,
+    /// Path to the executable (for external type)
+    #[serde(default)]
+    pub executable: Option<String>,
+    /// Path to the WASM file (for wasm type)
+    #[serde(default)]
+    pub path: Option<String>,
+    /// Optional arguments to pass to the executable (for external type)
     #[serde(default)]
     pub args: Vec<String>,
+}
+
+impl ExternalLibraryConfigEntry {
+    /// Infer the library type from the configuration
+    pub fn infer_type(&self) -> LibraryResult<LibraryType> {
+        // If type is explicitly specified, use it
+        if let Some(t) = &self.r#type {
+            return Ok(t.clone());
+        }
+        
+        // Infer from file extension if path is specified
+        if let Some(path) = &self.path {
+            if path.ends_with(".wasm") {
+                return Ok(LibraryType::Wasm);
+            }
+        }
+        
+        // If executable is specified, it's external
+        if self.executable.is_some() {
+            return Ok(LibraryType::External);
+        }
+        
+        // If path is specified but not .wasm, could be external executable
+        if self.path.is_some() {
+            return Ok(LibraryType::External);
+        }
+        
+        Err(LibraryError::new(
+            "E512",
+            "Cannot infer library type: specify 'type', 'executable', or 'path' with .wasm extension"
+        ))
+    }
+    
+    /// Get the executable path (for external libraries)
+    pub fn get_executable(&self) -> LibraryResult<String> {
+        self.executable
+            .clone()
+            .or_else(|| self.path.clone())
+            .ok_or_else(|| LibraryError::new("E513", "No executable or path specified"))
+    }
+    
+    /// Get the WASM path (for wasm libraries)
+    pub fn get_wasm_path(&self) -> LibraryResult<String> {
+        self.path
+            .clone()
+            .ok_or_else(|| LibraryError::new("E514", "No path specified for WASM library"))
+    }
 }
 
 /// JSON-RPC request structure
@@ -191,7 +255,7 @@ impl ExternalLibrary {
     }
 
     /// Convert Value to serde_json::Value for serialization.
-    fn value_to_json(value: &Value) -> serde_json::Value {
+    pub fn value_to_json(value: &Value) -> serde_json::Value {
         match value {
             Value::Null => serde_json::Value::Null,
             Value::Bool(b) => serde_json::Value::Bool(*b),
@@ -229,7 +293,7 @@ impl ExternalLibrary {
     }
 
     /// Convert serde_json::Value back to Value.
-    fn json_to_value(json: serde_json::Value) -> LibraryResult<Value> {
+    pub fn json_to_value(json: serde_json::Value) -> LibraryResult<Value> {
         // Handle direct primitives
         match &json {
             serde_json::Value::Null => return Ok(Value::Null),
@@ -311,7 +375,7 @@ impl ExternalLibrary {
     }
 
     /// Convert JSON to CheckResult.
-    fn json_to_check_result(json: serde_json::Value) -> LibraryResult<CheckResult> {
+    pub fn json_to_check_result(json: serde_json::Value) -> LibraryResult<CheckResult> {
         if let serde_json::Value::Object(obj) = &json {
             if obj.contains_key("Pass") || obj.get("result") == Some(&serde_json::json!("pass")) {
                 return Ok(CheckResult::Pass);
@@ -430,11 +494,16 @@ pub fn load_external_libraries(config_path: &Path) -> LibraryResult<Vec<External
 
     let mut libraries = Vec::new();
     for (name, entry) in config.libraries {
-        libraries.push(ExternalLibrary::new(ExternalLibraryConfig {
-            name,
-            executable: entry.executable,
-            args: entry.args,
-        }));
+        // Only load external type libraries
+        let lib_type = entry.infer_type()?;
+        if lib_type == LibraryType::External {
+            let executable = entry.get_executable()?;
+            libraries.push(ExternalLibrary::new(ExternalLibraryConfig {
+                name,
+                executable,
+                args: entry.args,
+            }));
+        }
     }
 
     Ok(libraries)
@@ -462,6 +531,30 @@ docker = { executable = "hielements-docker" }
         assert_eq!(config.libraries.len(), 2);
         assert!(config.libraries.contains_key("python"));
         assert!(config.libraries.contains_key("docker"));
+    }
+
+    #[test]
+    fn test_config_with_wasm() {
+        let toml_content = r#"
+[libraries]
+typescript = { type = "wasm", path = "lib/typescript.wasm" }
+golang = { path = "lib/golang.wasm" }
+custom = { executable = "./custom.py" }
+"#;
+        let config: HielementsConfig = toml::from_str(toml_content).unwrap();
+        assert_eq!(config.libraries.len(), 3);
+        
+        // Check typescript (explicit wasm type)
+        let ts = config.libraries.get("typescript").unwrap();
+        assert_eq!(ts.infer_type().unwrap(), LibraryType::Wasm);
+        
+        // Check golang (inferred from .wasm extension)
+        let go = config.libraries.get("golang").unwrap();
+        assert_eq!(go.infer_type().unwrap(), LibraryType::Wasm);
+        
+        // Check custom (inferred from executable)
+        let custom = config.libraries.get("custom").unwrap();
+        assert_eq!(custom.infer_type().unwrap(), LibraryType::External);
     }
 
     #[test]
