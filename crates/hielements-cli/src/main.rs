@@ -369,11 +369,7 @@ fn print_element_checks(element: &hielements_core::Element, indent: usize) {
     }
 
     for cp in &element.connection_points {
-        let type_info = if let Some(type_ann) = &cp.type_annotation {
-            format!(": {}", type_ann.type_name.name)
-        } else {
-            String::new()
-        };
+        let type_info = format!(": {}", cp.type_annotation.type_name.name);
         println!("{}  connection_point {}{} = ...", prefix, cp.name.name.magenta(), type_info.yellow());
     }
 

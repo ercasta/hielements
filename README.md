@@ -98,11 +98,11 @@ Templates ensure consistency across similar components, making architectural pat
 
 ### 🔒 Type-Safe Connection Points
 
-Explicit type annotations enable correct integration across multiple libraries and languages:
+Explicit type annotations are **required** for all connection points, enabling correct integration across multiple libraries and languages:
 
 ```hielements
 element api_service:
-    # Basic types
+    # Basic types (mandatory)
     connection_point port: integer = docker.exposed_port(dockerfile)
     connection_point api_url: string = config.get_url()
     connection_point ssl_enabled: boolean = config.get_flag('ssl')
@@ -112,7 +112,7 @@ element api_service:
     connection_point db_conn: DatabaseConnection = python.class_selector(module, 'Database')
 ```
 
-Types are optional, maintaining backward compatibility while providing additional safety and documentation.
+Mandatory types provide safety and serve as inline documentation of interfaces.
 
 ### 🎯 Cross-Technology Elements
 

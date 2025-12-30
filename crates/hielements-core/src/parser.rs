@@ -434,13 +434,9 @@ impl<'a> Parser<'a> {
         self.expect(TokenKind::ConnectionPoint)?;
         let name = self.parse_identifier()?;
         
-        // Parse optional type annotation: `: <type>`
-        let type_annotation = if self.check(TokenKind::Colon) {
-            self.advance();
-            Some(self.parse_type_annotation()?)
-        } else {
-            None
-        };
+        // Parse mandatory type annotation: `: <type>`
+        self.expect(TokenKind::Colon)?;
+        let type_annotation = self.parse_type_annotation()?;
         
         self.expect(TokenKind::Equals)?;
         let expression = self.parse_expression()?;
@@ -820,9 +816,9 @@ element service:
     fn test_parse_template_declaration() {
         let source = r#"template compiler:
     element lexer:
-        connection_point tokens = rust.function_selector('tokenize')
+        connection_point tokens: TokenStream = rust.function_selector('tokenize')
     element parser:
-        connection_point ast = rust.function_selector('parse')
+        connection_point ast: AbstractSyntaxTree = rust.function_selector('parse')
     check compiler.lexer.tokens.compatible_with(compiler.parser.input)
 "#;
         let parser = Parser::new(source, "test.hie");
@@ -896,7 +892,7 @@ element service:
     scope config = files.file_selector('config.yaml')
     
     element api:
-        connection_point endpoint = rust.function_selector('api_handler')
+        connection_point endpoint: HttpHandler = rust.function_selector('api_handler')
     
     check microservice.api.endpoint.is_valid()
 "#;
@@ -929,37 +925,27 @@ element service:
         
         // Check first connection point with type
         assert_eq!(element.connection_points[0].name.name, "port");
-        assert!(element.connection_points[0].type_annotation.is_some());
-        assert_eq!(element.connection_points[0].type_annotation.as_ref().unwrap().type_name.name, "integer");
+        assert_eq!(element.connection_points[0].type_annotation.type_name.name, "integer");
         
         // Check second connection point with type
         assert_eq!(element.connection_points[1].name.name, "url");
-        assert!(element.connection_points[1].type_annotation.is_some());
-        assert_eq!(element.connection_points[1].type_annotation.as_ref().unwrap().type_name.name, "string");
+        assert_eq!(element.connection_points[1].type_annotation.type_name.name, "string");
         
         // Check third connection point with type
         assert_eq!(element.connection_points[2].name.name, "enabled");
-        assert!(element.connection_points[2].type_annotation.is_some());
-        assert_eq!(element.connection_points[2].type_annotation.as_ref().unwrap().type_name.name, "boolean");
+        assert_eq!(element.connection_points[2].type_annotation.type_name.name, "boolean");
     }
 
     #[test]
-    fn test_parse_connection_point_without_type() {
+    fn test_parse_connection_point_without_type_fails() {
         let source = r#"element api_service:
     connection_point endpoint = python.public_functions(module)
 "#;
         let parser = Parser::new(source, "test.hie");
-        let (program, diagnostics) = parser.parse();
+        let (_program, diagnostics) = parser.parse();
 
-        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
-        let program = program.unwrap();
-        assert_eq!(program.elements.len(), 1);
-        let element = &program.elements[0];
-        assert_eq!(element.connection_points.len(), 1);
-        
-        // Check connection point without type annotation
-        assert_eq!(element.connection_points[0].name.name, "endpoint");
-        assert!(element.connection_points[0].type_annotation.is_none());
+        // Should have errors because type annotation is mandatory
+        assert!(diagnostics.has_errors(), "Expected error for missing type annotation");
     }
 
     #[test]
@@ -982,13 +968,11 @@ element service:
         // Check lexer connection point with custom type
         let lexer = &template.elements[0];
         assert_eq!(lexer.connection_points[0].name.name, "tokens");
-        assert!(lexer.connection_points[0].type_annotation.is_some());
-        assert_eq!(lexer.connection_points[0].type_annotation.as_ref().unwrap().type_name.name, "TokenStream");
+        assert_eq!(lexer.connection_points[0].type_annotation.type_name.name, "TokenStream");
         
         // Check parser connection point with custom type
         let parser_elem = &template.elements[1];
         assert_eq!(parser_elem.connection_points[0].name.name, "ast");
-        assert!(parser_elem.connection_points[0].type_annotation.is_some());
-        assert_eq!(parser_elem.connection_points[0].type_annotation.as_ref().unwrap().type_name.name, "AbstractSyntaxTree");
+        assert_eq!(parser_elem.connection_points[0].type_annotation.type_name.name, "AbstractSyntaxTree");
     }
 }

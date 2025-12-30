@@ -276,8 +276,10 @@ Connection points expose interfaces, APIs, or dependencies that other elements c
 ### 5.1 Syntax
 
 ```
-connection_point_declaration ::= 'connection_point' identifier (':' type_name)? '=' expression
+connection_point_declaration ::= 'connection_point' identifier ':' type_name '=' expression
 ```
+
+Type annotations are **mandatory** for all connection points.
 
 ### 5.2 Basic Connection Points
 
@@ -285,23 +287,23 @@ connection_point_declaration ::= 'connection_point' identifier (':' type_name)? 
 element api_server:
     scope module = python.module_selector('api')
     
-    # Expose the public API functions (untyped)
-    connection_point rest_api = python.public_functions(module)
+    # All connection points must have type annotations
+    connection_point rest_api: HttpHandler = python.public_functions(module)
     
-    # Expose the main entry point (untyped)
-    connection_point main = python.function_selector(module, 'main')
+    # Expose the main entry point
+    connection_point main: Function = python.function_selector(module, 'main')
 ```
 
 ### 5.3 Connection Point Type Annotations
 
-Connection points can have explicit type annotations to ensure type safety across libraries and languages:
+Connection points **must** have explicit type annotations to ensure type safety across libraries and languages:
 
 ```hielements
 element api_server:
     scope module = python.module_selector('api')
     scope dockerfile = docker.file_selector('Dockerfile')
     
-    # Basic type annotations
+    # Basic type annotations (mandatory)
     connection_point port: integer = docker.exposed_port(dockerfile)
     connection_point api_url: string = python.get_api_url(module)
     connection_point ssl_enabled: boolean = config.get_flag('ssl')
@@ -336,15 +338,6 @@ template compiler:
     
     element parser:
         connection_point ast: AbstractSyntaxTree = rust.struct_selector('Program')
-```
-
-#### Type Inference
-
-When type annotation is omitted, the connection point is untyped (backward compatible):
-
-```hielements
-# Untyped connection point (backward compatible)
-connection_point legacy = python.public_functions(module)
 ```
 
 ### 5.4 Using Connection Points
@@ -383,7 +376,7 @@ Different libraries expose different types of connection points:
 - They can be **referenced** across element boundaries using dot notation
 - Connection points enable **dependency checking** between elements
 - They provide **documentation** of element interfaces
-- **Type annotations** are optional and provide additional type safety
+- **Type annotations** are mandatory and provide type safety
 - **Type checking** occurs at specification validation time (when implemented)
 
 ---
@@ -1031,8 +1024,11 @@ qualified_identifier ::= identifier ('.' identifier)+
 
 (* Declarations *)
 scope_declaration           ::= 'scope' identifier '=' expression NEWLINE
-connection_point_declaration ::= 'connection_point' identifier (':' identifier)? '=' expression NEWLINE
+connection_point_declaration ::= 'connection_point' identifier ':' identifier '=' expression NEWLINE
 check_declaration           ::= 'check' function_call NEWLINE
+
+(* Type annotations *)
+type_name                   ::= identifier  (* Basic types: string, integer, float, boolean; or custom types *)
 
 (* Expressions *)
 expression         ::= function_call

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the implementation of explicit typing for connection points in Hielements. Connection points now support type annotations to ensure correct integration across multiple libraries and languages.
+This document describes the implementation of explicit typing for connection points in Hielements. Connection points **require** type annotations to ensure correct integration across multiple libraries and languages.
 
 ## Problem Statement
 
@@ -14,10 +14,9 @@ Connection points previously had no explicit type information, making it difficu
 
 ## Solution
 
-Add explicit type annotations to connection points with support for:
+Add **mandatory** explicit type annotations to connection points with support for:
 - **Basic types**: `string`, `integer`, `float`, `boolean`
 - **Custom types**: User-defined type aliases and composite structures
-- **Optional typing**: Types are optional to maintain backward compatibility
 
 ## Syntax
 
@@ -27,10 +26,12 @@ Add explicit type annotations to connection points with support for:
 connection_point <name>: <type> = <expression>
 ```
 
+Type annotations are **mandatory** for all connection points.
+
 ### Examples
 
 ```hielements
-# Basic types
+# Basic types (all mandatory)
 connection_point port: integer = docker.exposed_port(dockerfile)
 connection_point api_url: string = python.get_api_url(module)
 connection_point enabled: boolean = config.get_flag('feature_enabled')
@@ -42,9 +43,6 @@ connection_point ast: AbstractSyntaxTree = rust.struct_selector('Program')
 
 # Composite type (structure)
 connection_point db_config: DbConfig = python.class_selector(module, 'DatabaseConfig')
-
-# Untyped (backward compatible)
-connection_point legacy = python.public_functions(module)
 ```
 
 ## Type System
@@ -82,14 +80,6 @@ Custom types can be:
    connection_point config: ServiceConfig = python.class_selector(module, 'Config')
    ```
 
-### Type Inference
-
-When type annotation is omitted, the type is inferred from the expression:
-```hielements
-# Type inferred from selector function's return type
-connection_point tokens = rust.struct_selector('Token')  # Type: Token (inferred)
-```
-
 ## Implementation Details
 
 ### AST Changes
@@ -99,7 +89,7 @@ Updated `ConnectionPointDeclaration` structure:
 ```rust
 pub struct ConnectionPointDeclaration {
     pub name: Identifier,
-    pub type_annotation: Option<TypeAnnotation>,  // NEW
+    pub type_annotation: TypeAnnotation,  // Mandatory
     pub expression: Expression,
     pub span: Span,
 }
@@ -116,20 +106,17 @@ No new tokens required. The `:` token already exists for element declarations.
 
 ### Parser Changes
 
-Updated `parse_connection_point` to handle optional type annotation:
+Updated `parse_connection_point` to **require** type annotation:
 
 ```rust
 fn parse_connection_point(&mut self) -> Result<ConnectionPointDeclaration, Diagnostic> {
-    // connection_point <name> [: <type>] = <expression>
+    // connection_point <name> : <type> = <expression>
     self.expect(TokenKind::ConnectionPoint)?;
     let name = self.parse_identifier()?;
     
-    let type_annotation = if self.current_token_is(TokenKind::Colon) {
-        self.advance();
-        Some(self.parse_type_annotation()?)
-    } else {
-        None
-    };
+    // Type annotation is mandatory
+    self.expect(TokenKind::Colon)?;
+    let type_annotation = self.parse_type_annotation()?;
     
     self.expect(TokenKind::Equals)?;
     let expression = self.parse_expression()?;
@@ -165,26 +152,21 @@ fn struct_selector(&self, name: &str) -> Value {
 
 ## Migration Guide
 
-### Backward Compatibility
+### Type Annotations Required
 
-All existing Hielements specifications remain valid. Type annotations are optional.
+All connection points **must** have type annotations. This ensures:
+- Clear documentation of interfaces
+- Type safety across elements
+- Better error messages
+- IDE support for type checking
 
-### Adding Types to Existing Specs
-
-1. Start with critical integration points between elements
-2. Add type annotations where type safety is most valuable
-3. Gradually add types as the specification evolves
-
-Example migration:
+Example:
 
 ```hielements
-# Before
 element api:
-    connection_point endpoint = python.function_selector(module, 'handler')
-
-# After
-element api:
+    # Type annotation is mandatory
     connection_point endpoint: HttpHandler = python.function_selector(module, 'handler')
+    connection_point port: integer = docker.exposed_port(dockerfile)
 ```
 
 ## Benefits

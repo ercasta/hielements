@@ -116,8 +116,8 @@ pub struct ScopeDeclaration {
 pub struct ConnectionPointDeclaration {
     /// Connection point name
     pub name: Identifier,
-    /// Optional type annotation
-    pub type_annotation: Option<TypeAnnotation>,
+    /// Type annotation (mandatory)
+    pub type_annotation: TypeAnnotation,
     /// Expression defining the connection point
     pub expression: Expression,
     /// Source span

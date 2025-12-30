@@ -20,9 +20,7 @@ element api_service:
     ## Custom type annotations
     connection_point handler: HttpHandler = rust.function_selector(api_module, 'handle_request')
     connection_point middleware: Middleware = rust.function_selector(api_module, 'apply_middleware')
-    
-    ## Untyped connection points (backward compatible)
-    connection_point routes = rust.function_selector(api_module, 'get_routes')
+    connection_point routes: Routes = rust.function_selector(api_module, 'get_routes')
     
     check rust.function_exists(api_module, 'handle_request')
     check rust.function_exists(api_module, 'apply_middleware')
