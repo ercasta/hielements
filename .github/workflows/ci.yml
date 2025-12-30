@@ -78,14 +78,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
-    
-    - name: Install cargo-audit
-      run: cargo install cargo-audit
-    
     - name: Run cargo audit
-      run: cargo audit
+      uses: rustsec/audit-check@v2
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
 
   # VSCode extension checks
   vscode-extension:
@@ -102,11 +98,14 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: vscode-extension/package-lock.json
     
     - name: Install dependencies
-      run: npm ci || npm install
+      run: |
+        if [ -f package-lock.json ]; then
+          npm ci
+        else
+          npm install
+        fi
     
     - name: Compile TypeScript
       run: npm run compile
