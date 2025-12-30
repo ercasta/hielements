@@ -204,14 +204,30 @@ hielements check spec.hie --format sarif > results.sarif
 | Alternative | Pros | Cons | Verdict |
 |-------------|------|------|---------|
 | **Plugin DLLs/SOs** | Fast, in-process execution | Language-specific, ABI stability issues, security risks | Complex and limits plugin languages |
-| **WASM Plugins** | Sandboxed, portable, fast | Ecosystem maturity, memory constraints | Promising future direction |
+| **WASM Plugins** | Sandboxed, portable, fast | Ecosystem maturity, memory constraints | **Implemented (experimental)** - Infrastructure in place for future use |
 | **Embedded Scripting (Lua/Rhai)** | Fast, sandboxed, easy integration | Another language to learn, limited ecosystem | Good for simple customizations |
 | **gRPC/HTTP Services** | Language-agnostic, networkable | Operational overhead, latency | Overkill for local analysis |
 
-**Recommendation:** External tool invocation is pragmatic for initial implementation. Consider:
-1. **WASM plugins** for performance-critical, sandboxed extensions
-2. **JSON-RPC over stdio** as standardized protocol (like LSP)
-3. **Caching layer** to minimize repeated tool invocations
+**Current Status**: 
+- **External tool invocation** (JSON-RPC over stdio) is the primary plugin mechanism
+- **WASM plugins** infrastructure has been implemented with capability-based security
+- Both mechanisms are supported, allowing users to choose based on their needs:
+  - External plugins for flexibility and existing tool integration
+  - WASM plugins (when fully enabled) for enhanced security and performance
+
+**WASM Plugin Implementation:**
+1. Infrastructure components: ✅ Complete
+   - WasmLibrary implementing Library trait
+   - WasmCapabilities for fine-grained security
+   - Configuration support in hielements.toml
+   - Type conversions and serialization
+2. Runtime execution: ⏳ Planned for future release
+   - Wasmtime integration pending API stabilization
+   - WASI file system access for workspace reads
+3. Benefits when enabled:
+   - Capability-based sandboxing
+   - Near-native performance
+   - Platform-independent binaries
 
 ---
 

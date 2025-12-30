@@ -6,13 +6,29 @@
 # External Libraries
 # Each entry defines a library that can be imported in .hie files.
 # 
-# Format:
+# Hielements supports two types of plugins:
+# 1. External Process Plugins - Standalone programs communicating via JSON-RPC
+# 2. WASM Plugins (Experimental) - WebAssembly modules with sandboxed execution
+#
+# External Process Plugin Format:
 #   [libraries]
 #   library_name = { executable = "path/to/executable", args = ["arg1", "arg2"] }
 #
-# Example:
+# WASM Plugin Format (Experimental):
+#   [libraries.library_name]
+#   type = "wasm"
+#   path = "path/to/plugin.wasm"
+#   capabilities = { fs = "read", workspace_only = true, env_access = false }
+#
+# Example external process plugin:
 #   [libraries]
 #   sample = { executable = "python3", args = ["examples/plugins/sample_plugin.py"] }
+#
+# Example WASM plugin (experimental - infrastructure in place, execution coming soon):
+#   [libraries.wasm_sample]
+#   type = "wasm"
+#   path = "plugins/sample.wasm"
+#   capabilities = { fs = "read", workspace_only = true }
 #
 # Then in your .hie file:
 #   import sample
@@ -22,5 +38,11 @@
 #       check sample.file_count_check(src, 100)
 
 [libraries]
-# Uncomment the following line to enable the sample plugin:
+# Uncomment the following line to enable the sample Python plugin:
 # sample = { executable = "python3", args = ["examples/plugins/sample_plugin.py"] }
+
+# WASM plugins (experimental - will be fully functional in a future release):
+# [libraries.wasm_sample]
+# type = "wasm"
+# path = "plugins/sample.wasm"
+# capabilities = { fs = "read", workspace_only = true, env_access = false }
