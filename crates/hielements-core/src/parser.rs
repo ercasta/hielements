@@ -234,25 +234,33 @@ impl<'a> Parser<'a> {
                 children.push(self.parse_element(child_doc)?);
             } else if self.check(TokenKind::Identifier) {
                 // Could be a template binding (e.g., template.element.scope = ...)
-                // Try to parse as template binding
+                // Peek ahead to see if this looks like a template binding (has a dot after the identifier)
                 let pos = self.pos;
-                match self.try_parse_template_binding() {
-                    Ok(binding) => template_bindings.push(binding),
-                    Err(_) => {
-                        // Not a template binding, restore position and error
-                        self.pos = pos;
-                        let token = self.current();
-                        return Err(Diagnostic::error(
-                            "E002",
-                            format!(
-                                "Expected 'scope', 'connection_point', 'check', or 'element', found {:?}",
-                                token.kind
-                            ),
-                        )
-                        .with_file(&self.file_path)
-                        .with_span(token.span)
-                        .build());
+                self.advance(); // consume identifier
+                if self.check(TokenKind::Dot) {
+                    // Looks like a template binding, restore and try to parse it
+                    self.pos = pos;
+                    match self.try_parse_template_binding() {
+                        Ok(binding) => template_bindings.push(binding),
+                        Err(err) => {
+                            // Failed to parse as template binding
+                            return Err(err);
+                        }
                     }
+                } else {
+                    // Not a template binding (no dot after identifier)
+                    self.pos = pos; // restore
+                    let token = self.current();
+                    return Err(Diagnostic::error(
+                        "E002",
+                        format!(
+                            "Expected 'scope', 'connection_point', 'check', or 'element', found {:?}",
+                            token.kind
+                        ),
+                    )
+                    .with_file(&self.file_path)
+                    .with_span(token.span)
+                    .build());
                 }
             } else if self.check(TokenKind::Dedent) || self.is_at_end() {
                 break;
@@ -361,12 +369,15 @@ impl<'a> Parser<'a> {
     /// Try to parse a template binding (e.g., template.element.scope = expression).
     fn try_parse_template_binding(&mut self) -> Result<TemplateBinding, Diagnostic> {
         let start_span = self.current_span();
+        let start_pos = self.pos;
         
         // Parse the qualified path (template.element.property)
         let mut path = vec![self.parse_identifier()?];
         
         // Must have at least one dot for it to be a template binding
         if !self.check(TokenKind::Dot) {
+            // Restore position and fail
+            self.pos = start_pos;
             return Err(Diagnostic::error("E003", "Not a template binding")
                 .with_file(&self.file_path)
                 .with_span(start_span)
@@ -376,6 +387,16 @@ impl<'a> Parser<'a> {
         while self.check(TokenKind::Dot) {
             self.advance(); // consume dot
             path.push(self.parse_identifier()?);
+        }
+        
+        // Template bindings must have at least 2 parts (template.property) and use =
+        if path.len() < 2 || !self.check(TokenKind::Equals) {
+            // Restore position and fail
+            self.pos = start_pos;
+            return Err(Diagnostic::error("E003", "Not a template binding")
+                .with_file(&self.file_path)
+                .with_span(start_span)
+                .build());
         }
         
         self.expect(TokenKind::Equals)?;
@@ -537,17 +558,28 @@ impl<'a> Parser<'a> {
         })
     }
 
-    /// Parse an identifier.
+    /// Parse an identifier (or keyword used as identifier in some contexts).
     fn parse_identifier(&mut self) -> Result<Identifier, Diagnostic> {
         if self.check(TokenKind::Identifier) {
             let token = self.advance();
             Ok(Identifier::new(token.text, token.span))
         } else {
+            // In some contexts (like template binding paths), keywords can be used as identifiers
+            // Allow certain keywords to be treated as identifiers
             let token = self.current();
-            Err(Diagnostic::error("E004", format!("Expected identifier, found {:?}", token.kind))
-                .with_file(&self.file_path)
-                .with_span(token.span)
-                .build())
+            match token.kind {
+                TokenKind::Scope | TokenKind::Element | TokenKind::Check | 
+                TokenKind::ConnectionPoint | TokenKind::Template | TokenKind::Implements => {
+                    let token = self.advance();
+                    Ok(Identifier::new(token.text, token.span))
+                }
+                _ => {
+                    Err(Diagnostic::error("E004", format!("Expected identifier, found {:?}", token.kind))
+                        .with_file(&self.file_path)
+                        .with_span(token.span)
+                        .build())
+                }
+            }
         }
     }
 
@@ -761,5 +793,100 @@ element service:
         assert_eq!(program.elements.len(), 1);
         assert_eq!(program.elements[0].children.len(), 1);
         assert_eq!(program.elements[0].children[0].name.name, "child");
+    }
+
+    #[test]
+    fn test_parse_template_declaration() {
+        let source = r#"template compiler:
+    element lexer:
+        connection_point tokens = rust.function_selector('tokenize')
+    element parser:
+        connection_point ast = rust.function_selector('parse')
+    check compiler.lexer.tokens.compatible_with(compiler.parser.input)
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.templates.len(), 1);
+        assert_eq!(program.templates[0].name.name, "compiler");
+        assert_eq!(program.templates[0].elements.len(), 2);
+        assert_eq!(program.templates[0].elements[0].name.name, "lexer");
+        assert_eq!(program.templates[0].elements[1].name.name, "parser");
+        assert_eq!(program.templates[0].checks.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_template_implementation() {
+        let source = r#"element my_compiler implements compiler:
+    scope src = files.folder_selector('src')
+    compiler.lexer.scope = rust.module_selector('lexer')
+    compiler.parser.scope = rust.module_selector('parser')
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.elements.len(), 1);
+        assert_eq!(program.elements[0].name.name, "my_compiler");
+        assert_eq!(program.elements[0].implements.len(), 1);
+        assert_eq!(program.elements[0].implements[0].template_name.name, "compiler");
+        assert_eq!(program.elements[0].template_bindings.len(), 2);
+        
+        // Check first binding
+        let binding1 = &program.elements[0].template_bindings[0];
+        assert_eq!(binding1.path.len(), 3);
+        assert_eq!(binding1.path[0].name, "compiler");
+        assert_eq!(binding1.path[1].name, "lexer");
+        assert_eq!(binding1.path[2].name, "scope");
+        
+        // Check second binding
+        let binding2 = &program.elements[0].template_bindings[1];
+        assert_eq!(binding2.path.len(), 3);
+        assert_eq!(binding2.path[0].name, "compiler");
+        assert_eq!(binding2.path[1].name, "parser");
+        assert_eq!(binding2.path[2].name, "scope");
+    }
+
+    #[test]
+    fn test_parse_multiple_template_implementation() {
+        let source = r#"element my_service implements microservice, observable:
+    scope config = files.file_selector('config.yaml')
+    microservice.api.scope = rust.module_selector('api')
+    observable.metrics.scope = rust.module_selector('metrics')
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.elements.len(), 1);
+        assert_eq!(program.elements[0].implements.len(), 2);
+        assert_eq!(program.elements[0].implements[0].template_name.name, "microservice");
+        assert_eq!(program.elements[0].implements[1].template_name.name, "observable");
+        assert_eq!(program.elements[0].template_bindings.len(), 2);
+    }
+
+    #[test]
+    fn test_parse_template_with_scopes_and_checks() {
+        let source = r#"template microservice:
+    scope config = files.file_selector('config.yaml')
+    
+    element api:
+        connection_point endpoint = rust.function_selector('api_handler')
+    
+    check microservice.api.endpoint.is_valid()
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.templates.len(), 1);
+        assert_eq!(program.templates[0].scopes.len(), 1);
+        assert_eq!(program.templates[0].elements.len(), 1);
+        assert_eq!(program.templates[0].checks.len(), 1);
     }
 }
