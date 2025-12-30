@@ -21,7 +21,7 @@ jobs:
         rust: [stable]
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@master
@@ -76,7 +76,7 @@ jobs:
     name: Security Audit
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Run cargo audit
       uses: rustsec/audit-check@v2
@@ -92,7 +92,7 @@ jobs:
         working-directory: vscode-extension
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Setup Node.js
       uses: actions/setup-node@v4
