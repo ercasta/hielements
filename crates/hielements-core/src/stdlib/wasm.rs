@@ -55,6 +55,10 @@ pub struct WasmLibrary {
     name: String,
     store: Store,
     instance: Instance,
+    /// Capability restrictions for this WASM library
+    /// Stored for future use when host functions are implemented.
+    /// Currently configured but not enforced due to missing host function integration.
+    #[allow(dead_code)]
     capabilities: WasmCapabilities,
     workspace: Arc<Mutex<String>>,
 }
