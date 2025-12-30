@@ -2,36 +2,46 @@
 
 This guide explains how to create custom libraries (plugins) for Hielements. External libraries allow you to extend Hielements with your own selectors and checks, supporting any programming language or technology.
 
+Hielements supports two types of external plugins:
+1. **External Process Plugins** - Standalone programs communicating via JSON-RPC
+2. **WASM Plugins** (Experimental) - WebAssembly modules running in a sandboxed environment
+
 ---
 
 ## Table of Contents
 
 1. [Overview](#1-overview)
 2. [Configuration](#2-configuration)
-3. [Protocol Specification](#3-protocol-specification)
-4. [Implementing a Plugin](#4-implementing-a-plugin)
-5. [Example: Python Plugin](#5-example-python-plugin)
-6. [Best Practices](#6-best-practices)
-7. [Troubleshooting](#7-troubleshooting)
+3. [External Process Plugins](#3-external-process-plugins)
+4. [WASM Plugins (Experimental)](#4-wasm-plugins-experimental)
+5. [Best Practices](#5-best-practices)
+6. [Troubleshooting](#6-troubleshooting)
 
 ---
 
 ## 1. Overview
 
-External libraries are standalone programs that communicate with the Hielements interpreter via JSON-RPC 2.0 over stdin/stdout. This design provides:
+Hielements supports two plugin mechanisms:
+
+### External Process Plugins
+
+External process plugins are standalone programs that communicate with the Hielements interpreter via JSON-RPC 2.0 over stdin/stdout. This design provides:
 
 - **Language Independence**: Write plugins in Python, JavaScript, Go, or any language
 - **Security**: Process isolation between plugins and the interpreter
 - **Flexibility**: Leverage existing analysis tools and libraries
 - **Simplicity**: Simple text-based protocol
 
-### How It Works
+### WASM Plugins (Experimental)
 
-1. You configure external libraries in `hielements.toml`
-2. When a library is imported, Hielements spawns the plugin process
-3. The interpreter sends JSON-RPC requests to the plugin
-4. The plugin responds with results (scopes, check outcomes)
-5. The process stays running for subsequent calls
+WASM plugins are WebAssembly modules that run in a sandboxed environment. This approach provides:
+
+- **Enhanced Security**: Capability-based security with fine-grained file system access
+- **Performance**: Near-native execution speed
+- **Portability**: Single binary works on all platforms
+- **Sandboxing**: Strong isolation from the host system
+
+**Note**: WASM plugin support is currently experimental and under active development. The infrastructure is in place but full execution capability will be added in a future release. For production use, please use external process plugins.
 
 ---
 
@@ -39,35 +49,23 @@ External libraries are standalone programs that communicate with the Hielements 
 
 ### Configuration File
 
-Create a `hielements.toml` file in your workspace root:
+Create a `hielements.toml` file in your workspace root to configure plugins:
 
 ```toml
 [libraries]
-# Basic plugin
+# External process plugin (default type)
 mylib = { executable = "path/to/mylib" }
 
-# Plugin with arguments
+# External process plugin with arguments
 python_checks = { executable = "python3", args = ["scripts/checks.py"] }
 
-# Plugin with multiple arguments
-custom = { executable = "./plugins/custom", args = ["--workspace", "--verbose"] }
+# WASM plugin (experimental)
+wasm_lib = { type = "wasm", path = "plugins/mylib.wasm", capabilities = { fs = "read" } }
 ```
-
-### Configuration Options
-
-| Option | Type | Required | Description |
-|--------|------|----------|-------------|
-| `executable` | String | Yes | Path to the plugin executable |
-| `args` | Array | No | Command-line arguments to pass |
-
-### Path Resolution
-
-- Relative paths are resolved from the workspace directory
-- Use absolute paths for system-installed tools
 
 ---
 
-## 3. Protocol Specification
+## 3. External Process Plugins
 
 External libraries use JSON-RPC 2.0 over stdio. Each request is a single JSON line, and each response is a single JSON line.
 
@@ -392,7 +390,92 @@ if __name__ == "__main__":
 
 ---
 
-## 7. Troubleshooting
+## 4. WASM Plugins (Experimental)
+
+### Overview
+
+WASM (WebAssembly) plugins provide a sandboxed execution environment with fine-grained capability control. They offer better security than external process plugins while maintaining near-native performance.
+
+**Current Status**: The infrastructure for WASM plugins is in place, including:
+- Configuration support in `hielements.toml`
+- Capability-based security model
+- Type conversion and serialization
+- Plugin discovery and loading
+
+Full WASM execution with WASI file system access will be added in a future release once the wasmtime API integration is stabilized.
+
+### Configuration
+
+Add a WASM plugin to `hielements.toml`:
+
+```toml
+[libraries.mylib]
+type = "wasm"
+path = "plugins/mylib.wasm"
+capabilities = { fs = "read", workspace_only = true, env_access = false }
+```
+
+### Capability Model
+
+WASM plugins use a capability-based security model:
+
+| Capability | Values | Description |
+|------------|--------|-------------|
+| `fs` | `"none"`, `"read"`, `"write"` | File system access level |
+| `workspace_only` | `true`/`false` | Restrict access to workspace directory |
+| `env_access` | `true`/`false` | Allow reading environment variables |
+
+**Default capabilities**: All capabilities are denied by default. Plugins must explicitly request what they need.
+
+### Security Benefits
+
+1. **Memory isolation**: WASM has its own linear memory, isolated from the host
+2. **No direct system access**: Must go through WASI or host functions
+3. **Capability-based**: Only explicitly granted capabilities are accessible
+4. **Deterministic**: Same inputs produce same outputs (no hidden state)
+5. **Platform independent**: Single .wasm file works on all platforms
+
+### Creating WASM Plugins
+
+WASM plugins can be written in any language that compiles to WebAssembly:
+
+- **Rust**: Use `wasm32-wasi` target
+- **C/C++**: Use Emscripten or wasi-sdk
+- **AssemblyScript**: Direct TypeScript-like syntax for WASM
+- **Go**: TinyGo with WASI support
+
+Example plugin structure (conceptual):
+
+```rust
+// Future: Plugin implementation example
+// Will be provided once WASM execution is fully implemented
+```
+
+### Migration from External to WASM
+
+When WASM execution is fully implemented, you can migrate external process plugins to WASM for:
+- **Better performance**: No process spawning overhead
+- **Enhanced security**: Capability-based sandboxing
+- **Simpler deployment**: Single .wasm file instead of language-specific scripts
+
+The plugin interface (selectors and checks) remains the same, only the execution environment changes.
+
+### Limitations
+
+Current experimental status means:
+- WASM plugins can be configured but will return a "not yet implemented" error when called
+- Use external process plugins for production workloads
+- WASI file system access is pending wasmtime API stabilization
+
+Future releases will add:
+- Full WASM execution with wasmtime runtime
+- WASI file system access for reading workspace files
+- Memory-safe string passing between host and WASM
+- Example WASM plugins in Rust and other languages
+
+---
+
+## 5. Best Practices
 
 ### Common Issues
 

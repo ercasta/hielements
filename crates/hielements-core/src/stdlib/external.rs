@@ -29,10 +29,37 @@ pub struct ExternalLibraryConfig {
 pub struct HielementsConfig {
     /// External library configurations
     #[serde(default)]
-    pub libraries: HashMap<String, ExternalLibraryConfigEntry>,
+    pub libraries: HashMap<String, LibraryConfigEntry>,
 }
 
-/// Entry in the libraries configuration
+/// Entry in the libraries configuration (can be external or WASM)
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum LibraryConfigEntry {
+    /// External process library
+    External {
+        /// Path to the executable
+        executable: String,
+        /// Optional arguments to pass to the executable
+        #[serde(default)]
+        args: Vec<String>,
+        /// Optional type field (defaults to "external")
+        #[serde(default)]
+        r#type: String,
+    },
+    /// WASM library
+    Wasm {
+        /// Type discriminator (must be "wasm")
+        r#type: String,
+        /// Path to the .wasm file
+        path: String,
+        /// Capabilities granted to this plugin
+        #[serde(default)]
+        capabilities: super::wasm::WasmCapabilities,
+    },
+}
+
+/// Legacy entry format (for backward compatibility)
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ExternalLibraryConfigEntry {
     /// Path to the executable
@@ -430,11 +457,19 @@ pub fn load_external_libraries(config_path: &Path) -> LibraryResult<Vec<External
 
     let mut libraries = Vec::new();
     for (name, entry) in config.libraries {
-        libraries.push(ExternalLibrary::new(ExternalLibraryConfig {
-            name,
-            executable: entry.executable,
-            args: entry.args,
-        }));
+        match entry {
+            LibraryConfigEntry::External { executable, args, .. } => {
+                libraries.push(ExternalLibrary::new(ExternalLibraryConfig {
+                    name,
+                    executable,
+                    args,
+                }));
+            }
+            LibraryConfigEntry::Wasm { .. } => {
+                // Skip WASM libraries in this function
+                // They should be loaded via load_all_libraries instead
+            }
+        }
     }
 
     Ok(libraries)

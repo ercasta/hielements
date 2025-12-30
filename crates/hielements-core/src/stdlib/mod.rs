@@ -3,11 +3,13 @@
 pub mod external;
 pub mod files;
 pub mod rust;
+pub mod wasm;
 
 use std::collections::HashMap;
 use std::path::Path;
 
 pub use external::{ExternalLibrary, ExternalLibraryConfig, load_external_libraries, load_workspace_libraries};
+pub use wasm::{WasmLibrary, WasmLibraryConfig, WasmCapabilities, load_wasm_library};
 
 /// Result type for library function calls.
 pub type LibraryResult<T> = Result<T, LibraryError>;
@@ -202,13 +204,15 @@ impl LibraryRegistry {
 
     /// Load external libraries from a workspace configuration file.
     /// 
-    /// Looks for `hielements.toml` in the workspace root.
+    /// Looks for `hielements.toml` in the workspace root and loads both
+    /// external process libraries and WASM libraries.
     pub fn load_from_workspace(&mut self, workspace: &str) {
         let config_path = Path::new(workspace).join("hielements.toml");
         if config_path.exists() {
-            if let Ok(libs) = load_external_libraries(&config_path) {
+            // Load using the unified loader
+            if let Ok(libs) = load_all_libraries(&config_path, workspace) {
                 for lib in libs {
-                    self.register(Box::new(lib));
+                    self.register(lib);
                 }
             }
         }
@@ -223,4 +227,53 @@ impl LibraryRegistry {
     pub fn names(&self) -> Vec<&str> {
         self.libraries.keys().map(|s| s.as_str()).collect()
     }
+}
+
+/// Load all libraries (external and WASM) from a configuration file.
+pub fn load_all_libraries(config_path: &Path, workspace: &str) -> LibraryResult<Vec<Box<dyn Library>>> {
+    if !config_path.exists() {
+        return Ok(Vec::new());
+    }
+
+    let content = std::fs::read_to_string(config_path).map_err(|e| {
+        LibraryError::new("E700", format!("Failed to read config file: {}", e))
+    })?;
+
+    let config: external::HielementsConfig = toml::from_str(&content).map_err(|e| {
+        LibraryError::new("E701", format!("Failed to parse config file: {}", e))
+    })?;
+
+    let mut libraries: Vec<Box<dyn Library>> = Vec::new();
+    
+    for (name, entry) in config.libraries {
+        match entry {
+            external::LibraryConfigEntry::External { executable, args, .. } => {
+                // Load as external process library
+                libraries.push(Box::new(ExternalLibrary::new(ExternalLibraryConfig {
+                    name,
+                    executable,
+                    args,
+                })));
+            }
+            external::LibraryConfigEntry::Wasm { path, capabilities, .. } => {
+                // Load as WASM library
+                match wasm::load_wasm_library(
+                    wasm::WasmLibraryConfig {
+                        name,
+                        path,
+                        capabilities,
+                    },
+                    workspace,
+                ) {
+                    Ok(lib) => libraries.push(Box::new(lib)),
+                    Err(e) => {
+                        // Log error but continue loading other libraries
+                        eprintln!("Warning: Failed to load WASM library: {}", e.message);
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(libraries)
 }
