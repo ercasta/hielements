@@ -60,6 +60,11 @@ element hielements:
             check rust.struct_exists('Program')
             check rust.struct_exists('Element')
             check rust.enum_exists('Expression')
+            
+            ## Template support structures
+            check rust.struct_exists('Template')
+            check rust.struct_exists('TemplateImplementation')
+            check rust.struct_exists('TemplateBinding')
         
         ## Interpreter - semantic validation and check execution
         element interpreter:
@@ -229,3 +234,5 @@ element hielements:
         check files.exists(examples, 'simple.hie')
         check files.exists(examples, 'microservices.hie')
         check files.exists(examples, 'plugin_example.hie')
+        check files.exists(examples, 'template_compiler.hie')
+        check files.exists(examples, 'template_microservice.hie')
