@@ -13,12 +13,13 @@ This document provides a complete reference for the Hielements language syntax a
 5. [Connection Points](#5-connection-points)
 6. [Rules (Checks)](#6-rules-checks)
 7. [Children Elements](#7-children-elements)
-8. [Imports and Modules](#8-imports-and-modules)
-9. [Expressions](#9-expressions)
-10. [Built-in Libraries](#10-built-in-libraries)
-11. [Comments](#11-comments)
-12. [Complete Grammar](#12-complete-grammar)
-13. [Examples](#13-examples)
+8. [Element Templates](#8-element-templates)
+9. [Imports and Modules](#9-imports-and-modules)
+10. [Expressions](#10-expressions)
+11. [Built-in Libraries](#11-built-in-libraries)
+12. [Comments](#12-comments)
+13. [Complete Grammar](#13-complete-grammar)
+14. [Examples](#14-examples)
 
 ---
 
@@ -59,6 +60,8 @@ The following are reserved keywords:
 | Keyword | Description |
 |---------|-------------|
 | `element` | Declares an element |
+| `template` | Declares an element template |
+| `implements` | Declares that an element implements template(s) |
 | `scope` | Declares a scope selector |
 | `connection_point` | Declares a connection point |
 | `check` | Declares a rule/check |
@@ -482,7 +485,168 @@ element microservices:
 
 ---
 
-## 8. Imports and Modules
+## 8. Element Templates
+
+Element templates allow creating reusable element definitions that define the nature of a component. Templates establish structural patterns that elements can implement with concrete scopes and checks.
+
+### 8.1 Template Declaration
+
+Templates are declared using the `template` keyword and define a structure that elements can implement:
+
+```hielements
+template compiler:
+    ## Lexer component
+    element lexer:
+        connection_point tokens
+    
+    ## Parser component
+    element parser:
+        connection_point ast
+    
+    ## Ensure lexer output is compatible with parser input
+    check compiler.lexer.tokens.compatible_with(compiler.parser.input)
+```
+
+### 8.2 Implementing Templates
+
+Elements implement templates using the `implements` keyword, then provide concrete bindings:
+
+```hielements
+element python_compiler implements compiler:
+    # Provide concrete scopes for template elements
+    compiler.lexer.scope = python.module_selector('compiler.lexer')
+    compiler.parser.scope = python.module_selector('compiler.parser')
+    
+    # Provide concrete connection points
+    compiler.lexer.tokens = python.get_tokens(compiler.lexer.scope)
+    compiler.parser.ast = python.get_ast(compiler.parser.scope)
+    
+    # Can add additional elements and checks
+    element optimizer:
+        scope module = python.module_selector('optimizer')
+```
+
+### 8.3 Absolute References
+
+Template properties are referenced using absolute paths prefixed with the template name (e.g., `compiler.lexer`). This prevents name clashes when implementing multiple templates:
+
+```hielements
+template microservice:
+    element api:
+        connection_point rest_endpoint
+
+template observable:
+    element api:
+        connection_point metrics_endpoint
+
+# No name clash - each 'api' is explicitly qualified
+element my_service implements microservice, observable:
+    microservice.api.scope = python.module_selector('service.api')
+    observable.api.scope = python.module_selector('service.metrics')
+    
+    # Reference both in checks
+    check microservice.api.rest_endpoint.port != observable.api.metrics_endpoint.port
+```
+
+### 8.4 Multiple Template Implementation
+
+An element can implement multiple templates:
+
+```hielements
+template resilient:
+    element circuit_breaker
+
+template secured:
+    element authentication
+
+element production_service implements microservice, resilient, secured:
+    # Microservice bindings
+    microservice.api.scope = python.module_selector('api')
+    
+    # Resilient bindings
+    resilient.circuit_breaker.scope = python.module_selector('resilience')
+    
+    # Secured bindings
+    secured.authentication.scope = python.module_selector('auth')
+```
+
+### 8.5 Template Requirements
+
+When implementing a template, all required elements must have their scopes and connection points bound:
+
+```hielements
+template web_service:
+    element frontend:
+        connection_point static_files
+    
+    element backend:
+        connection_point api
+
+# Valid - all required bindings provided
+element complete_service implements web_service:
+    web_service.frontend.scope = files.folder_selector('frontend/')
+    web_service.backend.scope = python.module_selector('backend')
+    web_service.frontend.static_files = files.glob_selector('frontend/dist/*')
+    web_service.backend.api = python.public_functions(web_service.backend.scope)
+
+# Invalid - missing bindings (would produce validation error)
+element incomplete_service implements web_service:
+    web_service.frontend.scope = files.folder_selector('frontend/')
+    # ERROR: web_service.backend bindings missing
+```
+
+### 8.6 Template Checks
+
+Checks defined in templates are automatically included when the template is implemented. The checks use absolute references and are evaluated with the concrete bindings:
+
+```hielements
+template microservice:
+    element api
+    element database
+    element container
+    
+    # Template checks
+    check microservice.container.exposes_port(8080)
+    check microservice.api.connects_to(microservice.database)
+
+element orders_service implements microservice:
+    microservice.api.scope = python.module_selector('orders.api')
+    microservice.database.scope = postgres.database_selector('orders_db')
+    microservice.container.scope = docker.file_selector('orders.dockerfile')
+    
+    # The template checks are automatically evaluated:
+    # - check orders_service.microservice.container.exposes_port(8080)
+    # - check orders_service.microservice.api.connects_to(orders_service.microservice.database)
+```
+
+### 8.7 Library-Defined Templates
+
+Templates can be defined in external libraries and imported for use:
+
+```hielements
+import architecture_patterns
+
+element my_service implements architecture_patterns.hexagonal:
+    # Bind the hexagonal architecture template elements
+    hexagonal.domain.scope = python.package_selector('myapp.domain')
+    hexagonal.application.scope = python.package_selector('myapp.application')
+    hexagonal.adapters.scope = python.package_selector('myapp.adapters')
+```
+
+External libraries can provide templates via the library protocol. See the [External Library Plugin Guide](external_libraries.md) for details.
+
+### 8.8 Template Semantics
+
+- Templates define **structure** but not **implementation**
+- Elements implementing templates **must provide** all required bindings
+- Template checks are **inherited** by implementing elements
+- Absolute references **prevent name clashes** between multiple templates
+- Templates **cannot be nested** (a template cannot implement another template)
+- Template names must be **unique** within their scope
+
+---
+
+## 9. Imports and Modules
 
 Imports bring libraries and other Hielements specifications into scope.
 
@@ -559,7 +723,7 @@ External libraries communicate via JSON-RPC 2.0 over stdin/stdout. See the [Exte
 
 ---
 
-## 9. Expressions
+## 10. Expressions
 
 Expressions compute values for scopes, connection points, and check arguments.
 
@@ -606,9 +770,9 @@ check docker.exposes_ports(dockerfile, [80, 443, 8080])
 
 ---
 
-## 10. Built-in Libraries
+## 11. Built-in Libraries
 
-### 10.1 `files` Library
+### 11.1 `files` Library
 
 The `files` library provides selectors and checks for files and folders.
 
@@ -643,7 +807,7 @@ element source_code:
     check files.no_files_matching(src, '__pycache__')
 ```
 
-### 10.2 `python` Library
+### 11.2 `python` Library
 
 The `python` library provides analysis for Python code.
 
@@ -689,7 +853,7 @@ element api_module:
     check python.has_docstring(public_api)
 ```
 
-### 10.3 `docker` Library
+### 11.3 `docker` Library
 
 The `docker` library provides analysis for Dockerfiles.
 
@@ -737,9 +901,9 @@ element containerized_service:
 
 ---
 
-## 11. Comments
+## 12. Comments
 
-### 11.1 Single-line Comments
+### 12.1 Single-line Comments
 
 ```hielements
 # This is a comment
@@ -747,7 +911,7 @@ element my_service:  # Inline comment
     scope src = files.folder_selector('src/')  # Another comment
 ```
 
-### 11.2 Multi-line Comments
+### 12.2 Multi-line Comments
 
 ```hielements
 ###
@@ -758,7 +922,7 @@ element my_service:
     scope src = files.folder_selector('src/')
 ```
 
-### 11.3 Documentation Comments
+### 12.3 Documentation Comments
 
 Documentation comments (doc comments) provide descriptions for elements:
 
@@ -772,13 +936,13 @@ element orders_service:
 
 ---
 
-## 12. Complete Grammar
+## 13. Complete Grammar
 
 The following is the complete EBNF grammar for Hielements:
 
 ```ebnf
 (* Program structure *)
-program            ::= import_statement* element_declaration+
+program            ::= import_statement* (template_declaration | element_declaration)+
 
 (* Imports *)
 import_statement   ::= 'import' import_path ('as' identifier)?
@@ -786,13 +950,27 @@ import_statement   ::= 'import' import_path ('as' identifier)?
 import_path        ::= string_literal | identifier ('.' identifier)*
 identifier_list    ::= identifier (',' identifier)*
 
+(* Templates *)
+template_declaration ::= doc_comment? 'template' identifier ':' NEWLINE INDENT template_body DEDENT
+template_body        ::= template_item+
+template_item        ::= scope_declaration
+                       | connection_point_declaration
+                       | check_declaration
+                       | element_declaration
+
 (* Elements *)
-element_declaration ::= doc_comment? 'element' identifier ':' NEWLINE INDENT element_body DEDENT
+element_declaration ::= doc_comment? 'element' identifier template_implementation? ':' NEWLINE INDENT element_body DEDENT
+template_implementation ::= 'implements' identifier (',' identifier)*
 element_body        ::= element_item+
 element_item        ::= scope_declaration
                       | connection_point_declaration
                       | check_declaration
                       | element_declaration
+                      | template_binding
+
+(* Template Bindings *)
+template_binding    ::= qualified_identifier '=' expression NEWLINE
+qualified_identifier ::= identifier ('.' identifier)+
 
 (* Declarations *)
 scope_declaration           ::= 'scope' identifier '=' expression NEWLINE
@@ -835,9 +1013,9 @@ DEDENT             ::= <decrease in indentation level>
 
 ---
 
-## 13. Examples
+## 14. Examples
 
-### 13.1 Simple Service
+### 14.1 Simple Service
 
 ```hielements
 import python
@@ -868,7 +1046,7 @@ element orders_service:
     check docker.base_image(dockerfile, 'python:3.11-slim')
 ```
 
-### 13.2 Microservices Architecture
+### 14.2 Microservices Architecture
 
 ```hielements
 import python
@@ -915,7 +1093,7 @@ element ecommerce_platform:
     check python.no_dependency(payments_service.module, orders_service.module)
 ```
 
-### 13.3 Hexagonal Architecture
+### 14.3 Hexagonal Architecture
 
 ```hielements
 import python
@@ -963,7 +1141,7 @@ element hexagonal_app:
         check python.imports(module, domain.module)
 ```
 
-### 13.4 Infrastructure Validation
+### 14.4 Infrastructure Validation
 
 ```hielements
 import docker
@@ -1001,7 +1179,7 @@ element infrastructure:
         check files.no_files_matching(config_dir, '*password*')
 ```
 
-### 13.5 Testing Requirements
+### 14.5 Testing Requirements
 
 ```hielements
 import python
@@ -1028,6 +1206,100 @@ element testing_standards:
         
         check python.module_exists(tests)
         check python.function_exists(tests, 'test_create_order')
+```
+
+### 14.6 Element Templates
+
+```hielements
+import python
+import docker
+
+## Compiler Template
+## Defines the structure of a compiler with lexer and parser components.
+template compiler:
+    ## Lexer - tokenizes source code
+    element lexer:
+        connection_point tokens
+    
+    ## Parser - produces abstract syntax tree
+    element parser:
+        connection_point ast
+    
+    ## Verify lexer output is compatible with parser input
+    check compiler.lexer.tokens.compatible_with(compiler.parser.input)
+
+## Python Compiler Implementation
+## Implements the compiler template for Python code.
+element python_compiler implements compiler:
+    # Bind lexer element to concrete Python module
+    compiler.lexer.scope = python.module_selector('pycompiler.lexer')
+    compiler.lexer.tokens = python.get_tokens(compiler.lexer.scope)
+    
+    # Bind parser element to concrete Python module
+    compiler.parser.scope = python.module_selector('pycompiler.parser')
+    compiler.parser.ast = python.get_ast(compiler.parser.scope)
+    
+    # Add compiler-specific elements
+    element optimizer:
+        scope module = python.module_selector('pycompiler.optimizer')
+        check python.function_exists(module, 'optimize_ast')
+
+## Microservice Template
+## Defines a standard microservice with API, database, and container.
+template microservice:
+    element api:
+        connection_point rest_endpoint
+    
+    element database:
+        connection_point connection
+    
+    element container:
+        connection_point ports
+    
+    check microservice.container.exposes_port(8080)
+    check microservice.api.connects_to(microservice.database)
+
+## Orders Service
+## A microservice for managing orders.
+element orders_service implements microservice:
+    microservice.api.scope = python.module_selector('orders.api')
+    microservice.api.rest_endpoint = python.public_functions(microservice.api.scope)
+    
+    microservice.database.scope = python.module_selector('orders.db')
+    microservice.database.connection = python.get_db_connection(microservice.database.scope)
+    
+    microservice.container.scope = docker.file_selector('orders.dockerfile')
+    microservice.container.ports = docker.exposed_ports(microservice.container.scope)
+
+## Multiple Template Implementation
+template observable:
+    element metrics:
+        connection_point prometheus_endpoint
+
+template resilient:
+    element circuit_breaker:
+        connection_point breaker_config
+
+## Production Service with Multiple Templates
+element production_service implements microservice, observable, resilient:
+    # Microservice bindings
+    microservice.api.scope = python.module_selector('service.api')
+    microservice.database.scope = python.module_selector('service.db')
+    microservice.container.scope = docker.file_selector('service.dockerfile')
+    
+    # Observable bindings
+    observable.metrics.scope = python.module_selector('service.metrics')
+    observable.metrics.prometheus_endpoint = python.function_selector(
+        observable.metrics.scope, 
+        'metrics_handler'
+    )
+    
+    # Resilient bindings
+    resilient.circuit_breaker.scope = python.module_selector('service.resilience')
+    resilient.circuit_breaker.breaker_config = python.class_selector(
+        resilient.circuit_breaker.scope,
+        'CircuitBreakerConfig'
+    )
 ```
 
 ---

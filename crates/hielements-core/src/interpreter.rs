@@ -103,12 +103,45 @@ impl Interpreter {
             }
         }
 
+        // Validate templates
+        for template in &program.templates {
+            self.validate_template(template, file_path, &mut diagnostics);
+        }
+
         // Validate elements
         for element in &program.elements {
             self.validate_element(element, file_path, &mut diagnostics, &[]);
         }
 
         diagnostics
+    }
+
+    /// Validate a template and its children.
+    fn validate_template(
+        &self,
+        template: &Template,
+        file_path: &str,
+        diagnostics: &mut Diagnostics,
+    ) {
+        // Validate scopes
+        for scope in &template.scopes {
+            self.validate_expression(&scope.expression, file_path, diagnostics);
+        }
+
+        // Validate connection points
+        for cp in &template.connection_points {
+            self.validate_expression(&cp.expression, file_path, diagnostics);
+        }
+
+        // Validate checks
+        for check in &template.checks {
+            self.validate_expression(&check.expression, file_path, diagnostics);
+        }
+
+        // Validate child elements
+        for element in &template.elements {
+            self.validate_element(element, file_path, diagnostics, &[]);
+        }
     }
 
     /// Validate an element and its children.
@@ -121,6 +154,14 @@ impl Interpreter {
     ) {
         let mut current_path = path.to_vec();
         current_path.push(element.name.name.clone());
+
+        // Validate template implementations (just check syntax for now)
+        // Full validation would require resolving template definitions
+        for template_impl in &element.implements {
+            // Could add validation that template exists, but that requires
+            // building a template registry first
+            let _ = template_impl; // Acknowledge the field
+        }
 
         // Validate scopes
         for scope in &element.scopes {
@@ -135,6 +176,11 @@ impl Interpreter {
         // Validate checks
         for check in &element.checks {
             self.validate_expression(&check.expression, file_path, diagnostics);
+        }
+
+        // Validate template bindings
+        for binding in &element.template_bindings {
+            self.validate_expression(&binding.expression, file_path, diagnostics);
         }
 
         // Validate children

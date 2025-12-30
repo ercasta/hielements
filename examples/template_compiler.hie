@@ -1,0 +1,60 @@
+# Example: Compiler Template
+# Demonstrates element templates with a compiler structure
+
+import files
+import rust
+
+## Compiler Template
+## Defines the standard structure of a compiler with lexer and parser components.
+## This template can be reused for different compiler implementations.
+template compiler:
+    ## Lexer component
+    ## Responsible for tokenizing source code
+    element lexer:
+        scope module = rust.module_selector('lexer')
+        connection_point tokens = rust.function_selector(module, 'tokenize')
+    
+    ## Parser component
+    ## Responsible for producing an abstract syntax tree
+    element parser:
+        scope module = rust.module_selector('parser')
+        connection_point ast = rust.function_selector(module, 'parse')
+    
+    ## Ensure lexer output is compatible with parser input
+    check compiler.lexer.tokens.compatible_with(compiler.parser.input)
+
+## Python Compiler
+## A concrete implementation of the compiler template for Python code.
+element python_compiler implements compiler:
+    # Bind lexer element to concrete Rust module
+    compiler.lexer.scope = rust.module_selector('pycompiler::lexer')
+    compiler.lexer.tokens = rust.function_selector(compiler.lexer.scope, 'tokenize')
+    
+    # Bind parser element to concrete Rust module
+    compiler.parser.scope = rust.module_selector('pycompiler::parser')
+    compiler.parser.ast = rust.function_selector(compiler.parser.scope, 'parse')
+    
+    # Add compiler-specific elements beyond the template
+    element optimizer:
+        scope module = rust.module_selector('pycompiler::optimizer')
+        check rust.function_exists(module, 'optimize_ast')
+    
+    element code_generator:
+        scope module = rust.module_selector('pycompiler::codegen')
+        check rust.function_exists(module, 'generate_bytecode')
+
+## JavaScript Compiler
+## Another implementation of the compiler template for JavaScript.
+element js_compiler implements compiler:
+    # Bind lexer element
+    compiler.lexer.scope = rust.module_selector('jscompiler::lexer')
+    compiler.lexer.tokens = rust.function_selector(compiler.lexer.scope, 'lex')
+    
+    # Bind parser element
+    compiler.parser.scope = rust.module_selector('jscompiler::parser')
+    compiler.parser.ast = rust.function_selector(compiler.parser.scope, 'parse_js')
+    
+    # JavaScript-specific element
+    element transpiler:
+        scope module = rust.module_selector('jscompiler::transpiler')
+        check rust.function_exists(module, 'transpile_to_es5')

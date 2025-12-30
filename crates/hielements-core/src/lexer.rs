@@ -14,6 +14,12 @@ pub enum TokenKind {
     #[token("element")]
     Element,
 
+    #[token("template")]
+    Template,
+
+    #[token("implements")]
+    Implements,
+
     #[token("scope")]
     Scope,
 
@@ -346,12 +352,14 @@ mod tests {
 
     #[test]
     fn test_keywords() {
-        let source = "element scope connection_point check import from as true false";
+        let source = "element template implements scope connection_point check import from as true false";
         let mut lexer = Lexer::new(source);
         let tokens = lexer.tokenize();
 
         let kinds: Vec<_> = tokens.iter().map(|t| &t.kind).collect();
         assert!(kinds.contains(&&TokenKind::Element));
+        assert!(kinds.contains(&&TokenKind::Template));
+        assert!(kinds.contains(&&TokenKind::Implements));
         assert!(kinds.contains(&&TokenKind::Scope));
         assert!(kinds.contains(&&TokenKind::ConnectionPoint));
         assert!(kinds.contains(&&TokenKind::Check));
@@ -360,5 +368,29 @@ mod tests {
         assert!(kinds.contains(&&TokenKind::As));
         assert!(kinds.contains(&&TokenKind::True));
         assert!(kinds.contains(&&TokenKind::False));
+    }
+
+    #[test]
+    fn test_template_keyword() {
+        let source = "template compiler:\n    element lexer";
+        let mut lexer = Lexer::new(source);
+        let tokens = lexer.tokenize();
+
+        let kinds: Vec<_> = tokens.iter().map(|t| &t.kind).collect();
+        assert!(kinds.contains(&&TokenKind::Template));
+        assert!(kinds.contains(&&TokenKind::Identifier));
+        assert!(kinds.contains(&&TokenKind::Colon));
+        assert!(kinds.contains(&&TokenKind::Element));
+    }
+
+    #[test]
+    fn test_implements_keyword() {
+        let source = "element service implements microservice";
+        let mut lexer = Lexer::new(source);
+        let tokens = lexer.tokenize();
+
+        let kinds: Vec<_> = tokens.iter().map(|t| &t.kind).collect();
+        assert!(kinds.contains(&&TokenKind::Element));
+        assert!(kinds.contains(&&TokenKind::Implements));
     }
 }

@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 pub struct Program {
     /// Import statements
     pub imports: Vec<ImportStatement>,
+    /// Template declarations
+    pub templates: Vec<Template>,
     /// Top-level element declarations
     pub elements: Vec<Element>,
     /// Source span
@@ -36,12 +38,12 @@ pub enum ImportPath {
     String(StringLiteral),
 }
 
-/// An element declaration.
+/// A template declaration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Element {
+pub struct Template {
     /// Documentation comment
     pub doc_comment: Option<String>,
-    /// Element name
+    /// Template name
     pub name: Identifier,
     /// Scope declarations
     pub scopes: Vec<ScopeDeclaration>,
@@ -49,6 +51,49 @@ pub struct Element {
     pub connection_points: Vec<ConnectionPointDeclaration>,
     /// Check declarations
     pub checks: Vec<CheckDeclaration>,
+    /// Nested elements
+    pub elements: Vec<Element>,
+    /// Source span
+    pub span: Span,
+}
+
+/// Template implementation specification.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TemplateImplementation {
+    /// Template name being implemented
+    pub template_name: Identifier,
+    /// Source span
+    pub span: Span,
+}
+
+/// Template binding (e.g., `template.element.scope = expression`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TemplateBinding {
+    /// Path to the template property (e.g., ["template_name", "element_name", "scope"])
+    pub path: Vec<Identifier>,
+    /// Expression value to bind
+    pub expression: Expression,
+    /// Source span
+    pub span: Span,
+}
+
+/// An element declaration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Element {
+    /// Documentation comment
+    pub doc_comment: Option<String>,
+    /// Element name
+    pub name: Identifier,
+    /// Templates this element implements
+    pub implements: Vec<TemplateImplementation>,
+    /// Scope declarations
+    pub scopes: Vec<ScopeDeclaration>,
+    /// Connection point declarations
+    pub connection_points: Vec<ConnectionPointDeclaration>,
+    /// Check declarations
+    pub checks: Vec<CheckDeclaration>,
+    /// Template bindings (when implementing templates)
+    pub template_bindings: Vec<TemplateBinding>,
     /// Nested elements
     pub children: Vec<Element>,
     /// Source span

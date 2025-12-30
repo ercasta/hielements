@@ -1,0 +1,73 @@
+# Example: Microservice Template
+# Demonstrates multiple template implementation
+
+import files
+import rust
+
+## Microservice Template
+## Defines the standard structure of a microservice with API, database, and container.
+template microservice:
+    element api:
+        scope module = rust.module_selector('api')
+        connection_point rest_endpoint = rust.function_selector(module, 'routes')
+    
+    element database:
+        scope module = rust.module_selector('db')
+        connection_point connection = rust.struct_selector(module, 'DbConnection')
+    
+    element container:
+        scope dockerfile = files.file_selector('Dockerfile')
+        connection_point ports = rust.const_selector('PORT')
+    
+    check microservice.container.exposes_port(8080)
+
+## Observable Template
+## Adds observability features to a service
+template observable:
+    element metrics:
+        scope module = rust.module_selector('metrics')
+        connection_point prometheus_endpoint = rust.function_selector(module, 'metrics_handler')
+    
+    element logging:
+        scope module = rust.module_selector('logging')
+        connection_point log_output = rust.function_selector(module, 'setup_logging')
+    
+    check observable.metrics.prometheus_endpoint.is_available()
+
+## Resilient Template  
+## Adds resilience patterns to a service
+template resilient:
+    element circuit_breaker:
+        scope module = rust.module_selector('resilience')
+        connection_point breaker_config = rust.struct_selector(module, 'BreakerConfig')
+    
+    element retry_policy:
+        scope module = rust.module_selector('retry')
+        connection_point retry_config = rust.struct_selector(module, 'RetryPolicy')
+
+## Orders Service
+## A production-ready microservice implementing multiple templates
+element orders_service implements microservice, observable, resilient:
+    microservice.api.scope = rust.module_selector('orders::api')
+    microservice.api.rest_endpoint = rust.function_selector(microservice.api.scope, 'create_routes')
+    
+    microservice.database.scope = rust.module_selector('orders::db')
+    microservice.database.connection = rust.struct_selector(microservice.database.scope, 'DbConnection')
+    
+    microservice.container.scope = files.file_selector('orders.dockerfile')
+    microservice.container.ports = rust.const_selector(microservice.api.scope, 'SERVICE_PORT')
+    
+    observable.metrics.scope = rust.module_selector('orders::metrics')
+    observable.metrics.prometheus_endpoint = rust.function_selector(observable.metrics.scope, 'metrics_handler')
+    
+    observable.logging.scope = rust.module_selector('orders::logging')
+    observable.logging.log_output = rust.function_selector(observable.logging.scope, 'setup_logging')
+    
+    resilient.circuit_breaker.scope = rust.module_selector('orders::resilience::breaker')
+    resilient.circuit_breaker.breaker_config = rust.struct_selector(resilient.circuit_breaker.scope, 'BreakerConfig')
+    
+    resilient.retry_policy.scope = rust.module_selector('orders::resilience::retry')
+    resilient.retry_policy.retry_config = rust.struct_selector(resilient.retry_policy.scope, 'RetryPolicy')
+    
+    check rust.has_tests(microservice.api.scope)
+    check rust.has_tests(microservice.database.scope)
