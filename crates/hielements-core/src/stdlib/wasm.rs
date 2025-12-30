@@ -104,6 +104,10 @@ impl WasmLibrary {
     }
 
     /// Call a WASM function
+    /// 
+    /// Note: Currently uses JSON serialization for simplicity. This introduces some overhead
+    /// compared to external processes. Future optimization: use binary protocol or direct
+    /// memory passing with WASM Component Model for better performance.
     fn call_wasm_function(
         &mut self,
         function_name: &str,
@@ -163,6 +167,7 @@ impl WasmLibrary {
             .map_err(|e| LibraryError::new("E609", format!("WASM memory not found: {}", e)))?;
 
         let memory_view = memory.view(&self.store);
+        // TODO: Optimize using bulk memory operations (e.g., write_slice) for better performance
         for (i, byte) in json_bytes.iter().enumerate() {
             memory_view
                 .write_u8(ptr_value as u64 + i as u64, *byte)

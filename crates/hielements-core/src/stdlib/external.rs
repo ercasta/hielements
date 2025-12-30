@@ -45,10 +45,10 @@ pub enum LibraryConfigEntry {
         #[serde(default)]
         capabilities: WasmCapabilitiesConfig,
     },
-    /// External process library configuration
-    External {
+    /// External process library configuration with explicit type
+    ExternalTyped {
         #[serde(rename = "type")]
-        library_type: Option<String>, // Optional "external"
+        library_type: String, // Must be "external"
         executable: String,
         #[serde(default)]
         args: Vec<String>,
@@ -59,6 +59,34 @@ pub enum LibraryConfigEntry {
         #[serde(default)]
         args: Vec<String>,
     },
+}
+
+impl LibraryConfigEntry {
+    /// Validate that the library_type field has correct values
+    pub fn validate(&self) -> Result<(), String> {
+        match self {
+            LibraryConfigEntry::Wasm { library_type, .. } => {
+                if library_type != "wasm" {
+                    return Err(format!(
+                        "Invalid library type '{}', expected 'wasm'",
+                        library_type
+                    ));
+                }
+            }
+            LibraryConfigEntry::ExternalTyped { library_type, .. } => {
+                if library_type != "external" {
+                    return Err(format!(
+                        "Invalid library type '{}', expected 'external'",
+                        library_type
+                    ));
+                }
+            }
+            LibraryConfigEntry::Legacy { .. } => {
+                // Legacy format is always valid
+            }
+        }
+        Ok(())
+    }
 }
 
 /// WASM capability configuration
@@ -469,9 +497,16 @@ pub fn load_external_libraries(config_path: &Path) -> LibraryResult<Vec<External
 
     let mut libraries = Vec::new();
     for (name, entry) in config.libraries {
+        // Validate configuration entry
+        if let Err(e) = entry.validate() {
+            return Err(LibraryError::new("E512", format!(
+                "Invalid configuration for library '{}': {}", name, e
+            )));
+        }
+        
         // Only load external process libraries (not WASM)
         match entry {
-            LibraryConfigEntry::External { executable, args, .. } 
+            LibraryConfigEntry::ExternalTyped { executable, args, .. } 
             | LibraryConfigEntry::Legacy { executable, args } => {
                 libraries.push(ExternalLibrary::new(ExternalLibraryConfig {
                     name,
@@ -551,6 +586,48 @@ network = false
         } else {
             panic!("Expected WASM library config");
         }
+    }
+
+    #[test]
+    fn test_library_config_validation() {
+        // Valid WASM config
+        let wasm_config = LibraryConfigEntry::Wasm {
+            library_type: "wasm".to_string(),
+            path: "lib.wasm".to_string(),
+            capabilities: WasmCapabilitiesConfig::default(),
+        };
+        assert!(wasm_config.validate().is_ok());
+        
+        // Invalid WASM config (wrong type)
+        let invalid_wasm = LibraryConfigEntry::Wasm {
+            library_type: "invalid".to_string(),
+            path: "lib.wasm".to_string(),
+            capabilities: WasmCapabilitiesConfig::default(),
+        };
+        assert!(invalid_wasm.validate().is_err());
+        
+        // Valid external config
+        let ext_config = LibraryConfigEntry::ExternalTyped {
+            library_type: "external".to_string(),
+            executable: "cmd".to_string(),
+            args: vec![],
+        };
+        assert!(ext_config.validate().is_ok());
+        
+        // Invalid external config (wrong type)
+        let invalid_ext = LibraryConfigEntry::ExternalTyped {
+            library_type: "wrong".to_string(),
+            executable: "cmd".to_string(),
+            args: vec![],
+        };
+        assert!(invalid_ext.validate().is_err());
+        
+        // Legacy config is always valid
+        let legacy_config = LibraryConfigEntry::Legacy {
+            executable: "cmd".to_string(),
+            args: vec![],
+        };
+        assert!(legacy_config.validate().is_ok());
     }
 
     #[test]
