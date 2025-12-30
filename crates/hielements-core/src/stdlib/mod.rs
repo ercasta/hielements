@@ -3,11 +3,13 @@
 pub mod external;
 pub mod files;
 pub mod rust;
+pub mod wasm;
 
 use std::collections::HashMap;
 use std::path::Path;
 
 pub use external::{ExternalLibrary, ExternalLibraryConfig, load_external_libraries, load_workspace_libraries};
+pub use wasm::{WasmLibrary, WasmCapabilities, load_wasm_libraries, load_workspace_wasm_libraries};
 
 /// Result type for library function calls.
 pub type LibraryResult<T> = Result<T, LibraryError>;

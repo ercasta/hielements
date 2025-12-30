@@ -150,6 +150,16 @@ element hielements:
                 check rust.implements('ExternalLibrary', 'Library')
                 check rust.struct_exists('ExternalLibraryConfig')
                 check rust.function_exists('load_external_libraries')
+            
+            ## WASM library support - sandboxed plugin execution
+            element wasm:
+                scope wasm_module = files.file_selector('crates/hielements-core/src/stdlib/wasm.rs')
+                
+                check files.exists(stdlib_src, 'wasm.rs')
+                check rust.struct_exists('WasmLibrary')
+                check rust.implements('WasmLibrary', 'Library')
+                check rust.struct_exists('WasmCapabilities')
+                check rust.enum_exists('LibraryConfig')
         
         ## Span tracking for source locations
         element span:

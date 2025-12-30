@@ -27,19 +27,56 @@ pub struct ExternalLibraryConfig {
 /// Configuration file structure for hielements.toml
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct HielementsConfig {
-    /// External library configurations
+    /// Library configurations (supports both external and WASM)
     #[serde(default)]
-    pub libraries: HashMap<String, ExternalLibraryConfigEntry>,
+    pub libraries: HashMap<String, LibraryConfigEntry>,
 }
 
 /// Entry in the libraries configuration
+/// Supports both external process and WASM libraries
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ExternalLibraryConfigEntry {
-    /// Path to the executable
-    pub executable: String,
-    /// Optional arguments to pass to the executable
+#[serde(untagged)]
+pub enum LibraryConfigEntry {
+    /// WASM library configuration
+    Wasm {
+        #[serde(rename = "type")]
+        library_type: String, // Must be "wasm"
+        path: String,
+        #[serde(default)]
+        capabilities: WasmCapabilitiesConfig,
+    },
+    /// External process library configuration
+    External {
+        #[serde(rename = "type")]
+        library_type: Option<String>, // Optional "external"
+        executable: String,
+        #[serde(default)]
+        args: Vec<String>,
+    },
+    /// Legacy format (backward compatible, defaults to external)
+    Legacy {
+        executable: String,
+        #[serde(default)]
+        args: Vec<String>,
+    },
+}
+
+/// WASM capability configuration
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct WasmCapabilitiesConfig {
+    /// Allow reading files (default: true)
+    #[serde(default = "default_true")]
+    pub file_read: bool,
+    /// Allow writing files (default: false)
     #[serde(default)]
-    pub args: Vec<String>,
+    pub file_write: bool,
+    /// Allow network access (default: false, not yet implemented)
+    #[serde(default)]
+    pub network: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// JSON-RPC request structure
@@ -415,6 +452,8 @@ impl Library for ExternalLibrary {
 }
 
 /// Load external libraries from a configuration file.
+/// Note: This function now only loads external process libraries.
+/// For WASM libraries, use the new wasm module.
 pub fn load_external_libraries(config_path: &Path) -> LibraryResult<Vec<ExternalLibrary>> {
     if !config_path.exists() {
         return Ok(Vec::new());
@@ -430,11 +469,21 @@ pub fn load_external_libraries(config_path: &Path) -> LibraryResult<Vec<External
 
     let mut libraries = Vec::new();
     for (name, entry) in config.libraries {
-        libraries.push(ExternalLibrary::new(ExternalLibraryConfig {
-            name,
-            executable: entry.executable,
-            args: entry.args,
-        }));
+        // Only load external process libraries (not WASM)
+        match entry {
+            LibraryConfigEntry::External { executable, args, .. } 
+            | LibraryConfigEntry::Legacy { executable, args } => {
+                libraries.push(ExternalLibrary::new(ExternalLibraryConfig {
+                    name,
+                    executable,
+                    args,
+                }));
+            }
+            LibraryConfigEntry::Wasm { .. } => {
+                // Skip WASM libraries - they're loaded by wasm module
+                continue;
+            }
+        }
     }
 
     Ok(libraries)
@@ -462,6 +511,46 @@ docker = { executable = "hielements-docker" }
         assert_eq!(config.libraries.len(), 2);
         assert!(config.libraries.contains_key("python"));
         assert!(config.libraries.contains_key("docker"));
+    }
+
+    #[test]
+    fn test_config_with_wasm() {
+        let toml_content = r#"
+[libraries]
+wasm_lib = { type = "wasm", path = "lib.wasm" }
+external_lib = { type = "external", executable = "external" }
+legacy = { executable = "legacy" }
+"#;
+        let config: HielementsConfig = toml::from_str(toml_content).unwrap();
+        assert_eq!(config.libraries.len(), 3);
+        assert!(config.libraries.contains_key("wasm_lib"));
+        assert!(config.libraries.contains_key("external_lib"));
+        assert!(config.libraries.contains_key("legacy"));
+    }
+
+    #[test]
+    fn test_config_wasm_with_capabilities() {
+        let toml_content = r#"
+[libraries.secure]
+type = "wasm"
+path = "secure.wasm"
+
+[libraries.secure.capabilities]
+file_read = true
+file_write = false
+network = false
+"#;
+        let config: HielementsConfig = toml::from_str(toml_content).unwrap();
+        assert_eq!(config.libraries.len(), 1);
+        assert!(config.libraries.contains_key("secure"));
+        
+        if let LibraryConfigEntry::Wasm { capabilities, .. } = &config.libraries["secure"] {
+            assert!(capabilities.file_read);
+            assert!(!capabilities.file_write);
+            assert!(!capabilities.network);
+        } else {
+            panic!("Expected WASM library config");
+        }
     }
 
     #[test]
