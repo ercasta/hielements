@@ -65,7 +65,8 @@ fn handle_call(input: &str) -> String {
     };
     
     let function = request["function"].as_str().unwrap_or("");
-    let args = request["args"].as_array().unwrap_or(&vec![]);
+    let empty_vec = vec![];
+    let args = request["args"].as_array().unwrap_or(&empty_vec);
     let workspace = request["workspace"].as_str().unwrap_or(".");
     
     match function {
@@ -102,7 +103,8 @@ fn handle_check(input: &str) -> String {
     };
     
     let function = request["function"].as_str().unwrap_or("");
-    let args = request["args"].as_array().unwrap_or(&vec![]);
+    let empty_vec = vec![];
+    let args = request["args"].as_array().unwrap_or(&empty_vec);
     
     match function {
         "always_pass" => {

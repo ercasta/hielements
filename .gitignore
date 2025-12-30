@@ -3,6 +3,9 @@
 Cargo.lock.bak
 *.pdb
 
+# WASM plugins build artifacts
+examples/plugins/*/target/
+
 # VSCode Extension
 vscode-extension/node_modules/
 vscode-extension/out/
