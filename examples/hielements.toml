@@ -1,26 +1,71 @@
 # Hielements Configuration File
 #
-# This file configures external library plugins for the Hielements interpreter.
+# This file configures library plugins for the Hielements interpreter.
 # Place this file in your project root (next to your .hie files).
+#
+# Hielements supports two types of libraries:
+# 1. WASM libraries - Sandboxed WebAssembly modules (recommended for pure analysis)
+# 2. External process libraries - Standalone programs via JSON-RPC (for tools needing system access)
 
-# External Libraries
-# Each entry defines a library that can be imported in .hie files.
-# 
+# ===== WASM Libraries =====
+# Sandboxed, fast, portable. Use for pure code analysis.
+#
 # Format:
 #   [libraries]
-#   library_name = { executable = "path/to/executable", args = ["arg1", "arg2"] }
+#   library_name = { type = "wasm", path = "path/to/library.wasm" }
 #
-# Example:
+# With capabilities:
+#   library_name = { 
+#       type = "wasm", 
+#       path = "lib.wasm",
+#       capabilities = {
+#           file_read = true,    # Default: true
+#           file_write = false,  # Default: false
+#           network = false      # Default: false (not yet implemented)
+#       }
+#   }
+
+# Example WASM library (uncomment when you have a .wasm file):
+# [libraries.python_analyzer]
+# type = "wasm"
+# path = "libraries/python_analyzer.wasm"
+# capabilities = { file_read = true, file_write = false }
+
+# ===== External Process Libraries =====
+# Flexible, can call external tools. Use when you need system access.
+#
+# Format:
 #   [libraries]
-#   sample = { executable = "python3", args = ["examples/plugins/sample_plugin.py"] }
+#   library_name = { type = "external", executable = "path/to/executable", args = ["arg1", "arg2"] }
 #
-# Then in your .hie file:
+# Or legacy format (backward compatible, type defaults to "external"):
+#   library_name = { executable = "path/to/executable", args = ["arg1"] }
+
+[libraries]
+# Example: Sample Python plugin (uncomment to enable)
+# sample = { type = "external", executable = "python3", args = ["examples/plugins/sample_plugin.py"] }
+
+# Example: Legacy format (still supported)
+# sample = { executable = "python3", args = ["examples/plugins/sample_plugin.py"] }
+
+# Usage in .hie files:
+#
 #   import sample
 #   
 #   element mycomponent:
 #       scope src = sample.simple_selector('src')
 #       check sample.file_count_check(src, 100)
 
-[libraries]
-# Uncomment the following line to enable the sample plugin:
-# sample = { executable = "python3", args = ["examples/plugins/sample_plugin.py"] }
+# ===== Choosing Between WASM and External Process =====
+#
+# Use WASM when:
+#   - Writing pure code analysis (parsing, pattern matching, etc.)
+#   - Need strong security guarantees
+#   - Want maximum portability
+#   - Performance is critical
+#
+# Use External Process when:
+#   - Need to call external tools (git, docker, compilers, etc.)
+#   - Rapid prototyping in any language
+#   - Need full file system access
+#   - Working with existing analysis tools
