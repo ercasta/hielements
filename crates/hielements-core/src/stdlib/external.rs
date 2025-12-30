@@ -46,22 +46,17 @@ pub enum LibraryType {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum LibraryConfigEntry {
-    /// External process configuration
-    External {
-        #[serde(skip_serializing_if = "Option::is_none")]
-        r#type: Option<LibraryType>,
-        executable: String,
-        #[serde(default)]
-        args: Vec<String>,
-    },
-    /// WASM configuration
+    /// WASM configuration (distinguished by "path" field)
     Wasm {
         #[serde(skip_serializing_if = "Option::is_none")]
         r#type: Option<LibraryType>,
         path: String,
     },
-    /// Legacy format (backward compatible)
-    Legacy {
+    /// External process configuration (distinguished by "executable" field)
+    /// Also handles legacy format without type field
+    External {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        r#type: Option<LibraryType>,
         executable: String,
         #[serde(default)]
         args: Vec<String>,
@@ -467,8 +462,7 @@ pub fn load_external_libraries(config_path: &Path) -> LibraryResult<Vec<External
     let mut libraries = Vec::new();
     for (name, entry) in config.libraries {
         match entry {
-            LibraryConfigEntry::External { executable, args, .. } |
-            LibraryConfigEntry::Legacy { executable, args } => {
+            LibraryConfigEntry::External { executable, args, .. } => {
                 libraries.push(ExternalLibrary::new(ExternalLibraryConfig {
                     name,
                     executable,
@@ -496,8 +490,7 @@ pub fn load_workspace_libraries(workspace: &str) -> LibraryResult<Vec<ExternalLi
 /// Determines library type and loads appropriately.
 pub fn load_library(name: String, entry: LibraryConfigEntry) -> LibraryResult<Box<dyn super::Library>> {
     match entry {
-        LibraryConfigEntry::External { executable, args, .. } |
-        LibraryConfigEntry::Legacy { executable, args } => {
+        LibraryConfigEntry::External { executable, args, .. } => {
             let lib = ExternalLibrary::new(ExternalLibraryConfig {
                 name,
                 executable,

@@ -89,6 +89,12 @@ impl WasmLibrary {
                 LibraryError::new("E604", "WASM module must export 'allocate' function")
             })?;
         
+        let dealloc_func = instance
+            .get_func(&mut *store, "deallocate")
+            .ok_or_else(|| {
+                LibraryError::new("E604", "WASM module must export 'deallocate' function")
+            })?;
+        
         let args_bytes = json_args.as_bytes();
         let args_len = args_bytes.len() as i32;
         
@@ -123,12 +129,17 @@ impl WasmLibrary {
         
         // Call the function
         let mut call_results = vec![Val::I32(0), Val::I32(0)];
-        func.call(
+        let call_result = func.call(
             &mut *store,
             &[Val::I32(ptr), Val::I32(args_len)],
             &mut call_results,
-        )
-        .map_err(|e| {
+        );
+        
+        // Deallocate input memory to prevent leak
+        let _ = dealloc_func.call(&mut *store, &[Val::I32(ptr), Val::I32(args_len)], &mut vec![]);
+        
+        // Check for call error after cleanup
+        call_result.map_err(|e| {
             LibraryError::new("E609", format!("WASM function call failed: {}", e))
         })?;
         
@@ -150,6 +161,9 @@ impl WasmLibrary {
             .map_err(|e| {
                 LibraryError::new("E611", format!("Failed to read from WASM memory: {}", e))
             })?;
+        
+        // Deallocate result memory (WASM plugin is responsible for this)
+        // Note: Result memory is managed by WASM plugin, we just read it
         
         // Convert to string
         String::from_utf8(result_bytes).map_err(|e| {

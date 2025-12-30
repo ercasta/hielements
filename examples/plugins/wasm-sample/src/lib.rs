@@ -27,7 +27,10 @@ pub extern "C" fn deallocate(ptr: *mut u8, size: i32) {
 pub extern "C" fn library_call(ptr: *const u8, len: i32) -> (i32, i32) {
     let input = unsafe {
         let bytes = slice::from_raw_parts(ptr, len as usize);
-        str::from_utf8_unchecked(bytes)
+        match str::from_utf8(bytes) {
+            Ok(s) => s,
+            Err(_) => return error_result("Invalid UTF-8 input"),
+        }
     };
     
     let result = handle_call(input);
@@ -39,7 +42,10 @@ pub extern "C" fn library_call(ptr: *const u8, len: i32) -> (i32, i32) {
 pub extern "C" fn library_check(ptr: *const u8, len: i32) -> (i32, i32) {
     let input = unsafe {
         let bytes = slice::from_raw_parts(ptr, len as usize);
-        str::from_utf8_unchecked(bytes)
+        match str::from_utf8(bytes) {
+            Ok(s) => s,
+            Err(_) => return error_result("Invalid UTF-8 input"),
+        }
     };
     
     let result = handle_check(input);
@@ -55,6 +61,12 @@ fn string_to_ptr(s: &str) -> (i32, i32) {
         std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
     }
     (ptr as i32, len)
+}
+
+/// Return an error result as a pointer/length pair
+fn error_result(message: &str) -> (i32, i32) {
+    let error_json = json!({"Error": message}).to_string();
+    string_to_ptr(&error_json)
 }
 
 /// Handle a library call (selector)
