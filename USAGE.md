@@ -1,0 +1,629 @@
+# Hielements Usage Guide
+
+This guide walks you through using Hielements to describe, document, and enforce the architecture of your software systems.
+
+---
+
+## Table of Contents
+
+1. [Getting Started](#getting-started)
+2. [Writing Your First Hielements Spec](#writing-your-first-hielements-spec)
+3. [Using Element Templates](#using-element-templates)
+4. [Creating Custom Libraries](#creating-custom-libraries)
+5. [Best Practices](#best-practices)
+6. [Integration with CI/CD](#integration-with-cicd)
+7. [IDE Integration](#ide-integration)
+
+---
+
+## Getting Started
+
+### Installation
+
+Install Hielements via Cargo (Rust's package manager):
+
+```bash
+cargo install hielements
+```
+
+Verify the installation:
+
+```bash
+hielements --version
+```
+
+### Your First Check
+
+Create a file named `architecture.hie` in your project root:
+
+```hielements
+import files
+
+element my_project:
+    scope root = files.folder_selector('.')
+    
+    check files.exists(root, 'README.md')
+    check files.exists(root, 'LICENSE')
+```
+
+Run the check:
+
+```bash
+hielements check architecture.hie
+```
+
+Hielements will verify that your project has both `README.md` and `LICENSE` files.
+
+---
+
+## Writing Your First Hielements Spec
+
+### Basic Structure
+
+A Hielements specification consists of:
+- **Imports**: Libraries providing selectors and checks
+- **Elements**: Logical components of your system
+- **Scopes**: What code/artifacts belong to an element
+- **Connection Points**: APIs or interfaces the element exposes
+- **Checks**: Rules that must be satisfied
+
+### Example: Web Service Architecture
+
+```hielements
+import files
+import python
+
+element web_service:
+    ## Define scopes - what code belongs to this element
+    scope api_module = python.module_selector('src/api')
+    scope database_module = python.module_selector('src/database')
+    scope config = files.file_selector('config.yaml')
+    
+    ## Define connection points - what this element exposes
+    connection_point rest_api = python.public_functions(api_module)
+    connection_point db_connection = python.class_selector(database_module, 'Database')
+    
+    ## Define checks - rules that must be satisfied
+    check files.exists(config)
+    check python.has_tests(api_module)
+    check python.no_circular_imports(api_module)
+    check python.function_exists(api_module, 'health_check')
+```
+
+### Hierarchical Elements
+
+Build complex systems from smaller elements:
+
+```hielements
+import python
+import files
+
+element ecommerce_system:
+    ## Order management service
+    element orders_service:
+        scope module = python.module_selector('services/orders')
+        connection_point api = python.public_functions(module)
+        
+        check python.has_tests(module)
+        check python.has_docstrings(module)
+    
+    ## Payment processing service
+    element payments_service:
+        scope module = python.module_selector('services/payments')
+        connection_point api = python.public_functions(module)
+        
+        check python.has_tests(module)
+        check python.function_exists(module, 'process_payment')
+    
+    ## Shared database schema
+    element database:
+        scope migrations = files.folder_selector('db/migrations')
+        
+        check files.contains(migrations, '001_create_orders.sql')
+        check files.contains(migrations, '002_create_payments.sql')
+    
+    ## Cross-service checks
+    check python.can_import(orders_service.module, payments_service.api)
+```
+
+### Working with Multiple Technologies
+
+Hielements works across different languages and technologies:
+
+```hielements
+import python
+import docker
+import files
+
+element containerized_service:
+    ## Python application
+    scope python_src = python.module_selector('app')
+    connection_point main = python.get_main_module(python_src)
+    
+    ## Docker configuration
+    scope dockerfile = docker.file_selector('Dockerfile')
+    
+    ## Configuration files
+    scope config = files.file_selector('config.yaml')
+    
+    ## Cross-technology checks
+    check docker.base_image(dockerfile, 'python:3.11-slim')
+    check docker.exposes_port(dockerfile, 8080)
+    check docker.entry_point(dockerfile, main)
+    check python.has_tests(python_src)
+```
+
+---
+
+## Using Element Templates
+
+Element templates are reusable architectural patterns that can be instantiated with concrete implementations. Templates help enforce consistent structure across similar components.
+
+### What Are Templates?
+
+Templates define the **structure** and **requirements** that elements must satisfy. Think of them as architectural blueprints or interfaces that elements implement.
+
+### Defining a Template
+
+Use the `template` keyword to define reusable patterns:
+
+```hielements
+import rust
+
+template compiler:
+    ## Required: Lexer component
+    element lexer:
+        connection_point tokens
+    
+    ## Required: Parser component
+    element parser:
+        connection_point ast
+    
+    ## Structural check: lexer output compatible with parser input
+    check compiler.lexer.tokens.compatible_with(compiler.parser.input)
+```
+
+### Implementing a Template
+
+Use the `implements` keyword to create concrete implementations:
+
+```hielements
+element python_compiler implements compiler:
+    ## Bind lexer to concrete Rust module
+    compiler.lexer.scope = rust.module_selector('pycompiler::lexer')
+    compiler.lexer.tokens = rust.function_selector(compiler.lexer.scope, 'tokenize')
+    
+    ## Bind parser to concrete Rust module
+    compiler.parser.scope = rust.module_selector('pycompiler::parser')
+    compiler.parser.ast = rust.function_selector(compiler.parser.scope, 'parse')
+    
+    ## Add implementation-specific elements
+    element optimizer:
+        scope module = rust.module_selector('pycompiler::optimizer')
+        check rust.function_exists(module, 'optimize_ast')
+```
+
+### Multiple Template Implementation
+
+Elements can implement multiple templates:
+
+```hielements
+template microservice:
+    element api:
+        connection_point rest_endpoint
+    element database:
+        connection_point connection
+
+template observable:
+    element metrics:
+        connection_point prometheus_endpoint
+    element logging:
+        connection_point log_output
+
+## Implement both templates
+element orders_service implements microservice, observable:
+    ## Microservice bindings
+    microservice.api.scope = python.module_selector('orders.api')
+    microservice.database.scope = postgres.database_selector('orders_db')
+    
+    ## Observable bindings
+    observable.metrics.scope = python.module_selector('orders.metrics')
+    observable.logging.scope = python.module_selector('orders.logging')
+    
+    ## Cross-template checks
+    check microservice.api.exposes_rest()
+    check observable.metrics.prometheus_endpoint.is_available()
+```
+
+### Benefits of Templates
+
+1. **Consistency**: Ensure similar components follow the same structure
+2. **Reusability**: Define architectural patterns once, use everywhere
+3. **Evolution**: Update the template to update all implementations
+4. **Documentation**: Templates serve as architectural documentation
+5. **Validation**: Automatically verify implementations conform to patterns
+
+### When to Use Templates
+
+Use templates when:
+- You have multiple components with similar structure (e.g., multiple microservices)
+- You want to enforce architectural patterns (e.g., hexagonal architecture)
+- You need consistent structure across teams or projects
+- You're building a framework or platform with expected patterns
+
+Don't use templates when:
+- Components are truly unique with no shared structure
+- The pattern is used only once
+- The abstraction would be more complex than the concrete code
+
+---
+
+## Creating Custom Libraries
+
+Hielements is extensible via custom libraries. Libraries provide selectors (to identify code) and checks (to verify properties).
+
+### When to Create a Custom Library
+
+Create a custom library when you need to:
+- Support a new programming language or technology
+- Add domain-specific checks for your organization
+- Integrate with existing static analysis tools
+- Extend Hielements with custom functionality
+
+### Library Types
+
+1. **Built-in Libraries**: Rust libraries compiled into Hielements (files, rust)
+2. **External Libraries**: Standalone programs communicating via JSON-RPC
+
+For most use cases, external libraries are recommended as they:
+- Can be written in any language (Python, JavaScript, Go, etc.)
+- Don't require modifying Hielements source code
+- Can leverage existing tools and libraries
+- Run in isolated processes for security
+
+### Creating an External Library
+
+External libraries are programs that communicate with Hielements via JSON-RPC over stdin/stdout.
+
+#### Quick Start
+
+1. **Configure the library** in `hielements.toml`:
+
+```toml
+[libraries]
+mylib = { executable = "python3", args = ["scripts/mylib.py"] }
+```
+
+2. **Implement the protocol** in your chosen language:
+
+```python
+#!/usr/bin/env python3
+import json
+import sys
+
+def handle_call(function, args, workspace):
+    """Handle selector function calls."""
+    if function == "my_selector":
+        # Your selector logic here
+        return {
+            "Scope": {
+                "kind": {"Folder": "src/"},
+                "paths": ["/path/to/file1.py", "/path/to/file2.py"],
+                "resolved": True
+            }
+        }
+    raise ValueError(f"Unknown function: {function}")
+
+def handle_check(function, args, workspace):
+    """Handle check function calls."""
+    if function == "my_check":
+        # Your check logic here
+        return {"Pass": None}  # or {"Fail": "reason"} or {"Error": "message"}
+    raise ValueError(f"Unknown check: {function}")
+
+def main():
+    for line in sys.stdin:
+        request = json.loads(line.strip())
+        method = request.get("method")
+        params = request.get("params", {})
+        
+        if method == "library.call":
+            result = handle_call(
+                params.get("function"),
+                params.get("args", []),
+                params.get("workspace", ".")
+            )
+        elif method == "library.check":
+            result = handle_check(
+                params.get("function"),
+                params.get("args", []),
+                params.get("workspace", ".")
+            )
+        
+        response = {"jsonrpc": "2.0", "result": result, "id": request.get("id")}
+        print(json.dumps(response), flush=True)
+
+if __name__ == "__main__":
+    main()
+```
+
+3. **Use the library** in your Hielements specs:
+
+```hielements
+import mylib
+
+element my_component:
+    scope src = mylib.my_selector('src/')
+    check mylib.my_check(src)
+```
+
+### Detailed Documentation
+
+For complete documentation on creating custom libraries, including:
+- Full protocol specification
+- Value type serialization
+- Error handling
+- Best practices
+- Troubleshooting
+
+See [External Library Plugin Guide](doc/external_libraries.md).
+
+### Library Development Workflow
+
+1. **Design**: Define what selectors and checks your library will provide
+2. **Implement**: Write the library following the JSON-RPC protocol
+3. **Test**: Test manually with echo commands and unit tests
+4. **Configure**: Add to `hielements.toml`
+5. **Use**: Import and use in your `.hie` files
+6. **Iterate**: Refine based on usage
+
+---
+
+## Best Practices
+
+### Organizing Hielements Specs
+
+#### Single File vs. Multiple Files
+
+**Single File** (`architecture.hie`):
+- Good for small projects
+- Easier to understand at a glance
+- Simple to maintain
+
+**Multiple Files** (use imports):
+- Better for large projects
+- Organize by domain or layer
+- Easier to collaborate
+
+Example multi-file structure:
+```
+architecture/
+  ├── main.hie          # Top-level system description
+  ├── services.hie      # Microservices definitions
+  ├── infrastructure.hie # Infrastructure elements
+  └── templates.hie     # Reusable templates
+```
+
+### Naming Conventions
+
+- **Elements**: Use descriptive names matching your domain (`orders_service`, `payment_gateway`)
+- **Scopes**: Name after what they select (`api_module`, `config_file`, `dockerfile`)
+- **Connection Points**: Name after what they expose (`rest_api`, `database_connection`, `event_queue`)
+- **Templates**: Use generic pattern names (`microservice`, `compiler`, `hexagonal_architecture`)
+
+### Writing Effective Checks
+
+#### Do: Write Specific, Actionable Checks
+
+```hielements
+# Good - specific and actionable
+check docker.exposes_port(dockerfile, 8080)
+check python.function_exists(module, 'health_check')
+check files.max_size(config, 1048576)  # 1MB
+```
+
+#### Don't: Write Vague or Unverifiable Checks
+
+```hielements
+# Bad - too vague
+check "service is good"
+check "follows best practices"
+```
+
+### Incremental Adoption
+
+Start small and grow:
+
+1. **Phase 1**: Document existing structure
+   ```hielements
+   element my_service:
+       scope src = files.folder_selector('src/')
+       check files.exists(src, 'main.py')
+   ```
+
+2. **Phase 2**: Add basic checks
+   ```hielements
+   check python.has_tests(src)
+   check python.no_syntax_errors(src)
+   ```
+
+3. **Phase 3**: Enforce relationships
+   ```hielements
+   check python.no_circular_imports(module_a, module_b)
+   check docker.entry_point(dockerfile, python_main)
+   ```
+
+4. **Phase 4**: Use templates for consistency
+   ```hielements
+   element service_a implements microservice:
+       # Ensures consistent structure
+   ```
+
+### Documentation with Comments
+
+Use comments to explain architectural decisions:
+
+```hielements
+## Orders Service
+## Handles order creation, updates, and fulfillment.
+## Must remain independent from payment processing for PCI compliance.
+element orders_service:
+    scope module = python.module_selector('services.orders')
+    
+    ## Ensure no direct dependency on payments
+    ## (must use event bus instead)
+    check python.no_dependency(module, payments_service.module)
+```
+
+---
+
+## Integration with CI/CD
+
+### GitHub Actions
+
+Add architecture checks to your CI pipeline:
+
+```yaml
+# .github/workflows/architecture.yml
+name: Architecture Checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  architecture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Hielements
+        run: cargo install hielements
+      
+      - name: Check Architecture
+        run: hielements check architecture.hie
+```
+
+### GitLab CI
+
+```yaml
+# .gitlab-ci.yml
+architecture:
+  stage: test
+  image: rust:latest
+  script:
+    - cargo install hielements
+    - hielements check architecture.hie
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+```
+
+### Pre-commit Hooks
+
+Run checks before committing:
+
+```bash
+# .git/hooks/pre-commit
+#!/bin/bash
+hielements check architecture.hie
+if [ $? -ne 0 ]; then
+    echo "Architecture checks failed. Please fix violations before committing."
+    exit 1
+fi
+```
+
+---
+
+## IDE Integration
+
+### VS Code Extension
+
+Install the Hielements extension for VS Code:
+
+1. Open VS Code
+2. Go to Extensions (Ctrl+Shift+X)
+3. Search for "Hielements"
+4. Click Install
+
+**Features:**
+- Syntax highlighting
+- Real-time error checking
+- Go to definition
+- Auto-completion
+- Inline documentation
+
+### Language Server Protocol
+
+Hielements implements the Language Server Protocol (LSP), enabling integration with any LSP-compatible editor:
+
+- VS Code
+- Vim/Neovim (via coc.nvim or built-in LSP)
+- Emacs (via lsp-mode)
+- Sublime Text
+- Atom
+
+---
+
+## Advanced Topics
+
+### Using Element Templates at Scale
+
+For large organizations, consider:
+
+1. **Template Libraries**: Create organization-wide template libraries
+2. **Template Governance**: Establish processes for creating and updating templates
+3. **Template Documentation**: Document each template's purpose and usage
+4. **Template Versioning**: Version templates independently of implementations
+
+### Custom Library Development
+
+For complex libraries:
+
+1. **Caching**: Cache analysis results for performance
+2. **Incremental Analysis**: Only re-analyze changed files
+3. **External Tool Integration**: Leverage existing static analysis tools
+4. **Error Handling**: Provide clear, actionable error messages
+
+### Multi-Repository Architecture
+
+For microservices or monorepos:
+
+```hielements
+## In repository A
+element service_a:
+    scope module = python.module_selector('src/')
+    connection_point api = python.public_functions(module)
+
+## In repository B
+import service_a from "https://git.example.com/service_a/architecture.hie"
+
+element service_b:
+    scope module = python.module_selector('src/')
+    check can_communicate(module, service_a.api)
+```
+
+---
+
+## Getting Help
+
+- 📖 [Language Reference](doc/language_reference.md) - Complete syntax reference
+- 🔌 [External Libraries Guide](doc/external_libraries.md) - Creating custom libraries
+- 🏗️ [Technical Architecture](doc/technical_architecture.md) - Implementation details
+- 💬 [Discussions](https://github.com/ercasta/hielements/discussions) - Ask questions
+- 🐛 [Issue Tracker](https://github.com/ercasta/hielements/issues) - Report bugs
+
+---
+
+## Next Steps
+
+1. **Explore Examples**: Check out the [`examples/`](examples/) directory
+2. **Read the Language Reference**: Dive deep into [language_reference.md](doc/language_reference.md)
+3. **Create Your First Spec**: Start with a simple element describing part of your system
+4. **Add Checks**: Gradually add checks to enforce your architecture
+5. **Use Templates**: Abstract common patterns into reusable templates
+6. **Integrate CI/CD**: Add architecture checks to your pipeline
+7. **Extend with Libraries**: Create custom libraries for your needs
+
+Happy architecting with Hielements! 🏗️

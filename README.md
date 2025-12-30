@@ -18,6 +18,7 @@ Modern software systems are complex. As codebases grow, their actual structure d
 - ✅ **Enforcing architectural rules** via static checks
 - 🔗 **Making relationships explicit** between components
 - 🏗️ **Supporting hierarchical composition** for complex systems
+- 🎨 **Enabling reusable templates** for consistent architectural patterns
 - 🌐 **Working across languages** (Python, Docker, Terraform, and more)
 - 🤝 **Enabling human-AI collaboration** through structured specifications
 
@@ -47,9 +48,53 @@ element orders_service:
 
 Run `hielements check` and Hielements will verify your architecture against the actual code. If someone changes the Dockerfile or renames the module, the checks will fail—keeping your architecture in sync.
 
+### Reusable Templates
+
+Define architectural patterns once and reuse them across your system:
+
+```hielements
+# Define a template for microservices
+template microservice:
+    element api:
+        connection_point rest_endpoint
+    element database:
+        connection_point connection
+    check microservice.api.exposes_rest()
+
+# Implement the template multiple times
+element orders_service implements microservice:
+    microservice.api.scope = python.module_selector('orders.api')
+    microservice.database.scope = postgres.database_selector('orders_db')
+
+element payments_service implements microservice:
+    microservice.api.scope = python.module_selector('payments.api')
+    microservice.database.scope = postgres.database_selector('payments_db')
+```
+
+Templates ensure consistency across similar components and make architectural patterns explicit.
+
 ---
 
 ## Key Features
+
+### 🧩 Reusable Element Templates
+
+Define architectural patterns once and reuse them across your codebase:
+
+```hielements
+template compiler:
+    element lexer:
+        connection_point tokens
+    element parser:
+        connection_point ast
+    check compiler.lexer.tokens.compatible_with(compiler.parser.input)
+
+element python_compiler implements compiler:
+    compiler.lexer.scope = rust.module_selector('pycompiler::lexer')
+    compiler.parser.scope = rust.module_selector('pycompiler::parser')
+```
+
+Templates ensure consistency across similar components, making architectural patterns explicit and enforceable.
 
 ### 🎯 Cross-Technology Elements
 
@@ -99,6 +144,8 @@ check files.matches_pattern(config, '*.yaml')
 ### 🧩 Extensible via Libraries
 
 Built-in support for Python, Docker, and files/folders. Add support for any language by creating Hielements libraries.
+
+Learn how to create custom libraries in the [Usage Guide](USAGE.md#creating-custom-libraries) or [External Libraries Guide](doc/external_libraries.md).
 
 ---
 
@@ -206,7 +253,7 @@ Hielements evaluates all rules against your actual codebase and reports violatio
 cargo install hielements
 
 # Or download binary from releases
-# https://github.com/yourorg/hielements/releases
+# https://github.com/ercasta/hielements/releases
 ```
 
 ### Your First Hielements Spec
@@ -226,6 +273,14 @@ Run the check:
 hielements check architecture.hie
 ```
 
+### Learn More
+
+📖 **[Usage Guide](USAGE.md)** - Comprehensive guide covering:
+- Writing Hielements specifications
+- Using element templates for reusable patterns
+- Creating custom libraries
+- Best practices and CI/CD integration
+
 ### IDE Support
 
 Install the Hielements extension for VSCode:
@@ -238,7 +293,9 @@ Install the Hielements extension for VSCode:
 
 ## Documentation
 
+- 📘 **[Usage Guide](USAGE.md)** - Complete guide to using Hielements
 - 📖 [Language Reference](doc/language_reference.md) - Complete syntax and semantics
+- 🔌 [External Libraries Guide](doc/external_libraries.md) - Creating custom libraries
 - 🏗️ [Technical Architecture](doc/technical_architecture.md) - Implementation details
 - 🔍 [Related Work](doc/related_work.md) - Comparison with similar tools
 - 📝 [Summary](doc/summary.md) - High-level overview
@@ -252,8 +309,9 @@ Install the Hielements extension for VSCode:
 ### Roadmap
 
 - [x] Language design and specification
-- [ ] Core interpreter implementation (Rust)
-- [ ] Standard libraries (Python, Docker, files)
+- [x] Core interpreter implementation (Rust)
+- [x] Standard libraries (Python, Docker, files)
+- [x] Element templates for reusable patterns
 - [ ] VSCode extension
 - [ ] Language Server Protocol
 - [ ] CI/CD integration templates
