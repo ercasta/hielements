@@ -116,8 +116,19 @@ pub struct ScopeDeclaration {
 pub struct ConnectionPointDeclaration {
     /// Connection point name
     pub name: Identifier,
+    /// Type annotation (mandatory)
+    pub type_annotation: TypeAnnotation,
     /// Expression defining the connection point
     pub expression: Expression,
+    /// Source span
+    pub span: Span,
+}
+
+/// A type annotation for connection points.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TypeAnnotation {
+    /// Type identifier (e.g., "string", "integer", "TokenStream")
+    pub type_name: Identifier,
     /// Source span
     pub span: Span,
 }

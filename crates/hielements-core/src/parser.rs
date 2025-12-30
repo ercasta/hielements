@@ -433,6 +433,11 @@ impl<'a> Parser<'a> {
         let start_span = self.current_span();
         self.expect(TokenKind::ConnectionPoint)?;
         let name = self.parse_identifier()?;
+        
+        // Parse mandatory type annotation: `: <type>`
+        self.expect(TokenKind::Colon)?;
+        let type_annotation = self.parse_type_annotation()?;
+        
         self.expect(TokenKind::Equals)?;
         let expression = self.parse_expression()?;
         self.expect_newline()?;
@@ -440,6 +445,7 @@ impl<'a> Parser<'a> {
 
         Ok(ConnectionPointDeclaration {
             name,
+            type_annotation,
             expression,
             span: start_span.merge(&end_span),
         })
@@ -456,6 +462,17 @@ impl<'a> Parser<'a> {
         Ok(CheckDeclaration {
             expression,
             span: start_span.merge(&end_span),
+        })
+    }
+
+    /// Parse a type annotation.
+    fn parse_type_annotation(&mut self) -> Result<TypeAnnotation, Diagnostic> {
+        let type_name = self.parse_identifier()?;
+        let span = type_name.span;
+        
+        Ok(TypeAnnotation {
+            type_name,
+            span,
         })
     }
 
@@ -799,9 +816,9 @@ element service:
     fn test_parse_template_declaration() {
         let source = r#"template compiler:
     element lexer:
-        connection_point tokens = rust.function_selector('tokenize')
+        connection_point tokens: TokenStream = rust.function_selector('tokenize')
     element parser:
-        connection_point ast = rust.function_selector('parse')
+        connection_point ast: AbstractSyntaxTree = rust.function_selector('parse')
     check compiler.lexer.tokens.compatible_with(compiler.parser.input)
 "#;
         let parser = Parser::new(source, "test.hie");
@@ -875,7 +892,7 @@ element service:
     scope config = files.file_selector('config.yaml')
     
     element api:
-        connection_point endpoint = rust.function_selector('api_handler')
+        connection_point endpoint: HttpHandler = rust.function_selector('api_handler')
     
     check microservice.api.endpoint.is_valid()
 "#;
@@ -888,5 +905,74 @@ element service:
         assert_eq!(program.templates[0].scopes.len(), 1);
         assert_eq!(program.templates[0].elements.len(), 1);
         assert_eq!(program.templates[0].checks.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_connection_point_with_type() {
+        let source = r#"element api_service:
+    connection_point port: integer = docker.exposed_port(dockerfile)
+    connection_point url: string = config.get_api_url()
+    connection_point enabled: boolean = config.get_flag('api_enabled')
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.elements.len(), 1);
+        let element = &program.elements[0];
+        assert_eq!(element.connection_points.len(), 3);
+        
+        // Check first connection point with type
+        assert_eq!(element.connection_points[0].name.name, "port");
+        assert_eq!(element.connection_points[0].type_annotation.type_name.name, "integer");
+        
+        // Check second connection point with type
+        assert_eq!(element.connection_points[1].name.name, "url");
+        assert_eq!(element.connection_points[1].type_annotation.type_name.name, "string");
+        
+        // Check third connection point with type
+        assert_eq!(element.connection_points[2].name.name, "enabled");
+        assert_eq!(element.connection_points[2].type_annotation.type_name.name, "boolean");
+    }
+
+    #[test]
+    fn test_parse_connection_point_without_type_fails() {
+        let source = r#"element api_service:
+    connection_point endpoint = python.public_functions(module)
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (_program, diagnostics) = parser.parse();
+
+        // Should have errors because type annotation is mandatory
+        assert!(diagnostics.has_errors(), "Expected error for missing type annotation");
+    }
+
+    #[test]
+    fn test_parse_connection_point_with_custom_type() {
+        let source = r#"template compiler:
+    element lexer:
+        connection_point tokens: TokenStream = rust.struct_selector('Token')
+    element parser:
+        connection_point ast: AbstractSyntaxTree = rust.struct_selector('Program')
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.templates.len(), 1);
+        let template = &program.templates[0];
+        assert_eq!(template.elements.len(), 2);
+        
+        // Check lexer connection point with custom type
+        let lexer = &template.elements[0];
+        assert_eq!(lexer.connection_points[0].name.name, "tokens");
+        assert_eq!(lexer.connection_points[0].type_annotation.type_name.name, "TokenStream");
+        
+        // Check parser connection point with custom type
+        let parser_elem = &template.elements[1];
+        assert_eq!(parser_elem.connection_points[0].name.name, "ast");
+        assert_eq!(parser_elem.connection_points[0].type_annotation.type_name.name, "AbstractSyntaxTree");
     }
 }

@@ -25,8 +25,8 @@ element hielements:
             scope module = rust.module_selector('lexer')
             
             ## Connection points: what the lexer produces
-            connection_point token_output = rust.struct_selector('Token')
-            connection_point token_kinds = rust.enum_selector('TokenKind')
+            connection_point token_output: Token = rust.struct_selector('Token')
+            connection_point token_kinds: TokenKind = rust.enum_selector('TokenKind')
             
             check rust.struct_exists('Lexer')
             check rust.enum_exists('TokenKind')
@@ -39,7 +39,7 @@ element hielements:
             scope lexer_module = rust.module_selector('lexer')
             
             ## Connection points: what parser consumes and produces
-            connection_point ast_output = rust.struct_selector('Program')
+            connection_point ast_output: Program = rust.struct_selector('Program')
             
             check rust.struct_exists('Parser')
             check rust.function_exists('parse')
@@ -53,9 +53,9 @@ element hielements:
             scope module = rust.module_selector('ast')
             
             ## Connection points: AST types used by other components
-            connection_point program_type = rust.struct_selector('Program')
-            connection_point element_type = rust.struct_selector('Element')
-            connection_point expression_type = rust.enum_selector('Expression')
+            connection_point program_type: Program = rust.struct_selector('Program')
+            connection_point element_type: Element = rust.struct_selector('Element')
+            connection_point expression_type: Expression = rust.enum_selector('Expression')
             
             check rust.struct_exists('Program')
             check rust.struct_exists('Element')
@@ -74,7 +74,7 @@ element hielements:
             scope lexer_module = rust.module_selector('lexer')
             
             ## Connection points: interpreter interfaces
-            connection_point check_output = rust.enum_selector('CheckResult')
+            connection_point check_output: CheckResult = rust.enum_selector('CheckResult')
             
             check rust.struct_exists('Interpreter')
             check rust.function_exists('validate')
@@ -95,7 +95,7 @@ element hielements:
             scope module = rust.module_selector('diagnostics')
             
             ## Connection point: error types used throughout
-            connection_point diagnostic_type = rust.struct_selector('Diagnostic')
+            connection_point diagnostic_type: Diagnostic = rust.struct_selector('Diagnostic')
             
             check rust.struct_exists('Diagnostic')
             check rust.struct_exists('Diagnostics')
@@ -109,8 +109,8 @@ element hielements:
             scope interpreter_module = rust.module_selector('interpreter')
             
             ## Connection point: extension interface for adding new libraries
-            connection_point library_trait = rust.trait_selector('Library')
-            connection_point value_type = rust.enum_selector('Value')
+            connection_point library_trait: Library = rust.trait_selector('Library')
+            connection_point value_type: Value = rust.enum_selector('Value')
             
             check files.exists(stdlib_src, 'mod.rs')
             check files.exists(stdlib_src, 'files.rs')
@@ -156,8 +156,8 @@ element hielements:
             scope module = rust.module_selector('span')
             
             ## Connection point: location types used for error reporting
-            connection_point span_type = rust.struct_selector('Span')
-            connection_point position_type = rust.struct_selector('Position')
+            connection_point span_type: Span = rust.struct_selector('Span')
+            connection_point position_type: Position = rust.struct_selector('Position')
             
             check rust.struct_exists('Position')
             check rust.struct_exists('Span')

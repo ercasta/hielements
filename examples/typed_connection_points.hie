@@ -1,0 +1,72 @@
+# Example: Typed Connection Points
+# Demonstrates explicit type annotations for connection points
+# to enable type-safe integration across multiple libraries and languages
+
+import files
+import rust
+
+## API Service Example
+## Shows how type annotations help document and validate connection point interfaces
+element api_service:
+    scope api_module = rust.module_selector('api')
+    scope config_file = files.file_selector('config.yaml')
+    
+    ## Basic type annotations
+    connection_point port: integer = rust.const_selector('PORT')
+    connection_point host: string = rust.const_selector('HOST')
+    connection_point debug_mode: boolean = rust.const_selector('DEBUG')
+    connection_point timeout: float = rust.const_selector('TIMEOUT')
+    
+    ## Custom type annotations
+    connection_point handler: HttpHandler = rust.function_selector(api_module, 'handle_request')
+    connection_point middleware: Middleware = rust.function_selector(api_module, 'apply_middleware')
+    connection_point routes: Routes = rust.function_selector(api_module, 'get_routes')
+    
+    check rust.function_exists(api_module, 'handle_request')
+    check rust.function_exists(api_module, 'apply_middleware')
+    check rust.function_exists(api_module, 'get_routes')
+
+## Database Service Example
+## Shows typed connection points for database interactions
+element database_service:
+    scope db_module = rust.module_selector('database')
+    
+    connection_point connection: DbConnection = rust.struct_selector(db_module, 'Connection')
+    connection_point pool_size: integer = rust.const_selector('POOL_SIZE')
+    connection_point retry_attempts: integer = rust.const_selector('MAX_RETRIES')
+    connection_point connection_timeout: float = rust.const_selector('CONN_TIMEOUT')
+    
+    check rust.struct_exists(db_module, 'Connection')
+
+## Compiler Example
+## Shows typed connection points in a compiler pipeline
+template compiler_pipeline:
+    element source_reader:
+        scope module = rust.module_selector('reader')
+        connection_point source_code: string = rust.function_selector(module, 'read_source')
+    
+    element lexer:
+        scope module = rust.module_selector('lexer')
+        connection_point tokens: TokenStream = rust.function_selector(module, 'tokenize')
+    
+    element parser:
+        scope module = rust.module_selector('parser')
+        connection_point ast: AbstractSyntaxTree = rust.function_selector(module, 'parse')
+    
+    element code_generator:
+        scope module = rust.module_selector('codegen')
+        connection_point output: string = rust.function_selector(module, 'generate')
+
+## Concrete Compiler Implementation
+element python_compiler implements compiler_pipeline:
+    compiler_pipeline.source_reader.scope = rust.module_selector('pycompiler::reader')
+    compiler_pipeline.source_reader.source_code = rust.function_selector(compiler_pipeline.source_reader.scope, 'read')
+    
+    compiler_pipeline.lexer.scope = rust.module_selector('pycompiler::lexer')
+    compiler_pipeline.lexer.tokens = rust.function_selector(compiler_pipeline.lexer.scope, 'tokenize')
+    
+    compiler_pipeline.parser.scope = rust.module_selector('pycompiler::parser')
+    compiler_pipeline.parser.ast = rust.function_selector(compiler_pipeline.parser.scope, 'parse')
+    
+    compiler_pipeline.code_generator.scope = rust.module_selector('pycompiler::codegen')
+    compiler_pipeline.code_generator.output = rust.function_selector(compiler_pipeline.code_generator.scope, 'generate_bytecode')
