@@ -1,0 +1,69 @@
+## Standard Library Specification
+## Defines the structure of the stdlib module in hielements-core.
+
+import files
+import rust
+
+## Standard Library
+element stdlib:
+    scope module = rust.module_selector('stdlib')
+    scope stdlib_src = files.folder_selector('crates/hielements-core/src/stdlib')
+    scope parser_module = rust.module_selector('parser')
+    scope interpreter_module = rust.module_selector('interpreter')
+    
+    ## Connection point: extension interface for adding new libraries
+    connection_point library_trait: Library = rust.trait_selector('Library')
+    connection_point value_type: Value = rust.enum_selector('Value')
+    
+    check files.exists(stdlib_src, 'mod.rs')
+    check files.exists(stdlib_src, 'files.rs')
+    check files.exists(stdlib_src, 'rust.rs')
+    
+    check rust.trait_exists('Library')
+    check rust.struct_exists('LibraryRegistry')
+    check rust.enum_exists('Value')
+    check rust.enum_exists('CheckResult')
+    
+    ## Behavioral: stdlib is a leaf dependency - should NOT depend on parser/interpreter
+    check rust.no_dependency(module, parser_module)
+    check rust.no_dependency(module, interpreter_module)
+    
+    ## Files library - file system operations
+    element files_library:
+        scope files_module = files.file_selector('crates/hielements-core/src/stdlib/files.rs')
+        
+        check rust.struct_exists('FilesLibrary')
+        check rust.implements('FilesLibrary', 'Library')
+        check rust.has_tests(files_module)
+    
+    ## Rust library - Rust code analysis
+    element rust_library:
+        scope rust_module = files.file_selector('crates/hielements-core/src/stdlib/rust.rs')
+        
+        check rust.struct_exists('RustLibrary')
+        check rust.implements('RustLibrary', 'Library')
+        check rust.has_tests(rust_module)
+    
+    ## External library support - allows user-defined plugins
+    element external:
+        scope external_module = files.file_selector('crates/hielements-core/src/stdlib/external.rs')
+        
+        check files.exists(stdlib_src, 'external.rs')
+        check rust.struct_exists('ExternalLibrary')
+        check rust.implements('ExternalLibrary', 'Library')
+        check rust.struct_exists('ExternalLibraryConfig')
+        check rust.function_exists('load_external_libraries')
+        check rust.enum_exists('LibraryType')
+        check rust.has_tests(external_module)
+    
+    ## WASM library support - sandboxed plugins (infrastructure in place)
+    element wasm:
+        scope wasm_module = files.file_selector('crates/hielements-core/src/stdlib/wasm.rs')
+        
+        check files.exists(stdlib_src, 'wasm.rs')
+        check rust.struct_exists('WasmLibrary')
+        check rust.implements('WasmLibrary', 'Library')
+        check rust.struct_exists('WasmLibraryConfig')
+        check rust.function_exists('load_wasm_libraries')
+        check rust.function_exists('load_workspace_wasm_libraries')
+        check rust.has_tests(wasm_module)

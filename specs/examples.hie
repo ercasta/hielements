@@ -1,0 +1,19 @@
+## Examples Specification
+## Defines required example files.
+
+import files
+
+## Examples
+element examples:
+    scope examples = files.folder_selector('examples')
+    
+    check files.exists(examples, 'minimal.hie')
+    check files.exists(examples, 'simple.hie')
+    check files.exists(examples, 'microservices.hie')
+    check files.exists(examples, 'plugin_example.hie')
+    check files.exists(examples, 'hybrid_plugins.hie')
+    check files.exists(examples, 'template_compiler.hie')
+    check files.exists(examples, 'template_microservice.hie')
+    check files.exists(examples, 'hierarchical.hie')
+    check files.exists(examples, 'hielements.toml')
+    check files.exists(examples, 'hielements_hybrid.toml')

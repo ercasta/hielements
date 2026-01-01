@@ -1,0 +1,16 @@
+## CI/CD Specification
+## Defines required CI/CD configuration.
+
+import files
+
+## CI/CD and automation
+element cicd:
+    scope github_dir = files.folder_selector('.github')
+    scope workflows = files.folder_selector('.github/workflows')
+    
+    ## GitHub Actions workflows
+    check files.exists(workflows, 'ci.yml')
+    check files.exists(workflows, 'codeql.yml')
+    
+    ## Dependabot configuration
+    check files.exists(github_dir, 'dependabot.yml')

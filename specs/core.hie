@@ -1,0 +1,125 @@
+## Core Library Specification
+## Defines the structure of the hielements-core crate.
+
+import files
+import rust
+
+## Core library providing lexing, parsing, interpretation
+element core:
+    scope src = files.folder_selector('crates/hielements-core/src')
+    scope crate = rust.crate_selector('hielements-core')
+    
+    check files.exists(src, 'lib.rs')
+    
+    ## Lexer - tokenizes .hie source files using logos
+    element lexer:
+        scope module = rust.module_selector('lexer')
+        
+        ## Connection points: what the lexer produces
+        connection_point token_output: Token = rust.struct_selector('Token')
+        connection_point token_kinds: TokenKind = rust.enum_selector('TokenKind')
+        
+        check rust.struct_exists('Lexer')
+        check rust.enum_exists('TokenKind')
+        check rust.has_tests(module)
+        check rust.has_docs(module)
+    
+    ## Parser - produces AST from token stream
+    element parser:
+        scope module = rust.module_selector('parser')
+        scope lexer_module = rust.module_selector('lexer')
+        
+        ## Connection points: what parser consumes and produces
+        connection_point ast_output: Program = rust.struct_selector('Program')
+        
+        check rust.struct_exists('Parser')
+        check rust.function_exists('parse')
+        check rust.has_tests(module)
+        
+        ## Behavioral: Parser depends on lexer for tokens
+        check rust.depends_on(module, lexer_module)
+    
+    ## AST - typed representation of parsed programs
+    element ast:
+        scope module = rust.module_selector('ast')
+        
+        ## Connection points: AST types used by other components
+        connection_point program_type: Program = rust.struct_selector('Program')
+        connection_point element_type: Element = rust.struct_selector('Element')
+        connection_point expression_type: Expression = rust.enum_selector('Expression')
+        
+        check rust.struct_exists('Program')
+        check rust.struct_exists('Element')
+        check rust.enum_exists('Expression')
+        
+        ## Template support structures
+        check rust.struct_exists('Template')
+        check rust.struct_exists('TemplateImplementation')
+        check rust.struct_exists('TemplateBinding')
+        
+        ## Unified component requirement structures
+        check rust.struct_exists('ComponentRequirement')
+        check rust.enum_exists('RequirementAction')
+        check rust.enum_exists('ComponentSpec')
+        check rust.struct_exists('ConnectionPattern')
+    
+    ## Interpreter - semantic validation and check execution
+    element interpreter:
+        scope module = rust.module_selector('interpreter')
+        scope parser_module = rust.module_selector('parser')
+        scope stdlib_module = rust.module_selector('stdlib')
+        scope lexer_module = rust.module_selector('lexer')
+        
+        ## Connection points: interpreter interfaces
+        connection_point check_output: CheckResult = rust.enum_selector('CheckResult')
+        
+        check rust.struct_exists('Interpreter')
+        check rust.function_exists('validate')
+        check rust.function_exists('run')
+        
+        ## Behavioral: Interpreter depends on parser (for AST types)
+        check rust.depends_on(module, parser_module)
+        
+        ## Behavioral: Interpreter depends on stdlib for check execution
+        check rust.depends_on(module, stdlib_module)
+        
+        ## Behavioral: Interpreter should NOT directly depend on lexer
+        ## (it goes through parser's AST abstraction)
+        check rust.no_dependency(module, lexer_module)
+    
+    ## Diagnostics - error reporting infrastructure
+    element diagnostics:
+        scope module = rust.module_selector('diagnostics')
+        
+        ## Connection point: error types used throughout
+        connection_point diagnostic_type: Diagnostic = rust.struct_selector('Diagnostic')
+        
+        check rust.struct_exists('Diagnostic')
+        check rust.struct_exists('Diagnostics')
+        check rust.enum_exists('DiagnosticSeverity')
+    
+    ## Span tracking for source locations
+    element span:
+        scope module = rust.module_selector('span')
+        
+        ## Connection point: location types used for error reporting
+        connection_point span_type: Span = rust.struct_selector('Span')
+        connection_point position_type: Position = rust.struct_selector('Position')
+        
+        check rust.struct_exists('Position')
+        check rust.struct_exists('Span')
+    
+    ## ===== Core Pipeline Connections =====
+    ## These checks verify the data flow through the compilation pipeline:
+    ## Source -> Lexer -> Parser -> Interpreter -> Results
+    
+    scope lexer_mod = rust.module_selector('lexer')
+    scope parser_mod = rust.module_selector('parser')
+    scope interpreter_mod = rust.module_selector('interpreter')
+    scope ast_mod = rust.module_selector('ast')
+    
+    ## Verify parser uses lexer types (Token, TokenKind)
+    check rust.depends_on(parser_mod, lexer_mod)
+    
+    ## Verify interpreter uses parser/AST types (Program, etc)
+    check rust.depends_on(interpreter_mod, ast_mod)

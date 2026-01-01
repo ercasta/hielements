@@ -138,12 +138,10 @@ impl Interpreter {
             self.validate_expression(&check.expression, file_path, diagnostics);
         }
 
-        // Validate hierarchical requirements
-        for req in &template.hierarchical_requirements {
-            self.validate_hierarchical_requirement(req, file_path, diagnostics);
+        // Validate component requirements
+        for req in &template.component_requirements {
+            self.validate_component_requirement(req, file_path, diagnostics);
         }
-
-        // Connection boundaries don't need expression validation
 
         // Validate child elements
         for element in &template.elements {
@@ -190,13 +188,10 @@ impl Interpreter {
             self.validate_expression(&binding.expression, file_path, diagnostics);
         }
 
-        // Validate hierarchical requirements
-        for req in &element.hierarchical_requirements {
-            self.validate_hierarchical_requirement(req, file_path, diagnostics);
+        // Validate component requirements
+        for req in &element.component_requirements {
+            self.validate_component_requirement(req, file_path, diagnostics);
         }
-
-        // Connection boundaries don't need expression validation, just structural
-        // The target patterns are already parsed
 
         // Validate children
         for child in &element.children {
@@ -204,27 +199,32 @@ impl Interpreter {
         }
     }
 
-    /// Validate a hierarchical requirement.
-    fn validate_hierarchical_requirement(
+    /// Validate a component requirement.
+    fn validate_component_requirement(
         &self,
-        req: &HierarchicalRequirement,
+        req: &ComponentRequirement,
         file_path: &str,
         diagnostics: &mut Diagnostics,
     ) {
-        match &req.kind {
-            HierarchicalRequirementKind::Scope(scope) => {
+        match &req.component {
+            ComponentSpec::Scope(scope) => {
                 self.validate_expression(&scope.expression, file_path, diagnostics);
             }
-            HierarchicalRequirementKind::Check(check) => {
+            ComponentSpec::Check(check) => {
                 self.validate_expression(&check.expression, file_path, diagnostics);
             }
-            HierarchicalRequirementKind::Element(element) => {
-                self.validate_element(element, file_path, diagnostics, &[]);
+            ComponentSpec::Element { body, .. } => {
+                if let Some(element) = body {
+                    self.validate_element(element, file_path, diagnostics, &[]);
+                }
             }
-            HierarchicalRequirementKind::ImplementsTemplate(_template_name) => {
-                // Template name validation - just ensure it's a valid identifier
-                // Actual template existence check happens during element implementation validation
-                // No further validation needed here during parse-time validation
+            ComponentSpec::Connection(_) => {
+                // Connection patterns are already validated during parsing
+            }
+            ComponentSpec::ConnectionPoint { expression, .. } => {
+                if let Some(expr) = expression {
+                    self.validate_expression(expr, file_path, diagnostics);
+                }
             }
         }
     }
