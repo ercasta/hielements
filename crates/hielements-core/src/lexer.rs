@@ -63,6 +63,13 @@ pub enum TokenKind {
     #[token("to")]
     To,
 
+    // Language and connection check keywords
+    #[token("language")]
+    Language,
+
+    #[token("connection_check")]
+    ConnectionCheck,
+
     // Punctuation
     #[token(":")]
     Colon,
@@ -209,19 +216,32 @@ impl<'a> Lexer<'a> {
                     return;
                 }
                 '#' => {
-                    // Comment line - still track indentation for INDENT tokens
-                    // but only if we're increasing indentation
+                    // Comment line - but we still need to process DEDENT if we're decreasing indentation
                     let current_indent = *self.indent_stack.last().unwrap();
                     if indent > current_indent {
-                        // Emit INDENT token
+                        // Emit INDENT token for increased indentation
                         self.indent_stack.push(indent);
                         let span = Span::new(
                             self.current_position(offset),
                             self.current_position(pos),
                         );
                         self.pending_tokens.push(Token::new(TokenKind::Indent, "", span));
+                    } else if indent < current_indent {
+                        // Emit DEDENT tokens for each level we're leaving
+                        // This is important for doc comments after indented blocks
+                        while let Some(&top) = self.indent_stack.last() {
+                            if top <= indent {
+                                break;
+                            }
+                            self.indent_stack.pop();
+                            let span = Span::new(
+                                self.current_position(offset),
+                                self.current_position(offset),
+                            );
+                            self.pending_tokens.push(Token::new(TokenKind::Dedent, "", span));
+                        }
                     }
-                    // Don't process DEDENT on comment-only lines
+                    // Don't further process this line (it's a comment)
                     return;
                 }
                 _ => break,
@@ -441,5 +461,34 @@ mod tests {
         assert!(kinds.contains(&&TokenKind::Identifier));
         assert!(kinds.contains(&&TokenKind::Dot));
         assert!(kinds.contains(&&TokenKind::Star));
+    }
+
+    #[test]
+    fn test_language_keywords() {
+        let source = "language connection_check";
+        let mut lexer = Lexer::new(source);
+        let tokens = lexer.tokenize();
+
+        let kinds: Vec<_> = tokens.iter().map(|t| &t.kind).collect();
+        assert!(kinds.contains(&&TokenKind::Language));
+        assert!(kinds.contains(&&TokenKind::ConnectionCheck));
+    }
+
+    #[test]
+    fn test_language_declaration_tokens() {
+        let source = "language python:\n    connection_check can_import(source: scope[], target: scope[])";
+        let mut lexer = Lexer::new(source);
+        let tokens = lexer.tokenize();
+
+        let kinds: Vec<_> = tokens.iter().map(|t| &t.kind).collect();
+        assert!(kinds.contains(&&TokenKind::Language));
+        assert!(kinds.contains(&&TokenKind::Identifier)); // python, can_import, source, target
+        assert!(kinds.contains(&&TokenKind::Colon));
+        assert!(kinds.contains(&&TokenKind::ConnectionCheck));
+        assert!(kinds.contains(&&TokenKind::LParen));
+        assert!(kinds.contains(&&TokenKind::RParen));
+        assert!(kinds.contains(&&TokenKind::Scope));
+        assert!(kinds.contains(&&TokenKind::LBracket));
+        assert!(kinds.contains(&&TokenKind::RBracket));
     }
 }

@@ -15,5 +15,6 @@ element examples:
     check files.exists(examples, 'template_compiler.hie')
     check files.exists(examples, 'template_microservice.hie')
     check files.exists(examples, 'hierarchical.hie')
+    check files.exists(examples, 'language_example.hie')
     check files.exists(examples, 'hielements.toml')
     check files.exists(examples, 'hielements_hybrid.toml')

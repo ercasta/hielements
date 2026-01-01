@@ -62,6 +62,11 @@ element core:
         check rust.enum_exists('RequirementAction')
         check rust.enum_exists('ComponentSpec')
         check rust.struct_exists('ConnectionPattern')
+        
+        ## Language declaration structures
+        check rust.struct_exists('LanguageDeclaration')
+        check rust.struct_exists('ConnectionCheckDeclaration')
+        check rust.struct_exists('ConnectionCheckParameter')
     
     ## Interpreter - semantic validation and check execution
     element interpreter:

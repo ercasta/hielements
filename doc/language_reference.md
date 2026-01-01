@@ -76,6 +76,8 @@ The following are reserved keywords:
 | `descendant` | Modifier for hierarchical requirements (applies to descendants) |
 | `connection` | Specifies a connection requirement |
 | `to` | Specifies connection target |
+| `language` | Declares a language with optional connection checks |
+| `connection_check` | Defines a connection verification check for a language |
 
 ### 1.4 Literals
 
@@ -218,7 +220,7 @@ Scopes define what code, files, or artifacts belong to an element. Scopes are sp
 ### 4.1 Syntax
 
 ```
-scope_declaration ::= 'scope' identifier '=' selector_expression
+scope_declaration ::= 'scope' identifier ['=' ':' language_name] '=' selector_expression
 ```
 
 ### 4.2 Scope Selectors
@@ -241,19 +243,35 @@ scope dockerfile = docker.file_selector('Dockerfile')
 scope compose = docker.compose_selector('docker-compose.yml')
 ```
 
-### 4.3 Multiple Scopes
+### 4.3 Scopes with Language Annotations
+
+Scopes can optionally include a language annotation to explicitly declare which programming language the scope belongs to:
+
+```hielements
+element my_service:
+    # Scope with explicit language annotation
+    scope src : python = python.module_selector('my_service')
+    scope backend : rust = rust.module_selector('backend')
+    
+    # Scope without language annotation (inferred from library)
+    scope config = files.file_selector('config.yaml')
+```
+
+The language annotation follows the scope name after a colon (`: language_name`), before the equals sign.
+
+### 4.4 Multiple Scopes
 
 An element can have multiple scopes, representing different aspects:
 
 ```hielements
 element full_stack_feature:
-    scope frontend = typescript.module_selector('components/OrderForm')
-    scope backend = python.module_selector('api/orders')
+    scope frontend : typescript = typescript.module_selector('components/OrderForm')
+    scope backend : python = python.module_selector('api/orders')
     scope database = sql.migration_selector('migrations/001_orders.sql')
     scope container = docker.file_selector('orders.dockerfile')
 ```
 
-### 4.4 Scope Composition
+### 4.5 Scope Composition
 
 Scopes can be combined using set operations (library-dependent):
 
@@ -266,12 +284,13 @@ element api_layer:
     scope all_api = scopes.union(handlers, models)
 ```
 
-### 4.5 Scope Semantics
+### 4.6 Scope Semantics
 
 - Scopes are **lazy** - they don't scan the filesystem until needed
 - Scopes can **overlap** between elements (a file can belong to multiple elements)
 - Scope resolution may **fail** if the target doesn't exist (configurable: error vs warning)
 - Scopes provide **source locations** for error reporting
+- Scopes with **language annotations** enable language-specific connection verification
 
 ---
 
@@ -928,9 +947,101 @@ When A is allowed to connect to B, and B is allowed to connect to C:
 - Wildcards (`.*`) match **any path suffix** (library-specific interpretation)
 - Actual verification is **language-specific** - libraries check imports/dependencies
 
+### 8.12 Language Constraints
+
+Templates can constrain which programming languages elements may use through `requires`, `allows`, and `forbids` with the `language` keyword:
+
+```hielements
+template python_only:
+    requires language python
+    forbids language rust
+
+template multilingual:
+    allows language python
+    allows language rust
+    allows language java
+```
+
+When an element implements a template with language constraints:
+- `requires language X` - The element must have at least one scope with language X
+- `allows language X` - Only languages X are permitted (whitelist)
+- `forbids language X` - Language X is prohibited (blacklist)
+
 ---
 
-## 9. Imports and Modules
+## 9. Language Declarations
+
+Language declarations define supported languages and their connection verification checks.
+
+### 9.1 Simple Language Declaration
+
+A simple language declaration just registers a language name:
+
+```hielements
+language python
+language rust
+language java
+```
+
+### 9.2 Language with Connection Checks
+
+Languages can define connection checks that verify connections between scopes:
+
+```hielements
+language python:
+    connection_check can_import(source: scope[], target: scope[]):
+        python.imports_allowed(source, target)
+    
+    connection_check no_circular(scopes: scope[]):
+        python.no_circular_imports(scopes)
+
+language rust:
+    connection_check depends_on(source: scope[], target: scope[]):
+        rust.dependency_exists(source, target)
+```
+
+### 9.3 Connection Check Semantics
+
+Connection checks:
+- Accept `scope[]` parameters representing arrays of scopes
+- Return `True` (connection valid) or `False` (connection invalid)
+- Are automatically applied recursively along the parent-children hierarchy
+- Are language-specific - only applied to scopes with matching language annotation
+
+### 9.4 Connection Verification Process
+
+When verifying element connections:
+1. For each language used by an element, gather all scopes of that language
+2. For each child element, gather its scopes of the same language
+3. Apply all `connection_check` functions defined for that language
+4. Recursively verify all descendants
+
+**Example:**
+
+```hielements
+language python:
+    connection_check can_import(source: scope[], target: scope[]):
+        python.imports_allowed(source, target)
+
+element system:
+    element frontend:
+        scope src : python = python.module_selector('frontend')
+    
+    element backend:
+        scope src : python = python.module_selector('backend')
+        
+        element api:
+            scope src : python = python.module_selector('backend.api')
+```
+
+The `can_import` check will verify that:
+- `frontend` can import from `backend`
+- `backend.api` can import from its parent `backend`
+- And so on through the hierarchy
+
+---
+
+## 10. Imports and Modules
 
 Imports bring libraries and other Hielements specifications into scope.
 
@@ -1226,13 +1337,20 @@ The following is the complete EBNF grammar for Hielements:
 
 ```ebnf
 (* Program structure *)
-program            ::= import_statement* (template_declaration | element_declaration)+
+program            ::= import_statement* language_declaration* (template_declaration | element_declaration)+
 
 (* Imports *)
 import_statement   ::= 'import' import_path ('as' identifier)?
                      | 'from' import_path 'import' identifier_list
 import_path        ::= string_literal | identifier ('.' identifier)*
 identifier_list    ::= identifier (',' identifier)*
+
+(* Language Declarations *)
+language_declaration ::= 'language' identifier NEWLINE
+                       | 'language' identifier ':' NEWLINE INDENT connection_check+ DEDENT
+connection_check     ::= 'connection_check' identifier '(' parameter_list ')' ':' NEWLINE INDENT expression DEDENT
+parameter_list       ::= parameter (',' parameter)*
+parameter            ::= identifier ':' 'scope' '[' ']'
 
 (* Templates *)
 template_declaration ::= doc_comment? 'template' identifier ':' NEWLINE INDENT template_body DEDENT
@@ -1265,14 +1383,16 @@ component_spec        ::= scope_declaration
                         | element_spec
                         | connection_spec
                         | connection_point_spec
+                        | language_spec
 
 element_spec          ::= 'element' identifier [':' type_name] ['implements' identifier] [':' NEWLINE INDENT element_body DEDENT]
 connection_spec       ::= 'connection' ['to'] connection_pattern NEWLINE
 connection_point_spec ::= 'connection_point' identifier ':' type_name ['=' expression] NEWLINE
 connection_pattern    ::= identifier ('.' identifier)* ('.' '*')?
+language_spec         ::= 'language' identifier NEWLINE
 
 (* Declarations *)
-scope_declaration           ::= 'scope' identifier '=' expression NEWLINE
+scope_declaration           ::= 'scope' identifier [':' identifier] '=' expression NEWLINE
 connection_point_declaration ::= 'connection_point' identifier ':' identifier '=' expression NEWLINE
 check_declaration           ::= 'check' function_call NEWLINE
 

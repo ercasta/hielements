@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 pub struct Program {
     /// Import statements
     pub imports: Vec<ImportStatement>,
+    /// Language declarations
+    pub languages: Vec<LanguageDeclaration>,
     /// Template declarations
     pub templates: Vec<Template>,
     /// Top-level element declarations
@@ -109,6 +111,8 @@ pub struct Element {
 pub struct ScopeDeclaration {
     /// Scope name
     pub name: Identifier,
+    /// Optional language type annotation (e.g., `scope x : python = ...`)
+    pub language: Option<Identifier>,
     /// Scope expression (selector)
     pub expression: Expression,
     /// Source span
@@ -308,6 +312,8 @@ pub enum ComponentSpec {
         /// Optional expression
         expression: Option<Expression>,
     },
+    /// Language requirement: `language <name>`
+    Language(Identifier),
 }
 
 /// A connection pattern for matching connection targets.
@@ -317,6 +323,54 @@ pub struct ConnectionPattern {
     pub path: Vec<Identifier>,
     /// Whether this is a wildcard match (ends with .*)
     pub wildcard: bool,
+    /// Source span
+    pub span: Span,
+}
+
+// ============================================================================
+// Language Declaration Types
+// ============================================================================
+
+/// A language declaration with optional connection checks.
+/// Can be a simple declaration (`language python`) or include connection checks:
+/// ```hielements
+/// language python:
+///     connection_check can_import(source: scope[], target: scope[]):
+///         return python.imports_allowed(source, target)
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LanguageDeclaration {
+    /// Language name
+    pub name: Identifier,
+    /// Connection check definitions for this language
+    pub connection_checks: Vec<ConnectionCheckDeclaration>,
+    /// Source span
+    pub span: Span,
+}
+
+/// A connection check declaration.
+/// Defines a check that verifies connections between scopes for a specific language.
+/// ```hielements
+/// connection_check can_import(source: scope[], target: scope[]):
+///     return python.imports_allowed(source, target)
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConnectionCheckDeclaration {
+    /// Check name
+    pub name: Identifier,
+    /// Parameters (all are scope[])
+    pub parameters: Vec<ConnectionCheckParameter>,
+    /// Expression body (the check to execute)
+    pub body: Expression,
+    /// Source span
+    pub span: Span,
+}
+
+/// A connection check parameter.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConnectionCheckParameter {
+    /// Parameter name
+    pub name: Identifier,
     /// Source span
     pub span: Span,
 }
