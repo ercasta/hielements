@@ -583,35 +583,59 @@ impl<'a> Parser<'a> {
         })
     }
 
-    /// Parse a scope declaration.
-    /// Syntax: `scope <name> [: <language>] = <expression>`
+    /// Parse a scope declaration (V2 syntax).
+    /// Syntax: `scope <name> [<language>] [binds <path>] [= <expression>]`
+    /// Unbounded scopes (no `=`) are allowed in templates.
     fn parse_scope(&mut self) -> Result<ScopeDeclaration, Diagnostic> {
         let start_span = self.current_span();
         self.expect(TokenKind::Scope)?;
         let name = self.parse_identifier()?;
         
-        // Check for optional language annotation: `: <language>`
-        let language = if self.check(TokenKind::Colon) {
+        // Check for optional language annotation with angular brackets: `<language>`
+        let language = if self.check(TokenKind::LAngle) {
+            self.advance(); // consume '<'
+            let lang = self.parse_identifier()?;
+            self.expect(TokenKind::RAngle)?; // consume '>'
+            Some(lang)
+        } else if self.check(TokenKind::Colon) {
+            // Also support legacy colon syntax for backward compatibility during migration
             self.advance(); // consume ':'
             Some(self.parse_identifier()?)
         } else {
             None
         };
         
-        self.expect(TokenKind::Equals)?;
-        let expression = self.parse_expression()?;
+        // Check for optional binds clause: `binds template.element.scope`
+        let binds = if self.check(TokenKind::Binds) {
+            self.advance(); // consume 'binds'
+            Some(self.parse_qualified_path()?)
+        } else {
+            None
+        };
+        
+        // Expression is optional for unbounded scopes in templates
+        let expression = if self.check(TokenKind::Equals) {
+            self.expect(TokenKind::Equals)?;
+            Some(self.parse_expression()?)
+        } else {
+            None
+        };
+        
         self.expect_newline()?;
         let end_span = self.previous_span();
 
         Ok(ScopeDeclaration {
             name,
             language,
+            binds,
             expression,
             span: start_span.merge(&end_span),
         })
     }
 
-    /// Parse a connection point declaration.
+    /// Parse a connection point declaration (V2 syntax).
+    /// Syntax: `connection_point <name> : <type> [binds <path>] [= <expression>]`
+    /// Unbounded connection points (no `=`) are allowed in templates.
     fn parse_connection_point(&mut self) -> Result<ConnectionPointDeclaration, Diagnostic> {
         let start_span = self.current_span();
         self.expect(TokenKind::ConnectionPoint)?;
@@ -621,17 +645,42 @@ impl<'a> Parser<'a> {
         self.expect(TokenKind::Colon)?;
         let type_annotation = self.parse_type_annotation()?;
         
-        self.expect(TokenKind::Equals)?;
-        let expression = self.parse_expression()?;
+        // Check for optional binds clause: `binds template.element.connection_point`
+        let binds = if self.check(TokenKind::Binds) {
+            self.advance(); // consume 'binds'
+            Some(self.parse_qualified_path()?)
+        } else {
+            None
+        };
+        
+        // Expression is optional for unbounded connection points in templates
+        let expression = if self.check(TokenKind::Equals) {
+            self.expect(TokenKind::Equals)?;
+            Some(self.parse_expression()?)
+        } else {
+            None
+        };
+        
         self.expect_newline()?;
         let end_span = self.previous_span();
 
         Ok(ConnectionPointDeclaration {
             name,
             type_annotation,
+            binds,
             expression,
             span: start_span.merge(&end_span),
         })
+    }
+
+    /// Parse a qualified path for binds clauses: `template.element.scope`
+    fn parse_qualified_path(&mut self) -> Result<Vec<Identifier>, Diagnostic> {
+        let mut path = vec![self.parse_identifier()?];
+        while self.check(TokenKind::Dot) {
+            self.advance(); // consume '.'
+            path.push(self.parse_identifier()?);
+        }
+        Ok(path)
     }
 
     /// Parse a check declaration.
@@ -1048,7 +1097,7 @@ impl<'a> Parser<'a> {
             match token.kind {
                 TokenKind::Scope | TokenKind::Element | TokenKind::Check | 
                 TokenKind::ConnectionPoint | TokenKind::Template | TokenKind::Implements |
-                TokenKind::To |
+                TokenKind::Binds | TokenKind::To |
                 // Unified keywords can also be used as identifiers in some contexts
                 TokenKind::Requires | TokenKind::Allows | TokenKind::Forbids |
                 TokenKind::Descendant | TokenKind::Connection |
@@ -1966,5 +2015,176 @@ element my_api implements python_service:
         assert_eq!(program.elements.len(), 1);
         assert_eq!(program.elements[0].scopes.len(), 1);
         assert!(program.elements[0].scopes[0].language.is_some());
+    }
+
+    // ========================================================================
+    // Tests for V2 syntax: angular brackets, binds keyword, unbounded scopes
+    // ========================================================================
+
+    #[test]
+    fn test_parse_v2_angular_bracket_language() {
+        let source = r#"element test:
+    scope src<rust> = rust.module_selector('test')
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.elements.len(), 1);
+        assert_eq!(program.elements[0].scopes.len(), 1);
+        
+        let scope = &program.elements[0].scopes[0];
+        assert_eq!(scope.name.name, "src");
+        assert!(scope.language.is_some());
+        assert_eq!(scope.language.as_ref().unwrap().name, "rust");
+        assert!(scope.expression.is_some());
+    }
+
+    #[test]
+    fn test_parse_v2_unbounded_scope_in_template() {
+        let source = r#"template observable:
+    element metrics:
+        scope module<rust>
+        connection_point prometheus: MetricsHandler
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.templates.len(), 1);
+        let template = &program.templates[0];
+        assert_eq!(template.elements.len(), 1);
+        
+        let metrics = &template.elements[0];
+        assert_eq!(metrics.scopes.len(), 1);
+        
+        let scope = &metrics.scopes[0];
+        assert_eq!(scope.name.name, "module");
+        assert!(scope.language.is_some());
+        assert_eq!(scope.language.as_ref().unwrap().name, "rust");
+        // Unbounded scope - no expression
+        assert!(scope.expression.is_none());
+        
+        // Connection point - unbounded
+        assert_eq!(metrics.connection_points.len(), 1);
+        let cp = &metrics.connection_points[0];
+        assert_eq!(cp.name.name, "prometheus");
+        assert_eq!(cp.type_annotation.type_name.name, "MetricsHandler");
+        assert!(cp.expression.is_none());
+    }
+
+    #[test]
+    fn test_parse_v2_scope_with_binds() {
+        let source = r#"element component implements observable:
+    scope main_module<rust> binds observable.metrics.module = rust.module_selector('api')
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.elements.len(), 1);
+        
+        let element = &program.elements[0];
+        assert_eq!(element.scopes.len(), 1);
+        
+        let scope = &element.scopes[0];
+        assert_eq!(scope.name.name, "main_module");
+        assert!(scope.language.is_some());
+        assert_eq!(scope.language.as_ref().unwrap().name, "rust");
+        
+        // Check binds path
+        assert!(scope.binds.is_some());
+        let binds = scope.binds.as_ref().unwrap();
+        assert_eq!(binds.len(), 3);
+        assert_eq!(binds[0].name, "observable");
+        assert_eq!(binds[1].name, "metrics");
+        assert_eq!(binds[2].name, "module");
+        
+        // Check expression
+        assert!(scope.expression.is_some());
+    }
+
+    #[test]
+    fn test_parse_v2_connection_point_with_binds() {
+        let source = r#"element component implements observable:
+    connection_point handler: MetricsHandler binds observable.metrics.prometheus = rust.function_selector(module, 'handler')
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.elements.len(), 1);
+        
+        let element = &program.elements[0];
+        assert_eq!(element.connection_points.len(), 1);
+        
+        let cp = &element.connection_points[0];
+        assert_eq!(cp.name.name, "handler");
+        assert_eq!(cp.type_annotation.type_name.name, "MetricsHandler");
+        
+        // Check binds path
+        assert!(cp.binds.is_some());
+        let binds = cp.binds.as_ref().unwrap();
+        assert_eq!(binds.len(), 3);
+        assert_eq!(binds[0].name, "observable");
+        assert_eq!(binds[1].name, "metrics");
+        assert_eq!(binds[2].name, "prometheus");
+        
+        // Check expression
+        assert!(cp.expression.is_some());
+    }
+
+    #[test]
+    fn test_parse_v2_complete_template_and_implementation() {
+        let source = r#"template observable:
+    allows language rust
+    element metrics:
+        scope module<rust>
+        connection_point prometheus: MetricsHandler
+
+element observable_component implements observable:
+    scope main_module<rust> binds observable.metrics.module = rust.module_selector('payments::api')
+    connection_point main_handler: MetricsHandler binds observable.metrics.prometheus = rust.function_selector(main_module, 'handler')
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        
+        // Check template
+        assert_eq!(program.templates.len(), 1);
+        let template = &program.templates[0];
+        assert_eq!(template.name.name, "observable");
+        assert_eq!(template.elements.len(), 1);
+        assert_eq!(template.component_requirements.len(), 1); // allows language rust
+        
+        // Check template element has unbounded scope
+        let template_metrics = &template.elements[0];
+        assert!(template_metrics.scopes[0].expression.is_none());
+        assert!(template_metrics.connection_points[0].expression.is_none());
+        
+        // Check element implementation
+        assert_eq!(program.elements.len(), 1);
+        let element = &program.elements[0];
+        assert_eq!(element.name.name, "observable_component");
+        assert_eq!(element.implements.len(), 1);
+        assert_eq!(element.implements[0].template_name.name, "observable");
+        
+        // Check element has bound scope
+        assert_eq!(element.scopes.len(), 1);
+        let scope = &element.scopes[0];
+        assert!(scope.binds.is_some());
+        assert!(scope.expression.is_some());
+        
+        // Check element has bound connection point
+        assert_eq!(element.connection_points.len(), 1);
+        let cp = &element.connection_points[0];
+        assert!(cp.binds.is_some());
+        assert!(cp.expression.is_some());
     }
 }

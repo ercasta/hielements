@@ -123,14 +123,18 @@ impl Interpreter {
         file_path: &str,
         diagnostics: &mut Diagnostics,
     ) {
-        // Validate scopes
+        // Validate scopes (expression is optional for unbounded scopes in V2)
         for scope in &template.scopes {
-            self.validate_expression(&scope.expression, file_path, diagnostics);
+            if let Some(ref expr) = scope.expression {
+                self.validate_expression(expr, file_path, diagnostics);
+            }
         }
 
-        // Validate connection points
+        // Validate connection points (expression is optional for unbounded in V2)
         for cp in &template.connection_points {
-            self.validate_expression(&cp.expression, file_path, diagnostics);
+            if let Some(ref expr) = cp.expression {
+                self.validate_expression(expr, file_path, diagnostics);
+            }
         }
 
         // Validate checks
@@ -168,14 +172,18 @@ impl Interpreter {
             let _ = template_impl; // Acknowledge the field
         }
 
-        // Validate scopes
+        // Validate scopes (expression is optional for unbounded scopes in V2)
         for scope in &element.scopes {
-            self.validate_expression(&scope.expression, file_path, diagnostics);
+            if let Some(ref expr) = scope.expression {
+                self.validate_expression(expr, file_path, diagnostics);
+            }
         }
 
-        // Validate connection points
+        // Validate connection points (expression is optional for unbounded in V2)
         for cp in &element.connection_points {
-            self.validate_expression(&cp.expression, file_path, diagnostics);
+            if let Some(ref expr) = cp.expression {
+                self.validate_expression(expr, file_path, diagnostics);
+            }
         }
 
         // Validate checks
@@ -208,7 +216,9 @@ impl Interpreter {
     ) {
         match &req.component {
             ComponentSpec::Scope(scope) => {
-                self.validate_expression(&scope.expression, file_path, diagnostics);
+                if let Some(ref expr) = scope.expression {
+                    self.validate_expression(expr, file_path, diagnostics);
+                }
             }
             ComponentSpec::Check(check) => {
                 self.validate_expression(&check.expression, file_path, diagnostics);
@@ -310,19 +320,27 @@ impl Interpreter {
             if options.verbose {
                 eprintln!("[verbose] Evaluating scope: {}", scope_name);
             }
-            match self.evaluate_expression(&scope.expression) {
-                Ok(value) => {
-                    if options.verbose {
-                        eprintln!("[verbose]   -> resolved {} paths", 
-                            if let Value::Scope(ref s) = value { s.paths.len() } else { 0 });
+            // V2: expression is optional for unbounded scopes
+            if let Some(ref expr) = scope.expression {
+                match self.evaluate_expression(expr) {
+                    Ok(value) => {
+                        if options.verbose {
+                            eprintln!("[verbose]   -> resolved {} paths", 
+                                if let Value::Scope(ref s) = value { s.paths.len() } else { 0 });
+                        }
+                        self.scopes.insert(scope_name, value);
                     }
-                    self.scopes.insert(scope_name, value);
+                    Err(e) => {
+                        if options.verbose {
+                            eprintln!("[verbose]   -> ERROR: {}", e.message);
+                        }
+                        self.diagnostics.push(e);
+                    }
                 }
-                Err(e) => {
-                    if options.verbose {
-                        eprintln!("[verbose]   -> ERROR: {}", e.message);
-                    }
-                    self.diagnostics.push(e);
+            } else {
+                // Unbounded scope - no expression to evaluate
+                if options.verbose {
+                    eprintln!("[verbose]   -> unbounded scope (no expression)");
                 }
             }
         }

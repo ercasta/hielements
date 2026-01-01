@@ -20,6 +20,9 @@ pub enum TokenKind {
     #[token("implements")]
     Implements,
 
+    #[token("binds")]
+    Binds,
+
     #[token("scope")]
     Scope,
 
@@ -94,6 +97,12 @@ pub enum TokenKind {
 
     #[token("]")]
     RBracket,
+
+    #[token("<")]
+    LAngle,
+
+    #[token(">")]
+    RAngle,
 
     #[token("*")]
     Star,
@@ -490,5 +499,46 @@ mod tests {
         assert!(kinds.contains(&&TokenKind::Scope));
         assert!(kinds.contains(&&TokenKind::LBracket));
         assert!(kinds.contains(&&TokenKind::RBracket));
+    }
+
+    #[test]
+    fn test_binds_keyword() {
+        let source = "scope module binds template.element.scope";
+        let mut lexer = Lexer::new(source);
+        let tokens = lexer.tokenize();
+
+        let kinds: Vec<_> = tokens.iter().map(|t| &t.kind).collect();
+        assert!(kinds.contains(&&TokenKind::Scope));
+        assert!(kinds.contains(&&TokenKind::Binds));
+        assert!(kinds.contains(&&TokenKind::Identifier));
+        assert!(kinds.contains(&&TokenKind::Dot));
+    }
+
+    #[test]
+    fn test_angular_brackets() {
+        let source = "scope module<rust> = rust.module_selector('test')";
+        let mut lexer = Lexer::new(source);
+        let tokens = lexer.tokenize();
+
+        let kinds: Vec<_> = tokens.iter().map(|t| &t.kind).collect();
+        assert!(kinds.contains(&&TokenKind::Scope));
+        assert!(kinds.contains(&&TokenKind::Identifier)); // module, rust
+        assert!(kinds.contains(&&TokenKind::LAngle));
+        assert!(kinds.contains(&&TokenKind::RAngle));
+        assert!(kinds.contains(&&TokenKind::Equals));
+    }
+
+    #[test]
+    fn test_v2_scope_with_binds() {
+        let source = "scope main_module<rust> binds observable.metrics.module = rust.module_selector('api')";
+        let mut lexer = Lexer::new(source);
+        let tokens = lexer.tokenize();
+
+        let kinds: Vec<_> = tokens.iter().map(|t| &t.kind).collect();
+        assert!(kinds.contains(&&TokenKind::Scope));
+        assert!(kinds.contains(&&TokenKind::LAngle));
+        assert!(kinds.contains(&&TokenKind::RAngle));
+        assert!(kinds.contains(&&TokenKind::Binds));
+        assert!(kinds.contains(&&TokenKind::Equals));
     }
 }
