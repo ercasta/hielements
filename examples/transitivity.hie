@@ -119,3 +119,28 @@ element payment_processor implements secure_zone:
     element audit:
         scope src = files.folder_selector('payment/audit')
         check rust.function_exists(src, 'log_transaction')
+
+## Service Mesh Zone
+## Demonstrates requires_connection - all services in this zone
+## MUST have a dependency on the logging module
+element service_mesh:
+    ## All services in this mesh must import from logging module
+    requires_connection to logging.*
+    
+    ## Services may connect to other services in the mesh
+    allows_connection to mesh_internal.*
+    
+    ## Services cannot connect directly to external APIs
+    forbids_connection to external_api.*
+    
+    element user_service:
+        scope src = files.folder_selector('services/user')
+        # This service must import from logging.* to satisfy requires_connection
+    
+    element order_service:
+        scope src = files.folder_selector('services/order')
+        # This service must also import from logging.*
+    
+    element notification_service:
+        scope src = files.folder_selector('services/notification')
+        # And this one too

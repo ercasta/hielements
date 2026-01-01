@@ -240,6 +240,8 @@ impl<'a> Parser<'a> {
                 connection_boundaries.push(self.parse_connection_boundary(ConnectionBoundaryKind::Allows)?);
             } else if self.check(TokenKind::ForbidsConnection) {
                 connection_boundaries.push(self.parse_connection_boundary(ConnectionBoundaryKind::Forbids)?);
+            } else if self.check(TokenKind::RequiresConnection) {
+                connection_boundaries.push(self.parse_connection_boundary(ConnectionBoundaryKind::Requires)?);
             } else if self.check(TokenKind::Identifier) {
                 // Could be a template binding (e.g., template.element.scope = ...)
                 // Peek ahead to see if this looks like a template binding (has a dot after the identifier)
@@ -277,7 +279,7 @@ impl<'a> Parser<'a> {
                 return Err(Diagnostic::error(
                     "E002",
                     format!(
-                        "Expected 'scope', 'connection_point', 'check', 'element', 'requires_descendant', 'allows_connection', or 'forbids_connection', found {:?}",
+                        "Expected 'scope', 'connection_point', 'check', 'element', 'requires_descendant', 'allows_connection', 'forbids_connection', or 'requires_connection', found {:?}",
                         token.kind
                     ),
                 )
@@ -349,6 +351,8 @@ impl<'a> Parser<'a> {
                 connection_boundaries.push(self.parse_connection_boundary(ConnectionBoundaryKind::Allows)?);
             } else if self.check(TokenKind::ForbidsConnection) {
                 connection_boundaries.push(self.parse_connection_boundary(ConnectionBoundaryKind::Forbids)?);
+            } else if self.check(TokenKind::RequiresConnection) {
+                connection_boundaries.push(self.parse_connection_boundary(ConnectionBoundaryKind::Requires)?);
             } else if self.check(TokenKind::Dedent) || self.is_at_end() {
                 break;
             } else {
@@ -356,7 +360,7 @@ impl<'a> Parser<'a> {
                 return Err(Diagnostic::error(
                     "E002",
                     format!(
-                        "Expected 'scope', 'connection_point', 'check', 'element', 'requires_descendant', 'allows_connection', or 'forbids_connection' in template, found {:?}",
+                        "Expected 'scope', 'connection_point', 'check', 'element', 'requires_descendant', 'allows_connection', 'forbids_connection', or 'requires_connection' in template, found {:?}",
                         token.kind
                     ),
                 )
@@ -519,11 +523,11 @@ impl<'a> Parser<'a> {
         })
     }
 
-    /// Parse a connection boundary (allows_connection/forbids_connection to ...).
+    /// Parse a connection boundary (allows_connection/forbids_connection/requires_connection to ...).
     fn parse_connection_boundary(&mut self, kind: ConnectionBoundaryKind) -> Result<ConnectionBoundary, Diagnostic> {
         let start_span = self.current_span();
         
-        // Consume the keyword (AllowsConnection or ForbidsConnection)
+        // Consume the keyword (AllowsConnection, ForbidsConnection, or RequiresConnection)
         self.advance();
         
         // Expect 'to' keyword
@@ -695,7 +699,8 @@ impl<'a> Parser<'a> {
                 TokenKind::Scope | TokenKind::Element | TokenKind::Check | 
                 TokenKind::ConnectionPoint | TokenKind::Template | TokenKind::Implements |
                 TokenKind::To | TokenKind::RequiresDescendant | 
-                TokenKind::AllowsConnection | TokenKind::ForbidsConnection => {
+                TokenKind::AllowsConnection | TokenKind::ForbidsConnection |
+                TokenKind::RequiresConnection => {
                     let token = self.advance();
                     Ok(Identifier::new(token.text, token.span))
                 }
@@ -1234,5 +1239,50 @@ element service:
         assert!(matches!(element.connection_boundaries[0].kind, ConnectionBoundaryKind::Allows));
         assert!(matches!(element.connection_boundaries[1].kind, ConnectionBoundaryKind::Forbids));
         assert!(matches!(element.connection_boundaries[2].kind, ConnectionBoundaryKind::Forbids));
+    }
+
+    #[test]
+    fn test_parse_requires_connection() {
+        let source = r#"element service:
+    requires_connection to logging.*
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.elements.len(), 1);
+        let element = &program.elements[0];
+        assert_eq!(element.connection_boundaries.len(), 1);
+        
+        let boundary = &element.connection_boundaries[0];
+        assert!(matches!(boundary.kind, ConnectionBoundaryKind::Requires));
+        assert_eq!(boundary.target_pattern.path.len(), 1);
+        assert_eq!(boundary.target_pattern.path[0].name, "logging");
+        assert!(boundary.target_pattern.wildcard);
+    }
+
+    #[test]
+    fn test_parse_all_connection_boundary_types() {
+        let source = r#"element zone:
+    allows_connection to api.*
+    forbids_connection to database.*
+    requires_connection to logging.output
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.elements.len(), 1);
+        let element = &program.elements[0];
+        assert_eq!(element.connection_boundaries.len(), 3);
+        
+        assert!(matches!(element.connection_boundaries[0].kind, ConnectionBoundaryKind::Allows));
+        assert!(matches!(element.connection_boundaries[1].kind, ConnectionBoundaryKind::Forbids));
+        assert!(matches!(element.connection_boundaries[2].kind, ConnectionBoundaryKind::Requires));
+        
+        // The requires_connection should not have wildcard
+        assert!(!element.connection_boundaries[2].target_pattern.wildcard);
     }
 }

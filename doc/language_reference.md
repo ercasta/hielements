@@ -71,8 +71,9 @@ The following are reserved keywords:
 | `true` | Boolean literal |
 | `false` | Boolean literal |
 | `requires_descendant` | Declares a transitive requirement |
-| `allows_connection` | Declares an allowed connection target |
-| `forbids_connection` | Declares a forbidden connection target |
+| `allows_connection` | Declares an allowed architectural connection target |
+| `forbids_connection` | Declares a forbidden architectural connection target |
+| `requires_connection` | Declares a required architectural connection target |
 | `to` | Specifies connection target |
 
 ### 1.4 Literals
@@ -748,7 +749,7 @@ element my_app implements dockerized:
 
 ### 8.10 Connection Boundaries
 
-Connection boundaries allow specifying constraints on which elements descendants can connect to. These boundaries are inherited by all descendants.
+Connection boundaries allow specifying constraints on architectural dependencies (imports/dependencies) between elements. These boundaries are inherited by all descendants. **Note**: "Connections" refer to logical/architectural dependencies like module imports, not network connections.
 
 #### Allowing Connections
 
@@ -756,12 +757,12 @@ Use `allows_connection to` to whitelist specific connection targets:
 
 ```hielements
 element frontend_zone:
-    ## Descendants can only connect to api_gateway's public_api
+    ## Code in this zone may only import from api_gateway
     allows_connection to api_gateway.public_api
     
     element web_app:
         scope src = files.folder_selector('frontend/web')
-        ## Any connection_points here are checked against the boundary
+        ## Any imports from this scope are checked against the boundary
     
     element mobile_api:
         scope src = files.folder_selector('frontend/mobile')
@@ -773,13 +774,27 @@ Use `forbids_connection to` to blacklist specific connection targets:
 
 ```hielements
 element secure_zone:
-    ## Descendants cannot connect to external networks
+    ## Code in this zone cannot import from external modules
     forbids_connection to external.*
     forbids_connection to public_network.*
     
     element internal_service:
         scope src = files.folder_selector('internal')
         ## This element and all its children inherit the constraint
+```
+
+#### Requiring Connections
+
+Use `requires_connection to` to mandate that code MUST have a dependency:
+
+```hielements
+element service_mesh:
+    ## All services in this mesh must import from logging module
+    requires_connection to logging.*
+    
+    element user_service:
+        scope src = files.folder_selector('services/user')
+        # This service must import from logging.* to satisfy the constraint
 ```
 
 #### Wildcard Patterns
@@ -792,9 +807,11 @@ forbids_connection to external.*       ## Matches anything under external
 allows_connection to api.public.*      ## Matches api.public.users, api.public.orders, etc.
 ```
 
+**Note**: Wildcard interpretation is library-specific. Some libraries may treat wildcards as violations of strict boundaries or not sufficient for `requires_connection` rules.
+
 #### Combined Boundaries
 
-Multiple boundaries can be combined - allows create a whitelist, forbids create a blacklist:
+Multiple boundaries can be combined - allows create a whitelist, forbids create a blacklist, requires create mandatory dependencies:
 
 ```hielements
 element secure_service:
@@ -802,19 +819,28 @@ element secure_service:
     allows_connection to logging.output
     forbids_connection to database.*
     forbids_connection to external.network
+    requires_connection to audit.*
     
     ## Children inherit ALL of these boundaries
     element child_service:
         scope src = files.folder_selector('child')
 ```
 
+#### Transitive Dependency Composition
+
+When A is allowed to connect to B, and B is allowed to connect to C:
+- A→B→C is **allowed** (each hop respects its own boundary)
+- This enables construction of complex layered architectures
+
 #### Boundary Semantics
 
 - `allows_connection` boundaries create a **whitelist** - only listed targets are permitted
 - `forbids_connection` boundaries create a **blacklist** - listed targets are prohibited
-- Boundaries are **inherited** by all descendants
-- Multiple boundaries are **combined** (both allows AND forbids apply)
-- Wildcards (`.*`) match **any path suffix**
+- `requires_connection` boundaries create a **mandate** - dependencies MUST exist
+- Boundaries are **inherited** by all descendants within the parent/child hierarchy
+- Multiple boundaries are **combined** (allows AND forbids AND requires apply)
+- Wildcards (`.*`) match **any path suffix** (library-specific interpretation)
+- Actual verification is **language-specific** - libraries check imports/dependencies
 
 ---
 
@@ -1151,8 +1177,8 @@ qualified_identifier ::= identifier ('.' identifier)+
 (* Transitive Requirements - top-down transitivity *)
 transitive_requirement ::= 'requires_descendant' (scope_declaration | check_declaration | element_declaration)
 
-(* Connection Boundaries - connection constraints *)
-connection_boundary    ::= ('allows_connection' | 'forbids_connection') 'to' connection_pattern NEWLINE
+(* Connection Boundaries - architectural dependency constraints *)
+connection_boundary    ::= ('allows_connection' | 'forbids_connection' | 'requires_connection') 'to' connection_pattern NEWLINE
 connection_pattern     ::= identifier ('.' identifier)* ('.' '*')?
 
 (* Declarations *)

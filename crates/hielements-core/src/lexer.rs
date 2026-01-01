@@ -54,6 +54,9 @@ pub enum TokenKind {
     #[token("forbids_connection")]
     ForbidsConnection,
 
+    #[token("requires_connection")]
+    RequiresConnection,
+
     #[token("to")]
     To,
 
@@ -412,7 +415,7 @@ mod tests {
 
     #[test]
     fn test_transitivity_keywords() {
-        let source = "requires_descendant allows_connection forbids_connection to";
+        let source = "requires_descendant allows_connection forbids_connection requires_connection to";
         let mut lexer = Lexer::new(source);
         let tokens = lexer.tokenize();
 
@@ -420,6 +423,7 @@ mod tests {
         assert!(kinds.contains(&&TokenKind::RequiresDescendant));
         assert!(kinds.contains(&&TokenKind::AllowsConnection));
         assert!(kinds.contains(&&TokenKind::ForbidsConnection));
+        assert!(kinds.contains(&&TokenKind::RequiresConnection));
         assert!(kinds.contains(&&TokenKind::To));
     }
 

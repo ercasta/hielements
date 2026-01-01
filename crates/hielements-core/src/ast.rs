@@ -285,13 +285,15 @@ pub struct ConnectionBoundary {
     pub span: Span,
 }
 
-/// Types of connection boundaries.
+/// Types of connection boundaries for architectural dependencies.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ConnectionBoundaryKind {
-    /// Allows connections only to matching targets
+    /// Allows connections (imports/dependencies) only to matching targets
     Allows,
-    /// Forbids connections to matching targets
+    /// Forbids connections (imports/dependencies) to matching targets
     Forbids,
+    /// Requires connections (imports/dependencies) to matching targets
+    Requires,
 }
 
 /// A connection pattern for matching connection targets.
