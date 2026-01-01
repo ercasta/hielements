@@ -1,7 +1,7 @@
 # Example: Advanced Template Features
 # Demonstrates:
 # 1. Template-level connection points that can be used in checks
-# 2. requires_descendant implements <template> for hierarchical template requirements
+# 2. requires descendant implements <template> for hierarchical template requirements
 
 import files
 import rust
@@ -51,14 +51,14 @@ template microservice:
 ## Requires descendants to implement both dockerized and observable templates
 template production_ready:
     ## This template requires that at least one descendant implements dockerized
-    requires_descendant implements dockerized
+    requires descendant implements dockerized
     
     ## And at least one descendant implements observable
-    requires_descendant implements observable
+    requires descendant implements observable
     
     ## Connection boundaries for production services
-    forbids_connection to external.untrusted.*
-    requires_connection to logging.*
+    forbids connection to external.untrusted.*
+    requires connection to logging.*
 
 ## Orders Service - A complete microservice implementation
 ## Implements microservice template with a specific port

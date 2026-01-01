@@ -122,8 +122,8 @@ Define requirements that must be satisfied somewhere in your element hierarchy, 
 ```hielements
 template dockerized:
     ## At least one descendant must have a docker configuration
-    requires_descendant scope dockerfile = docker.file_selector('Dockerfile')
-    requires_descendant check docker.has_healthcheck(dockerfile)
+    requires descendant scope dockerfile = docker.file_selector('Dockerfile')
+    requires descendant check docker.has_healthcheck(dockerfile)
 
 element my_app implements dockerized:
     element frontend:
@@ -139,11 +139,12 @@ element my_app implements dockerized:
 Hierarchical checks also support **connection boundaries** to control architectural dependencies:
 
 ```hielements
-element frontend_zone:
+template frontend_zone:
     ## Code in this zone may only import from API gateway
-    allows_connection to api_gateway.public_api
-    forbids_connection to database.*
-    
+    allows connection to api_gateway.public_api
+    forbids connection to database.*
+
+element my_frontend implements frontend_zone:
     element web_app:
         scope src = files.folder_selector('frontend/web')
         # Inherits connection boundaries - cannot access database
