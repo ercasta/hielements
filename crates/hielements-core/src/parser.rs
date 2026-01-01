@@ -648,9 +648,9 @@ impl<'a> Parser<'a> {
             self.advance(); // consume 'implements'
             let template_name = self.parse_identifier()?;
             self.expect_newline()?;
-            // Create an element spec with just implements
+            // Create an element spec with just implements (anonymous element)
             ComponentSpec::Element {
-                name: Identifier::new("_", template_name.span),
+                name: Identifier::new("_anonymous", template_name.span),
                 type_annotation: None,
                 implements: Some(template_name),
                 body: None,
@@ -736,8 +736,8 @@ impl<'a> Parser<'a> {
         // Check for element body (colon followed by newline and indent)
         let body = if self.check(TokenKind::Colon) {
             let doc_comment = None;
-            // Put back the position before the colon, parse full element
-            // But we've already consumed 'element name', so we need to manually create the element
+            // We've already parsed 'element name [: Type] [implements ...]', now we parse the body
+            // by consuming the colon and parsing the indented block manually
             self.expect(TokenKind::Colon)?;
             self.skip_newlines();
             

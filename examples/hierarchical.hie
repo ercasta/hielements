@@ -22,7 +22,12 @@ template dockerized_new:
 ## Requires that at least one descendant exposes metrics for monitoring.
 template observable_new:
     ## At least one descendant must have metrics endpoint (new syntax with named element and implements)
-    requires descendant element metrics_service implements metrics_provider
+    requires descendant element metrics_service implements metrics_base
+
+## Metrics Base Template (NEW SYNTAX)
+## Base template for metrics components.
+template metrics_base:
+    requires element handler
 
 ## Secure Zone Template (NEW SYNTAX)
 ## Defines connection boundaries that apply to all descendants.
