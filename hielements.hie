@@ -66,12 +66,17 @@ element hielements:
             check rust.struct_exists('TemplateImplementation')
             check rust.struct_exists('TemplateBinding')
             
-            ## Top-down hierarchical check structures
+            ## Top-down hierarchical check structures (legacy)
             check rust.struct_exists('HierarchicalRequirement')
             check rust.enum_exists('HierarchicalRequirementKind')
             check rust.struct_exists('ConnectionBoundary')
             check rust.enum_exists('ConnectionBoundaryKind')
             check rust.struct_exists('ConnectionPattern')
+            
+            ## New unified component requirement structures
+            check rust.struct_exists('ComponentRequirement')
+            check rust.enum_exists('RequirementAction')
+            check rust.enum_exists('ComponentSpec')
         
         ## Interpreter - semantic validation and check execution
         element interpreter:
