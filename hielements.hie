@@ -1,6 +1,15 @@
 ## Hielements Self-Description
 ## This file describes the structure of the Hielements project itself,
 ## demonstrating the language's ability to model hierarchical software systems.
+##
+## The specification is split into multiple files for easier navigation:
+## - specs/core.hie        - Core library (lexer, parser, AST, interpreter)
+## - specs/stdlib.hie      - Standard library (files, rust, external, wasm)
+## - specs/cli.hie         - CLI module
+## - specs/vscode.hie      - VS Code extension
+## - specs/documentation.hie - Documentation structure
+## - specs/examples.hie    - Examples validation
+## - specs/cicd.hie        - CI/CD configuration
 
 import files
 import rust
@@ -66,17 +75,11 @@ element hielements:
             check rust.struct_exists('TemplateImplementation')
             check rust.struct_exists('TemplateBinding')
             
-            ## Top-down hierarchical check structures (legacy)
-            check rust.struct_exists('HierarchicalRequirement')
-            check rust.enum_exists('HierarchicalRequirementKind')
-            check rust.struct_exists('ConnectionBoundary')
-            check rust.enum_exists('ConnectionBoundaryKind')
-            check rust.struct_exists('ConnectionPattern')
-            
-            ## New unified component requirement structures
+            ## Unified component requirement structures
             check rust.struct_exists('ComponentRequirement')
             check rust.enum_exists('RequirementAction')
             check rust.enum_exists('ComponentSpec')
+            check rust.struct_exists('ConnectionPattern')
         
         ## Interpreter - semantic validation and check execution
         element interpreter:
@@ -191,8 +194,6 @@ element hielements:
         ## ===== Core Pipeline Connections =====
         ## These checks verify the data flow through the compilation pipeline:
         ## Source -> Lexer -> Parser -> Interpreter -> Results
-        ## NOTE: Cross-element connection point references (e.g., lexer.token_output)
-        ## require proper scope resolution - simplified for now using direct module refs
         
         scope lexer_mod = rust.module_selector('lexer')
         scope parser_mod = rust.module_selector('parser')

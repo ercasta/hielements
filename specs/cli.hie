@@ -1,0 +1,22 @@
+## CLI Specification
+## Defines the structure of the hielements-cli crate.
+
+import files
+import rust
+
+## CLI - command-line interface
+element cli:
+    scope cli_src = files.folder_selector('crates/hielements-cli/src')
+    scope main_module = rust.module_selector('main')
+    scope core_crate = rust.crate_selector('hielements-core')
+    
+    check files.exists(cli_src, 'main.rs')
+    check rust.function_exists('main')
+    check rust.struct_exists('Cli')
+    check rust.enum_exists('Commands')
+    
+    ## Behavioral: CLI depends on core library
+    check rust.depends_on(main_module, core_crate)
+    
+    ## Behavioral: Core should NOT depend on CLI (proper layering)
+    check rust.no_dependency(core_crate, cli_src)

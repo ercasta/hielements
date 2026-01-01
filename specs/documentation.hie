@@ -1,0 +1,15 @@
+## Documentation Specification
+## Defines required documentation structure.
+
+import files
+
+## Documentation
+element documentation:
+    scope docs = files.folder_selector('doc')
+    
+    check files.exists(docs, 'language_reference.md')
+    check files.exists(docs, 'technical_architecture.md')
+    check files.exists(docs, 'summary.md')
+    check files.exists(docs, 'external_libraries.md')
+    check files.exists(docs, 'wasm_plugins.md')
+    check files.exists(docs, 'related_work.md')

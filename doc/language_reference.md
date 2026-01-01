@@ -70,16 +70,12 @@ The following are reserved keywords:
 | `from` | Selective import |
 | `true` | Boolean literal |
 | `false` | Boolean literal |
-| `requires` | Declares a required component (new unified syntax) |
-| `allows` | Declares an allowed component (new unified syntax) |
-| `forbids` | Declares a forbidden component (new unified syntax) |
+| `requires` | Declares a required component |
+| `allows` | Declares an allowed component |
+| `forbids` | Declares a forbidden component |
 | `descendant` | Modifier for hierarchical requirements (applies to descendants) |
 | `connection` | Specifies a connection requirement |
 | `to` | Specifies connection target |
-| `requires_descendant` | Declares a hierarchical requirement (legacy syntax) |
-| `allows_connection` | Declares an allowed architectural connection target (legacy syntax) |
-| `forbids_connection` | Declares a forbidden architectural connection target (legacy syntax) |
-| `requires_connection` | Declares a required architectural connection target (legacy syntax) |
 
 ### 1.4 Literals
 
@@ -771,32 +767,8 @@ template production_ready:
     ## At least one descendant must implement the dockerized template (new syntax)
     requires descendant implements dockerized
     
-    ## At least one descendant must implement the observable template (new syntax)
-    requires descendant implements observable
-```
-
-**Legacy syntax** (still supported for backwards compatibility):
-
-```hielements
-template dockerized:
-    ## At least one descendant must have a docker scope
-    requires_descendant scope dockerfile = docker.file_selector('Dockerfile')
-    
-    ## At least one descendant must satisfy this check
-    requires_descendant check docker.has_healthcheck(dockerfile)
-
-template observable:
-    ## At least one descendant must have a metrics element
-    requires_descendant element metrics:
-        scope module = rust.module_selector('metrics')
-        connection_point prometheus: MetricsHandler = rust.function_selector(module, 'handler')
-
-template production_ready:
-    ## At least one descendant must implement the dockerized template
-    requires_descendant implements dockerized
-    
     ## At least one descendant must implement the observable template
-    requires_descendant implements observable
+    requires descendant implements observable
 ```
 
 #### Satisfying Hierarchical Requirements
@@ -833,8 +805,6 @@ element ecommerce_platform implements production_ready:
 
 #### Hierarchical Requirement Kinds
 
-**New unified syntax:**
-
 | Kind | Syntax | Description |
 |------|--------|-------------|
 | Scope | `requires descendant scope name = expr` | A descendant must have a matching scope |
@@ -842,15 +812,6 @@ element ecommerce_platform implements production_ready:
 | Element | `requires descendant element name [implements template]` | A descendant must have an element with this structure |
 | Template Implementation | `requires descendant implements template_name` | A descendant must implement the specified template |
 | Connection Point | `requires descendant connection_point name: Type` | A descendant must have a connection point |
-
-**Legacy syntax:**
-
-| Kind | Syntax | Description |
-|------|--------|-------------|
-| Scope | `requires_descendant scope name = expr` | A descendant must have a matching scope |
-| Check | `requires_descendant check expr` | A descendant must satisfy this check |
-| Element | `requires_descendant element name: ...` | A descendant must have an element with this structure |
-| Template Implementation | `requires_descendant implements template_name` | A descendant must implement the specified template |
 
 #### Immediate vs Descendant Requirements
 
@@ -871,22 +832,12 @@ Connection boundaries allow specifying constraints on architectural dependencies
 
 #### Allowing Connections
 
-**New unified syntax:**
-
-```hielements
-element frontend_zone:
-    ## Code in this zone may only import from api_gateway (new syntax)
-    allows connection to api_gateway.public_api
-```
-
-**Legacy syntax:**
-
-Use `allows_connection to` to whitelist specific connection targets:
+Use `allows connection to` to whitelist specific connection targets:
 
 ```hielements
 element frontend_zone:
     ## Code in this zone may only import from api_gateway
-    allows_connection to api_gateway.public_api
+    allows connection to api_gateway.public_api
     
     element web_app:
         scope src = files.folder_selector('frontend/web')
@@ -898,13 +849,13 @@ element frontend_zone:
 
 #### Forbidding Connections
 
-Use `forbids_connection to` to blacklist specific connection targets:
+Use `forbids connection to` to blacklist specific connection targets:
 
 ```hielements
 element secure_zone:
     ## Code in this zone cannot import from external modules
-    forbids_connection to external.*
-    forbids_connection to public_network.*
+    forbids connection to external.*
+    forbids connection to public_network.*
     
     element internal_service:
         scope src = files.folder_selector('internal')
@@ -913,12 +864,12 @@ element secure_zone:
 
 #### Requiring Connections
 
-Use `requires_connection to` to mandate that code MUST have a dependency:
+Use `requires connection to` to mandate that code MUST have a dependency:
 
 ```hielements
 element service_mesh:
     ## All services in this mesh must import from logging module
-    requires_connection to logging.*
+    requires connection to logging.*
     
     element user_service:
         scope src = files.folder_selector('services/user')
@@ -930,9 +881,9 @@ element service_mesh:
 Connection patterns support wildcards with `.*` to match any sub-path:
 
 ```hielements
-forbids_connection to database.*       ## Matches database.connection, database.pool, etc.
-forbids_connection to external.*       ## Matches anything under external
-allows_connection to api.public.*      ## Matches api.public.users, api.public.orders, etc.
+forbids connection to database.*       ## Matches database.connection, database.pool, etc.
+forbids connection to external.*       ## Matches anything under external
+allows connection to api.public.*      ## Matches api.public.users, api.public.orders, etc.
 ```
 
 **Note**: Wildcard interpretation is library-specific. For example, a Python library might expand `logging.*` to all modules in the logging package.
@@ -943,11 +894,11 @@ Multiple boundaries can be combined - allows create a whitelist, forbids create 
 
 ```hielements
 element secure_service:
-    allows_connection to api.endpoint
-    allows_connection to logging.output
-    forbids_connection to database.*
-    forbids_connection to external.network
-    requires_connection to audit.*
+    allows connection to api.endpoint
+    allows connection to logging.output
+    forbids connection to database.*
+    forbids connection to external.network
+    requires connection to audit.*
     
     ## Children inherit ALL of these boundaries
     element child_service:
@@ -962,9 +913,9 @@ When A is allowed to connect to B, and B is allowed to connect to C:
 
 #### Boundary Semantics
 
-- `allows_connection` boundaries create a **whitelist** - only listed targets are permitted
-- `forbids_connection` boundaries create a **blacklist** - listed targets are prohibited
-- `requires_connection` boundaries create a **mandate** - dependencies MUST exist
+- `allows connection` boundaries create a **whitelist** - only listed targets are permitted
+- `forbids connection` boundaries create a **blacklist** - listed targets are prohibited
+- `requires connection` boundaries create a **mandate** - dependencies MUST exist
 - Boundaries are **inherited** by all descendants within the parent/child hierarchy
 - Multiple boundaries are **combined** (allows AND forbids AND requires apply)
 - Wildcards (`.*`) match **any path suffix** (library-specific interpretation)
@@ -1297,14 +1248,12 @@ element_item        ::= scope_declaration
                       | element_declaration
                       | template_binding
                       | component_requirement
-                      | hierarchical_requirement
-                      | connection_boundary
 
 (* Template Bindings *)
 template_binding    ::= qualified_identifier '=' expression NEWLINE
 qualified_identifier ::= identifier ('.' identifier)+
 
-(* Component Requirements - new unified syntax *)
+(* Component Requirements - unified syntax *)
 component_requirement ::= ('requires' | 'allows' | 'forbids') ['descendant'] component_spec
 component_spec        ::= scope_declaration
                         | check_declaration
@@ -1315,14 +1264,7 @@ component_spec        ::= scope_declaration
 element_spec          ::= 'element' identifier [':' type_name] ['implements' identifier] [':' NEWLINE INDENT element_body DEDENT]
 connection_spec       ::= 'connection' ['to'] connection_pattern NEWLINE
 connection_point_spec ::= 'connection_point' identifier ':' type_name ['=' expression] NEWLINE
-
-(* Hierarchical Requirements - hierarchical checks (legacy syntax) *)
-hierarchical_requirement ::= 'requires_descendant' (scope_declaration | check_declaration | element_declaration | template_implementation_requirement)
-template_implementation_requirement ::= 'implements' identifier
-
-(* Connection Boundaries - architectural dependency constraints (legacy syntax) *)
-connection_boundary    ::= ('allows_connection' | 'forbids_connection' | 'requires_connection') 'to' connection_pattern NEWLINE
-connection_pattern     ::= identifier ('.' identifier)* ('.' '*')?
+connection_pattern    ::= identifier ('.' identifier)* ('.' '*')?
 
 (* Declarations *)
 scope_declaration           ::= 'scope' identifier '=' expression NEWLINE

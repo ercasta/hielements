@@ -51,11 +51,7 @@ pub struct Template {
     pub connection_points: Vec<ConnectionPointDeclaration>,
     /// Check declarations
     pub checks: Vec<CheckDeclaration>,
-    /// Hierarchical requirements (requires_descendant) - legacy syntax
-    pub hierarchical_requirements: Vec<HierarchicalRequirement>,
-    /// Connection boundaries (allows_connection/forbids_connection) - legacy syntax
-    pub connection_boundaries: Vec<ConnectionBoundary>,
-    /// Component requirements (new unified syntax: requires/allows/forbids [descendant] ...)
+    /// Component requirements (requires/allows/forbids [descendant] ...)
     pub component_requirements: Vec<ComponentRequirement>,
     /// Nested elements
     pub elements: Vec<Element>,
@@ -100,11 +96,7 @@ pub struct Element {
     pub checks: Vec<CheckDeclaration>,
     /// Template bindings (when implementing templates)
     pub template_bindings: Vec<TemplateBinding>,
-    /// Hierarchical requirements (requires_descendant) - legacy syntax
-    pub hierarchical_requirements: Vec<HierarchicalRequirement>,
-    /// Connection boundaries (allows_connection/forbids_connection) - legacy syntax
-    pub connection_boundaries: Vec<ConnectionBoundary>,
-    /// Component requirements (new unified syntax: requires/allows/forbids [descendant] ...)
+    /// Component requirements (requires/allows/forbids [descendant] ...)
     pub component_requirements: Vec<ComponentRequirement>,
     /// Nested elements
     pub children: Vec<Element>,
@@ -316,56 +308,6 @@ pub enum ComponentSpec {
         /// Optional expression
         expression: Option<Expression>,
     },
-}
-
-// ============================================================================
-// Legacy Types (kept for backwards compatibility)
-// ============================================================================
-
-/// A hierarchical requirement that must be satisfied by at least one descendant.
-/// Used with `requires_descendant` keyword (legacy syntax).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HierarchicalRequirement {
-    /// Kind of requirement (scope, check, or element)
-    pub kind: HierarchicalRequirementKind,
-    /// Source span
-    pub span: Span,
-}
-
-/// Types of hierarchical requirements (legacy).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum HierarchicalRequirementKind {
-    /// Requires a descendant with a matching scope
-    Scope(ScopeDeclaration),
-    /// Requires a descendant with a matching check
-    Check(CheckDeclaration),
-    /// Requires a descendant element with specific structure
-    Element(Box<Element>),
-    /// Requires a descendant that implements a specific template
-    ImplementsTemplate(Identifier),
-}
-
-/// A connection boundary constraint that applies to this element and all descendants.
-/// Used with `allows_connection` and `forbids_connection` keywords (legacy syntax).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConnectionBoundary {
-    /// Whether this allows or forbids the connection
-    pub kind: ConnectionBoundaryKind,
-    /// Target pattern (e.g., "api_gateway.*", "database.connection")
-    pub target_pattern: ConnectionPattern,
-    /// Source span
-    pub span: Span,
-}
-
-/// Types of connection boundaries for architectural dependencies (legacy).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ConnectionBoundaryKind {
-    /// Allows connections (imports/dependencies) only to matching targets
-    Allows,
-    /// Forbids connections (imports/dependencies) to matching targets
-    Forbids,
-    /// Requires connections (imports/dependencies) to matching targets
-    Requires,
 }
 
 /// A connection pattern for matching connection targets.

@@ -1,0 +1,25 @@
+## VS Code Extension Specification
+## Defines the structure of the VS Code editor integration.
+
+import files
+
+## VS Code Extension - editor integration
+element vscode_extension:
+    scope ext_src = files.folder_selector('vscode-extension')
+    
+    check files.exists(ext_src, 'package.json')
+    
+    ## Language configuration
+    element language_config:
+        scope config = files.file_selector('vscode-extension/language-configuration.json')
+        check files.exists(ext_src, 'language-configuration.json')
+    
+    ## Syntax highlighting
+    element syntax:
+        scope syntaxes = files.folder_selector('vscode-extension/syntaxes')
+        check files.exists(syntaxes, 'hielements.tmLanguage.json')
+    
+    ## Extension code
+    element extension:
+        scope main = files.file_selector('vscode-extension/src/extension.ts')
+        check files.exists(ext_src, 'src/extension.ts')
