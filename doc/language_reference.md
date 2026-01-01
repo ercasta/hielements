@@ -826,7 +826,7 @@ element secure_service:
         scope src = files.folder_selector('child')
 ```
 
-#### Transitive Dependency Composition
+#### Hierarchical Dependency Composition
 
 When A is allowed to connect to B, and B is allowed to connect to C:
 - A→B→C is **allowed** (each hop respects its own boundary)

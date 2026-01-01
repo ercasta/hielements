@@ -44,7 +44,7 @@ pub enum TokenKind {
     #[token("false")]
     False,
 
-    // Transitivity keywords
+    // Hierarchical check keywords
     #[token("requires_descendant")]
     RequiresDescendant,
 
@@ -414,7 +414,7 @@ mod tests {
     }
 
     #[test]
-    fn test_transitivity_keywords() {
+    fn test_hierarchical_check_keywords() {
         let source = "requires_descendant allows_connection forbids_connection requires_connection to";
         let mut lexer = Lexer::new(source);
         let tokens = lexer.tokenize();

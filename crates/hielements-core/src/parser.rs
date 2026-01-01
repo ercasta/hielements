@@ -1210,7 +1210,7 @@ element service:
     }
 
     #[test]
-    fn test_parse_template_with_transitivity() {
+    fn test_parse_template_with_hierarchical_checks() {
         let source = r#"template dockerized:
     requires_descendant scope dockerfile = docker.file_selector('Dockerfile')
     requires_descendant check docker.has_healthcheck(dockerfile)
