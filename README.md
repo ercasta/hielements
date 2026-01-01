@@ -6,6 +6,8 @@
 
 Hielements helps you define, document, and enforce the logical structure of your software systems. Unlike traditional architecture documentation that becomes stale, Hielements specifications are formally checked against your actual code—ensuring your architecture stays aligned with reality.
 
+> 📝 **Note**: This documentation describes Hielements V2, which introduces a clearer separation between **prescriptive** (templates with rules) and **descriptive** (actual implementations) parts of the language. V2 is incompatible with V1.
+
 ---
 
 ## Why Hielements?
@@ -25,6 +27,26 @@ Modern software systems are complex. As codebases grow, their actual structure d
 
 ---
 
+## Prescriptive vs Descriptive
+
+Hielements V2 separates two key concerns:
+
+**🏗️ Prescriptive** — Define the rules and constraints
+- Element **templates** establish architectural patterns
+- **Checks** enforce rules and requirements
+- Keywords like `requires`, `forbids`, and `allows` control constraints
+- Templates declare what *should* be true
+
+**📝 Descriptive** — Document what actually exists
+- **Elements** describe concrete implementations
+- **Scopes** bind to actual code and artifacts
+- The `implements` keyword connects elements to templates
+- The `binds` keyword maps implementations to template declarations
+
+You can use Hielements **descriptively only** (documenting structure without enforcement) or **prescriptively** (with templates and checks for enforcement). Mix and match based on your needs.
+
+---
+
 ## Quick Example
 
 Imagine a microservice with Python code and a Dockerfile. You want to ensure:
@@ -35,9 +57,9 @@ Imagine a microservice with Python code and a Dockerfile. You want to ensure:
 
 ```hielements
 element orders_service:
-    # Define scopes
-    scope python_module = python.module_selector('orders')
-    scope dockerfile = docker.file_selector('orders_service.dockerfile')
+    # Define scopes with language annotations (V2 syntax)
+    scope python_module<python> = python.module_selector('orders')
+    scope dockerfile<docker> = docker.file_selector('orders_service.dockerfile')
     
     # Define connection points with types
     connection_point main: PythonModule = python.get_main_module(python_module)
@@ -54,22 +76,26 @@ Run `hielements check` and Hielements will verify your architecture against the 
 Define architectural patterns once and reuse them across your system:
 
 ```hielements
-# Define a template for microservices
+# Define a template for microservices (prescriptive)
 template microservice:
     element api:
+        scope module<python>  # Unbounded scope in template
         connection_point rest_endpoint: RestEndpoint
     element database:
         connection_point connection: DatabaseConnection
     check microservice.api.exposes_rest()
 
-# Implement the template multiple times
+# Implement the template multiple times (descriptive + prescriptive)
 element orders_service implements microservice:
-    microservice.api.scope = python.module_selector('orders.api')
-    microservice.database.scope = postgres.database_selector('orders_db')
+    # Bind template scopes to actual code using V2 syntax
+    scope api_mod<python> binds microservice.api.module = python.module_selector('orders.api')
+    connection_point endpoint: RestEndpoint binds microservice.api.rest_endpoint = python.public_functions(api_mod)
+    connection_point db: DatabaseConnection binds microservice.database.connection = postgres.database_selector('orders_db')
 
 element payments_service implements microservice:
-    microservice.api.scope = python.module_selector('payments.api')
-    microservice.database.scope = postgres.database_selector('payments_db')
+    scope api_mod<python> binds microservice.api.module = python.module_selector('payments.api')
+    connection_point endpoint: RestEndpoint binds microservice.api.rest_endpoint = python.public_functions(api_mod)
+    connection_point db: DatabaseConnection binds microservice.database.connection = postgres.database_selector('payments_db')
 ```
 
 Templates ensure consistency across similar components and make architectural patterns explicit.
@@ -85,14 +111,20 @@ Define architectural patterns once and reuse them across your codebase:
 ```hielements
 template compiler:
     element lexer:
+        scope module<rust>  # Unbounded scope (V2)
         connection_point tokens: TokenStream
     element parser:
+        scope module<rust>  # Unbounded scope (V2)
         connection_point ast: AbstractSyntaxTree
     check compiler.lexer.tokens.compatible_with(compiler.parser.input)
 
 element python_compiler implements compiler:
-    compiler.lexer.scope = rust.module_selector('pycompiler::lexer')
-    compiler.parser.scope = rust.module_selector('pycompiler::parser')
+    # Bind template scopes using V2 binds keyword
+    scope lexer_mod<rust> binds compiler.lexer.module = rust.module_selector('pycompiler::lexer')
+    connection_point lexer_tokens: TokenStream binds compiler.lexer.tokens = rust.function_selector(lexer_mod, 'tokenize')
+    
+    scope parser_mod<rust> binds compiler.parser.module = rust.module_selector('pycompiler::parser')
+    connection_point parser_ast: AbstractSyntaxTree binds compiler.parser.ast = rust.function_selector(parser_mod, 'parse')
 ```
 
 Templates ensure consistency across similar components, making architectural patterns explicit and enforceable.
@@ -122,16 +154,16 @@ Define requirements that must be satisfied somewhere in your element hierarchy, 
 ```hielements
 template dockerized:
     ## At least one descendant must have a docker configuration
-    requires descendant scope dockerfile = docker.file_selector('Dockerfile')
+    requires descendant scope dockerfile<docker>
     requires descendant check docker.has_healthcheck(dockerfile)
 
 element my_app implements dockerized:
     element frontend:
-        scope src = files.folder_selector('frontend')
+        scope src<files> = files.folder_selector('frontend')
         # Not dockerized - that's OK
     
     element backend:
-        scope dockerfile = docker.file_selector('Dockerfile.backend')
+        scope dockerfile<docker> binds dockerized.dockerfile = docker.file_selector('Dockerfile.backend')
         check docker.has_healthcheck(dockerfile)
         # This satisfies the hierarchical requirement!
 ```
@@ -146,7 +178,7 @@ template frontend_zone:
 
 element my_frontend implements frontend_zone:
     element web_app:
-        scope src = files.folder_selector('frontend/web')
+        scope src<javascript> = files.folder_selector('frontend/web')
         # Inherits connection boundaries - cannot access database
 ```
 
@@ -161,10 +193,10 @@ Define elements that span multiple languages and artifacts:
 
 ```hielements
 element full_stack_feature:
-    scope frontend = typescript.module_selector('components/OrderForm')
-    scope backend = python.module_selector('api/orders')
-    scope database = sql.migration_selector('create_orders_table')
-    scope container = docker.file_selector('orders.dockerfile')
+    scope frontend<typescript> = typescript.module_selector('components/OrderForm')
+    scope backend<python> = python.module_selector('api/orders')
+    scope database<sql> = sql.migration_selector('create_orders_table')
+    scope container<docker> = docker.file_selector('orders.dockerfile')
 ```
 
 ### 🏗️ Hierarchical Composition
@@ -246,15 +278,30 @@ Reject PRs that violate architectural rules.
 
 ## How It Works
 
-### 1. Define Elements
+### 1. Define Elements (Descriptive)
 
 Elements represent logical components with:
-- **Scope**: What code/artifacts belong to this element
-- **Rules**: Constraints the element must satisfy
+- **Scope**: What code/artifacts belong to this element (with V2 language annotations like `<rust>`)
 - **Connection Points**: APIs, interfaces, or dependencies the element exposes
 - **Children**: Sub-elements for hierarchical composition
 
-### 2. Write Rules
+### 2. Define Templates (Prescriptive - Optional)
+
+Templates establish architectural patterns with:
+- **Unbounded scopes**: Declared without implementation (`scope module<rust>`)
+- **Rules**: Constraints that implementations must satisfy
+- **Requirements**: Using `requires`, `forbids`, and `allows` keywords
+- **Checks**: Verifiable properties
+
+### 3. Bind Implementations to Templates
+
+Use the `implements` and `binds` keywords to connect:
+```hielements
+element my_service implements observable:
+    scope metrics_mod<rust> binds observable.metrics.module = rust.module_selector('api')
+```
+
+### 4. Write Rules
 
 Rules use library functions to check properties:
 
@@ -264,7 +311,7 @@ check docker.base_image(dockerfile, "python:3.11-slim")
 check files.no_files_matching(src, "*.tmp")
 ```
 
-### 3. Run Checks
+### 5. Run Checks
 
 ```bash
 hielements check
@@ -326,7 +373,7 @@ Create a file `architecture.hie`:
 
 ```hielements
 element my_service:
-    scope src = files.folder_selector('src/')
+    scope src<files> = files.folder_selector('src/')
     
     check files.contains(src, 'main.py')
 ```
@@ -403,8 +450,12 @@ Check out our [Contributing Guide](CONTRIBUTING.md) (coming soon).
 - **Enforced**: Checked automatically, not just documented
 - **Evolvable**: Easy to update as systems change
 - **Multi-level**: From high-level system design to low-level module structure
+- **Flexible**: Support both description (documenting what exists) and prescription (enforcing what should be)
 
-**Hielements makes this possible.**
+**Hielements V2 makes this possible** through:
+- **Descriptive mode**: Document your architecture without enforcement
+- **Prescriptive mode**: Use templates and checks to enforce architectural rules
+- **Hybrid approach**: Mix both modes as needed for different parts of your system
 
 ---
 
@@ -434,6 +485,9 @@ Yes! Hielements works with both greenfield and brownfield projects.
 
 ### How is this different from linters?
 Linters check code quality and style within a single file or module. Hielements checks architectural rules across your entire system, including relationships between components.
+
+### What's the difference between prescriptive and descriptive modes?
+**Descriptive mode** lets you document your architecture without enforcement—useful for understanding existing systems or when you need flexibility. **Prescriptive mode** uses templates, `requires`/`forbids`/`allows` keywords, and checks to enforce architectural rules. You can mix both modes: describe some parts of your system while prescribing rules for others.
 
 ---
 
