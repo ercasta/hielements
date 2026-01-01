@@ -138,6 +138,13 @@ impl Interpreter {
             self.validate_expression(&check.expression, file_path, diagnostics);
         }
 
+        // Validate transitive requirements
+        for req in &template.transitive_requirements {
+            self.validate_transitive_requirement(req, file_path, diagnostics);
+        }
+
+        // Connection boundaries don't need expression validation
+
         // Validate child elements
         for element in &template.elements {
             self.validate_element(element, file_path, diagnostics, &[]);
@@ -183,9 +190,37 @@ impl Interpreter {
             self.validate_expression(&binding.expression, file_path, diagnostics);
         }
 
+        // Validate transitive requirements
+        for req in &element.transitive_requirements {
+            self.validate_transitive_requirement(req, file_path, diagnostics);
+        }
+
+        // Connection boundaries don't need expression validation, just structural
+        // The target patterns are already parsed
+
         // Validate children
         for child in &element.children {
             self.validate_element(child, file_path, diagnostics, &current_path);
+        }
+    }
+
+    /// Validate a transitive requirement.
+    fn validate_transitive_requirement(
+        &self,
+        req: &TransitiveRequirement,
+        file_path: &str,
+        diagnostics: &mut Diagnostics,
+    ) {
+        match &req.kind {
+            TransitiveRequirementKind::Scope(scope) => {
+                self.validate_expression(&scope.expression, file_path, diagnostics);
+            }
+            TransitiveRequirementKind::Check(check) => {
+                self.validate_expression(&check.expression, file_path, diagnostics);
+            }
+            TransitiveRequirementKind::Element(element) => {
+                self.validate_element(element, file_path, diagnostics, &[]);
+            }
         }
     }
 

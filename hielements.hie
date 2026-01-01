@@ -65,6 +65,13 @@ element hielements:
             check rust.struct_exists('Template')
             check rust.struct_exists('TemplateImplementation')
             check rust.struct_exists('TemplateBinding')
+            
+            ## Top-down transitivity structures
+            check rust.struct_exists('TransitiveRequirement')
+            check rust.enum_exists('TransitiveRequirementKind')
+            check rust.struct_exists('ConnectionBoundary')
+            check rust.enum_exists('ConnectionBoundaryKind')
+            check rust.struct_exists('ConnectionPattern')
         
         ## Interpreter - semantic validation and check execution
         element interpreter:
@@ -253,6 +260,7 @@ element hielements:
         check files.exists(examples, 'hybrid_plugins.hie')
         check files.exists(examples, 'template_compiler.hie')
         check files.exists(examples, 'template_microservice.hie')
+        check files.exists(examples, 'transitivity.hie')
         check files.exists(examples, 'hielements.toml')
         check files.exists(examples, 'hielements_hybrid.toml')
     

@@ -44,6 +44,22 @@ pub enum TokenKind {
     #[token("false")]
     False,
 
+    // Transitivity keywords
+    #[token("requires_descendant")]
+    RequiresDescendant,
+
+    #[token("allows_connection")]
+    AllowsConnection,
+
+    #[token("forbids_connection")]
+    ForbidsConnection,
+
+    #[token("requires_connection")]
+    RequiresConnection,
+
+    #[token("to")]
+    To,
+
     // Punctuation
     #[token(":")]
     Colon,
@@ -68,6 +84,9 @@ pub enum TokenKind {
 
     #[token("]")]
     RBracket,
+
+    #[token("*")]
+    Star,
 
     // Newline (significant for indentation-based syntax)
     #[regex(r"\r?\n")]
@@ -392,5 +411,31 @@ mod tests {
         let kinds: Vec<_> = tokens.iter().map(|t| &t.kind).collect();
         assert!(kinds.contains(&&TokenKind::Element));
         assert!(kinds.contains(&&TokenKind::Implements));
+    }
+
+    #[test]
+    fn test_transitivity_keywords() {
+        let source = "requires_descendant allows_connection forbids_connection requires_connection to";
+        let mut lexer = Lexer::new(source);
+        let tokens = lexer.tokenize();
+
+        let kinds: Vec<_> = tokens.iter().map(|t| &t.kind).collect();
+        assert!(kinds.contains(&&TokenKind::RequiresDescendant));
+        assert!(kinds.contains(&&TokenKind::AllowsConnection));
+        assert!(kinds.contains(&&TokenKind::ForbidsConnection));
+        assert!(kinds.contains(&&TokenKind::RequiresConnection));
+        assert!(kinds.contains(&&TokenKind::To));
+    }
+
+    #[test]
+    fn test_star_token() {
+        let source = "database.*";
+        let mut lexer = Lexer::new(source);
+        let tokens = lexer.tokenize();
+
+        let kinds: Vec<_> = tokens.iter().map(|t| &t.kind).collect();
+        assert!(kinds.contains(&&TokenKind::Identifier));
+        assert!(kinds.contains(&&TokenKind::Dot));
+        assert!(kinds.contains(&&TokenKind::Star));
     }
 }

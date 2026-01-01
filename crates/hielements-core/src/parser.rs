@@ -5,6 +5,12 @@ use crate::diagnostics::{Diagnostic, Diagnostics};
 use crate::lexer::{Lexer, Token, TokenKind};
 use crate::span::Span;
 
+/// Expected tokens in element body for error messages.
+const EXPECTED_ELEMENT_BODY_TOKENS: &str = "'scope', 'connection_point', 'check', 'element', 'requires_descendant', 'allows_connection', 'forbids_connection', or 'requires_connection'";
+
+/// Expected tokens in template body for error messages.
+const EXPECTED_TEMPLATE_BODY_TOKENS: &str = "'scope', 'connection_point', 'check', 'element', 'requires_descendant', 'allows_connection', 'forbids_connection', or 'requires_connection'";
+
 /// Parser for the Hielements language.
 pub struct Parser<'a> {
     #[allow(dead_code)]
@@ -212,6 +218,8 @@ impl<'a> Parser<'a> {
         let mut connection_points = Vec::new();
         let mut checks = Vec::new();
         let mut template_bindings = Vec::new();
+        let mut transitive_requirements = Vec::new();
+        let mut connection_boundaries = Vec::new();
         let mut children = Vec::new();
 
         loop {
@@ -232,6 +240,14 @@ impl<'a> Parser<'a> {
                 checks.push(self.parse_check()?);
             } else if self.check(TokenKind::Element) {
                 children.push(self.parse_element(child_doc)?);
+            } else if self.check(TokenKind::RequiresDescendant) {
+                transitive_requirements.push(self.parse_transitive_requirement()?);
+            } else if self.check(TokenKind::AllowsConnection) {
+                connection_boundaries.push(self.parse_connection_boundary(ConnectionBoundaryKind::Allows)?);
+            } else if self.check(TokenKind::ForbidsConnection) {
+                connection_boundaries.push(self.parse_connection_boundary(ConnectionBoundaryKind::Forbids)?);
+            } else if self.check(TokenKind::RequiresConnection) {
+                connection_boundaries.push(self.parse_connection_boundary(ConnectionBoundaryKind::Requires)?);
             } else if self.check(TokenKind::Identifier) {
                 // Could be a template binding (e.g., template.element.scope = ...)
                 // Peek ahead to see if this looks like a template binding (has a dot after the identifier)
@@ -254,7 +270,7 @@ impl<'a> Parser<'a> {
                     return Err(Diagnostic::error(
                         "E002",
                         format!(
-                            "Expected 'scope', 'connection_point', 'check', or 'element', found {:?}",
+                            "Expected 'scope', 'connection_point', 'check', 'element', 'requires_descendant', 'allows_connection', or 'forbids_connection', found {:?}",
                             token.kind
                         ),
                     )
@@ -269,7 +285,8 @@ impl<'a> Parser<'a> {
                 return Err(Diagnostic::error(
                     "E002",
                     format!(
-                        "Expected 'scope', 'connection_point', 'check', or 'element', found {:?}",
+                        "Expected {}, found {:?}",
+                        EXPECTED_ELEMENT_BODY_TOKENS,
                         token.kind
                     ),
                 )
@@ -294,6 +311,8 @@ impl<'a> Parser<'a> {
             connection_points,
             checks,
             template_bindings,
+            transitive_requirements,
+            connection_boundaries,
             children,
             span: start_span.merge(&end_span),
         })
@@ -311,6 +330,8 @@ impl<'a> Parser<'a> {
         let mut scopes = Vec::new();
         let mut connection_points = Vec::new();
         let mut checks = Vec::new();
+        let mut transitive_requirements = Vec::new();
+        let mut connection_boundaries = Vec::new();
         let mut elements = Vec::new();
 
         loop {
@@ -331,6 +352,14 @@ impl<'a> Parser<'a> {
                 checks.push(self.parse_check()?);
             } else if self.check(TokenKind::Element) {
                 elements.push(self.parse_element(child_doc)?);
+            } else if self.check(TokenKind::RequiresDescendant) {
+                transitive_requirements.push(self.parse_transitive_requirement()?);
+            } else if self.check(TokenKind::AllowsConnection) {
+                connection_boundaries.push(self.parse_connection_boundary(ConnectionBoundaryKind::Allows)?);
+            } else if self.check(TokenKind::ForbidsConnection) {
+                connection_boundaries.push(self.parse_connection_boundary(ConnectionBoundaryKind::Forbids)?);
+            } else if self.check(TokenKind::RequiresConnection) {
+                connection_boundaries.push(self.parse_connection_boundary(ConnectionBoundaryKind::Requires)?);
             } else if self.check(TokenKind::Dedent) || self.is_at_end() {
                 break;
             } else {
@@ -338,7 +367,8 @@ impl<'a> Parser<'a> {
                 return Err(Diagnostic::error(
                     "E002",
                     format!(
-                        "Expected 'scope', 'connection_point', 'check', or 'element' in template, found {:?}",
+                        "Expected {} in template, found {:?}",
+                        EXPECTED_TEMPLATE_BODY_TOKENS,
                         token.kind
                     ),
                 )
@@ -361,6 +391,8 @@ impl<'a> Parser<'a> {
             scopes,
             connection_points,
             checks,
+            transitive_requirements,
+            connection_boundaries,
             elements,
             span: start_span.merge(&end_span),
         })
@@ -461,6 +493,93 @@ impl<'a> Parser<'a> {
 
         Ok(CheckDeclaration {
             expression,
+            span: start_span.merge(&end_span),
+        })
+    }
+
+    /// Parse a transitive requirement (requires_descendant ...).
+    fn parse_transitive_requirement(&mut self) -> Result<TransitiveRequirement, Diagnostic> {
+        let start_span = self.current_span();
+        self.expect(TokenKind::RequiresDescendant)?;
+
+        // Next token determines the kind: scope, check, or element
+        let kind = if self.check(TokenKind::Scope) {
+            TransitiveRequirementKind::Scope(self.parse_scope()?)
+        } else if self.check(TokenKind::Check) {
+            TransitiveRequirementKind::Check(self.parse_check()?)
+        } else if self.check(TokenKind::Element) {
+            let child_doc = self.parse_doc_comment();
+            TransitiveRequirementKind::Element(Box::new(self.parse_element(child_doc)?))
+        } else {
+            let token = self.current();
+            return Err(Diagnostic::error(
+                "E010",
+                format!(
+                    "Expected 'scope', 'check', or 'element' after 'requires_descendant', found {:?}",
+                    token.kind
+                ),
+            )
+            .with_file(&self.file_path)
+            .with_span(token.span)
+            .build());
+        };
+
+        let end_span = self.previous_span();
+        Ok(TransitiveRequirement {
+            kind,
+            span: start_span.merge(&end_span),
+        })
+    }
+
+    /// Parse a connection boundary (allows_connection/forbids_connection/requires_connection to ...).
+    fn parse_connection_boundary(&mut self, kind: ConnectionBoundaryKind) -> Result<ConnectionBoundary, Diagnostic> {
+        let start_span = self.current_span();
+        
+        // Consume the keyword (AllowsConnection, ForbidsConnection, or RequiresConnection)
+        self.advance();
+        
+        // Expect 'to' keyword
+        self.expect(TokenKind::To)?;
+        
+        // Parse the connection pattern (e.g., api_gateway.public_api or database.*)
+        let target_pattern = self.parse_connection_pattern()?;
+        
+        self.expect_newline()?;
+        let end_span = self.previous_span();
+
+        Ok(ConnectionBoundary {
+            kind,
+            target_pattern,
+            span: start_span.merge(&end_span),
+        })
+    }
+
+    /// Parse a connection pattern (e.g., api_gateway.public_api or database.*).
+    fn parse_connection_pattern(&mut self) -> Result<ConnectionPattern, Diagnostic> {
+        let start_span = self.current_span();
+        let mut path = vec![self.parse_identifier()?];
+        let mut wildcard = false;
+
+        while self.check(TokenKind::Dot) {
+            self.advance(); // consume dot
+            
+            // Check for wildcard (*)
+            if self.check(TokenKind::Star) {
+                self.advance(); // consume *
+                wildcard = true;
+                break; // * must be last
+            } else if self.check(TokenKind::Identifier) {
+                path.push(self.parse_identifier()?);
+            } else {
+                // End of pattern
+                break;
+            }
+        }
+
+        let end_span = self.previous_span();
+        Ok(ConnectionPattern {
+            path,
+            wildcard,
             span: start_span.merge(&end_span),
         })
     }
@@ -586,7 +705,10 @@ impl<'a> Parser<'a> {
             let token = self.current();
             match token.kind {
                 TokenKind::Scope | TokenKind::Element | TokenKind::Check | 
-                TokenKind::ConnectionPoint | TokenKind::Template | TokenKind::Implements => {
+                TokenKind::ConnectionPoint | TokenKind::Template | TokenKind::Implements |
+                TokenKind::To | TokenKind::RequiresDescendant | 
+                TokenKind::AllowsConnection | TokenKind::ForbidsConnection |
+                TokenKind::RequiresConnection => {
                     let token = self.advance();
                     Ok(Identifier::new(token.text, token.span))
                 }
@@ -974,5 +1096,201 @@ element service:
         let parser_elem = &template.elements[1];
         assert_eq!(parser_elem.connection_points[0].name.name, "ast");
         assert_eq!(parser_elem.connection_points[0].type_annotation.type_name.name, "AbstractSyntaxTree");
+    }
+
+    #[test]
+    fn test_parse_requires_descendant_scope() {
+        let source = r#"element app:
+    requires_descendant scope dockerfile = docker.file_selector('Dockerfile')
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.elements.len(), 1);
+        let element = &program.elements[0];
+        assert_eq!(element.transitive_requirements.len(), 1);
+        
+        match &element.transitive_requirements[0].kind {
+            TransitiveRequirementKind::Scope(scope) => {
+                assert_eq!(scope.name.name, "dockerfile");
+            }
+            _ => panic!("Expected scope requirement"),
+        }
+    }
+
+    #[test]
+    fn test_parse_requires_descendant_check() {
+        let source = r#"element app:
+    requires_descendant check docker.has_healthcheck(dockerfile)
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.elements.len(), 1);
+        let element = &program.elements[0];
+        assert_eq!(element.transitive_requirements.len(), 1);
+        
+        match &element.transitive_requirements[0].kind {
+            TransitiveRequirementKind::Check(_) => (),
+            _ => panic!("Expected check requirement"),
+        }
+    }
+
+    #[test]
+    fn test_parse_requires_descendant_element() {
+        let source = r#"element app:
+    requires_descendant element metrics:
+        scope module = rust.module_selector('metrics')
+        connection_point prometheus: MetricsHandler = rust.function_selector(module, 'handler')
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.elements.len(), 1);
+        let element = &program.elements[0];
+        assert_eq!(element.transitive_requirements.len(), 1);
+        
+        match &element.transitive_requirements[0].kind {
+            TransitiveRequirementKind::Element(elem) => {
+                assert_eq!(elem.name.name, "metrics");
+                assert_eq!(elem.scopes.len(), 1);
+                assert_eq!(elem.connection_points.len(), 1);
+            }
+            _ => panic!("Expected element requirement"),
+        }
+    }
+
+    #[test]
+    fn test_parse_allows_connection() {
+        let source = r#"element frontend:
+    allows_connection to api_gateway.public_api
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.elements.len(), 1);
+        let element = &program.elements[0];
+        assert_eq!(element.connection_boundaries.len(), 1);
+        
+        let boundary = &element.connection_boundaries[0];
+        assert!(matches!(boundary.kind, ConnectionBoundaryKind::Allows));
+        assert_eq!(boundary.target_pattern.path.len(), 2);
+        assert_eq!(boundary.target_pattern.path[0].name, "api_gateway");
+        assert_eq!(boundary.target_pattern.path[1].name, "public_api");
+        assert!(!boundary.target_pattern.wildcard);
+    }
+
+    #[test]
+    fn test_parse_forbids_connection_with_wildcard() {
+        let source = r#"element secure_zone:
+    forbids_connection to external.*
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.elements.len(), 1);
+        let element = &program.elements[0];
+        assert_eq!(element.connection_boundaries.len(), 1);
+        
+        let boundary = &element.connection_boundaries[0];
+        assert!(matches!(boundary.kind, ConnectionBoundaryKind::Forbids));
+        assert_eq!(boundary.target_pattern.path.len(), 1);
+        assert_eq!(boundary.target_pattern.path[0].name, "external");
+        assert!(boundary.target_pattern.wildcard);
+    }
+
+    #[test]
+    fn test_parse_template_with_transitivity() {
+        let source = r#"template dockerized:
+    requires_descendant scope dockerfile = docker.file_selector('Dockerfile')
+    requires_descendant check docker.has_healthcheck(dockerfile)
+    forbids_connection to external.*
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.templates.len(), 1);
+        let template = &program.templates[0];
+        assert_eq!(template.name.name, "dockerized");
+        assert_eq!(template.transitive_requirements.len(), 2);
+        assert_eq!(template.connection_boundaries.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_element_with_multiple_boundaries() {
+        let source = r#"element secure_service:
+    allows_connection to api.endpoint
+    forbids_connection to database.*
+    forbids_connection to external.network
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.elements.len(), 1);
+        let element = &program.elements[0];
+        assert_eq!(element.connection_boundaries.len(), 3);
+        
+        assert!(matches!(element.connection_boundaries[0].kind, ConnectionBoundaryKind::Allows));
+        assert!(matches!(element.connection_boundaries[1].kind, ConnectionBoundaryKind::Forbids));
+        assert!(matches!(element.connection_boundaries[2].kind, ConnectionBoundaryKind::Forbids));
+    }
+
+    #[test]
+    fn test_parse_requires_connection() {
+        let source = r#"element service:
+    requires_connection to logging.*
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.elements.len(), 1);
+        let element = &program.elements[0];
+        assert_eq!(element.connection_boundaries.len(), 1);
+        
+        let boundary = &element.connection_boundaries[0];
+        assert!(matches!(boundary.kind, ConnectionBoundaryKind::Requires));
+        assert_eq!(boundary.target_pattern.path.len(), 1);
+        assert_eq!(boundary.target_pattern.path[0].name, "logging");
+        assert!(boundary.target_pattern.wildcard);
+    }
+
+    #[test]
+    fn test_parse_all_connection_boundary_types() {
+        let source = r#"element zone:
+    allows_connection to api.*
+    forbids_connection to database.*
+    requires_connection to logging.output
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.elements.len(), 1);
+        let element = &program.elements[0];
+        assert_eq!(element.connection_boundaries.len(), 3);
+        
+        assert!(matches!(element.connection_boundaries[0].kind, ConnectionBoundaryKind::Allows));
+        assert!(matches!(element.connection_boundaries[1].kind, ConnectionBoundaryKind::Forbids));
+        assert!(matches!(element.connection_boundaries[2].kind, ConnectionBoundaryKind::Requires));
+        
+        // The requires_connection should not have wildcard
+        assert!(!element.connection_boundaries[2].target_pattern.wildcard);
     }
 }

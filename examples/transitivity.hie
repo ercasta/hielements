@@ -1,0 +1,146 @@
+# Example: Top-Down Transitivity
+# Demonstrates transitive requirements and connection boundaries
+
+import files
+import rust
+
+## Dockerized Template
+## Requires that at least one descendant element has a docker configuration.
+## This is useful for ensuring that an application is properly containerized.
+template dockerized:
+    ## At least one descendant must have a docker scope
+    requires_descendant scope dockerfile = docker.file_selector('Dockerfile')
+    
+    ## At least one descendant must have health check configured
+    requires_descendant check docker.has_healthcheck(dockerfile)
+
+## Observable Template
+## Requires that at least one descendant exposes metrics for monitoring.
+template observable:
+    ## At least one descendant must have metrics endpoint
+    requires_descendant element metrics:
+        scope module = rust.module_selector('metrics')
+        connection_point prometheus: MetricsHandler = rust.function_selector(module, 'handler')
+
+## Secure Zone Template
+## Defines connection boundaries that apply to all descendants.
+## Descendants cannot connect to external or public networks.
+template secure_zone:
+    forbids_connection to external.*
+    forbids_connection to public_network.*
+
+## Frontend Zone Template
+## Frontend components can only connect to API gateway.
+template frontend_zone:
+    allows_connection to api_gateway.public_api
+    forbids_connection to database.*
+    forbids_connection to internal_services.*
+
+## My Application
+## A production-ready application that satisfies dockerized requirements.
+element my_app implements dockerized, observable:
+    scope root = files.folder_selector('.')
+    
+    ## Frontend service - not dockerized, but that's okay because
+    ## the backend satisfies the dockerized requirement
+    element frontend:
+        scope src = files.folder_selector('frontend/src')
+        check files.exists(src, 'index.html')
+    
+    ## Backend service - this satisfies the dockerized requirement
+    element backend:
+        scope src = files.folder_selector('backend/src')
+        scope dockerfile = docker.file_selector('backend/Dockerfile')
+        
+        check docker.has_healthcheck(dockerfile)
+        check rust.function_exists(src, 'main')
+    
+    ## Metrics service - this satisfies the observable requirement
+    element metrics:
+        scope module = rust.module_selector('metrics')
+        connection_point prometheus: MetricsHandler = rust.function_selector(module, 'handler')
+        
+        check rust.function_exists(module, 'collect_metrics')
+
+## E-Commerce Platform
+## Demonstrates connection boundaries at different levels.
+element ecommerce_platform:
+    
+    ## Public frontend zone - restricted connections
+    element frontend_zone:
+        allows_connection to api_gateway.public_api
+        forbids_connection to database.*
+        
+        element web_app:
+            scope src = files.folder_selector('frontend/web')
+            
+        element mobile_api:
+            scope src = files.folder_selector('frontend/mobile')
+    
+    ## API Gateway - the single entry point
+    element api_gateway:
+        scope src = files.folder_selector('gateway/src')
+        connection_point public_api: HttpHandler = rust.function_selector(src, 'routes')
+    
+    ## Secure backend zone - no external connections allowed
+    element backend_zone:
+        forbids_connection to external.*
+        
+        element order_service:
+            scope src = files.folder_selector('services/orders')
+            connection_point orders_api: HttpHandler = rust.function_selector(src, 'orders')
+        
+        element payment_service:
+            scope src = files.folder_selector('services/payments')
+            forbids_connection to public_network.*
+            
+            connection_point payments_api: HttpHandler = rust.function_selector(src, 'payments')
+        
+        element database:
+            scope config = files.file_selector('db/config.yaml')
+            connection_point db_connection: DbConnection = rust.struct_selector(config, 'Connection')
+
+## Payment Processor
+## An example of a deeply secure component with multiple requirements.
+element payment_processor implements secure_zone:
+    scope root = files.folder_selector('payment')
+    
+    ## All descendants inherit the forbids_connection constraints from secure_zone
+    
+    element card_validation:
+        scope src = files.folder_selector('payment/validation')
+        check rust.function_exists(src, 'validate_card')
+    
+    element tokenization:
+        scope src = files.folder_selector('payment/tokenization')
+        check rust.function_exists(src, 'tokenize_card')
+    
+    ## Audit logging - required for compliance
+    element audit:
+        scope src = files.folder_selector('payment/audit')
+        check rust.function_exists(src, 'log_transaction')
+
+## Service Mesh Zone
+## Demonstrates requires_connection - all services in this zone
+## MUST have a dependency on the logging module
+element service_mesh:
+    ## All services in this mesh must import from logging module
+    requires_connection to logging.*
+    
+    ## Services may connect to other services in the mesh
+    allows_connection to mesh_internal.*
+    
+    ## Services cannot connect directly to external APIs
+    forbids_connection to external_api.*
+    
+    element user_service:
+        scope src = files.folder_selector('services/user')
+        # This service must import from logging.* to satisfy requires_connection
+    
+    element order_service:
+        scope src = files.folder_selector('services/order')
+        # This service must also import from logging.*
+    
+    element notification_service:
+        scope src = files.folder_selector('services/notification')
+        # And this one too
