@@ -1,5 +1,5 @@
-# Example: Top-Down Transitivity
-# Demonstrates transitive requirements and connection boundaries
+# Example: Hierarchical Checks
+# Demonstrates hierarchical requirements and connection boundaries
 
 import files
 import rust

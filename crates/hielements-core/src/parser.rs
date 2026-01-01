@@ -218,7 +218,7 @@ impl<'a> Parser<'a> {
         let mut connection_points = Vec::new();
         let mut checks = Vec::new();
         let mut template_bindings = Vec::new();
-        let mut transitive_requirements = Vec::new();
+        let mut hierarchical_requirements = Vec::new();
         let mut connection_boundaries = Vec::new();
         let mut children = Vec::new();
 
@@ -241,7 +241,7 @@ impl<'a> Parser<'a> {
             } else if self.check(TokenKind::Element) {
                 children.push(self.parse_element(child_doc)?);
             } else if self.check(TokenKind::RequiresDescendant) {
-                transitive_requirements.push(self.parse_transitive_requirement()?);
+                hierarchical_requirements.push(self.parse_hierarchical_requirement()?);
             } else if self.check(TokenKind::AllowsConnection) {
                 connection_boundaries.push(self.parse_connection_boundary(ConnectionBoundaryKind::Allows)?);
             } else if self.check(TokenKind::ForbidsConnection) {
@@ -311,7 +311,7 @@ impl<'a> Parser<'a> {
             connection_points,
             checks,
             template_bindings,
-            transitive_requirements,
+            hierarchical_requirements,
             connection_boundaries,
             children,
             span: start_span.merge(&end_span),
@@ -330,7 +330,7 @@ impl<'a> Parser<'a> {
         let mut scopes = Vec::new();
         let mut connection_points = Vec::new();
         let mut checks = Vec::new();
-        let mut transitive_requirements = Vec::new();
+        let mut hierarchical_requirements = Vec::new();
         let mut connection_boundaries = Vec::new();
         let mut elements = Vec::new();
 
@@ -353,7 +353,7 @@ impl<'a> Parser<'a> {
             } else if self.check(TokenKind::Element) {
                 elements.push(self.parse_element(child_doc)?);
             } else if self.check(TokenKind::RequiresDescendant) {
-                transitive_requirements.push(self.parse_transitive_requirement()?);
+                hierarchical_requirements.push(self.parse_hierarchical_requirement()?);
             } else if self.check(TokenKind::AllowsConnection) {
                 connection_boundaries.push(self.parse_connection_boundary(ConnectionBoundaryKind::Allows)?);
             } else if self.check(TokenKind::ForbidsConnection) {
@@ -391,7 +391,7 @@ impl<'a> Parser<'a> {
             scopes,
             connection_points,
             checks,
-            transitive_requirements,
+            hierarchical_requirements,
             connection_boundaries,
             elements,
             span: start_span.merge(&end_span),
@@ -497,19 +497,19 @@ impl<'a> Parser<'a> {
         })
     }
 
-    /// Parse a transitive requirement (requires_descendant ...).
-    fn parse_transitive_requirement(&mut self) -> Result<TransitiveRequirement, Diagnostic> {
+    /// Parse a hierarchical requirement (requires_descendant ...).
+    fn parse_hierarchical_requirement(&mut self) -> Result<HierarchicalRequirement, Diagnostic> {
         let start_span = self.current_span();
         self.expect(TokenKind::RequiresDescendant)?;
 
         // Next token determines the kind: scope, check, or element
         let kind = if self.check(TokenKind::Scope) {
-            TransitiveRequirementKind::Scope(self.parse_scope()?)
+            HierarchicalRequirementKind::Scope(self.parse_scope()?)
         } else if self.check(TokenKind::Check) {
-            TransitiveRequirementKind::Check(self.parse_check()?)
+            HierarchicalRequirementKind::Check(self.parse_check()?)
         } else if self.check(TokenKind::Element) {
             let child_doc = self.parse_doc_comment();
-            TransitiveRequirementKind::Element(Box::new(self.parse_element(child_doc)?))
+            HierarchicalRequirementKind::Element(Box::new(self.parse_element(child_doc)?))
         } else {
             let token = self.current();
             return Err(Diagnostic::error(
@@ -525,7 +525,7 @@ impl<'a> Parser<'a> {
         };
 
         let end_span = self.previous_span();
-        Ok(TransitiveRequirement {
+        Ok(HierarchicalRequirement {
             kind,
             span: start_span.merge(&end_span),
         })
@@ -1110,10 +1110,10 @@ element service:
         let program = program.unwrap();
         assert_eq!(program.elements.len(), 1);
         let element = &program.elements[0];
-        assert_eq!(element.transitive_requirements.len(), 1);
+        assert_eq!(element.hierarchical_requirements.len(), 1);
         
-        match &element.transitive_requirements[0].kind {
-            TransitiveRequirementKind::Scope(scope) => {
+        match &element.hierarchical_requirements[0].kind {
+            HierarchicalRequirementKind::Scope(scope) => {
                 assert_eq!(scope.name.name, "dockerfile");
             }
             _ => panic!("Expected scope requirement"),
@@ -1132,10 +1132,10 @@ element service:
         let program = program.unwrap();
         assert_eq!(program.elements.len(), 1);
         let element = &program.elements[0];
-        assert_eq!(element.transitive_requirements.len(), 1);
+        assert_eq!(element.hierarchical_requirements.len(), 1);
         
-        match &element.transitive_requirements[0].kind {
-            TransitiveRequirementKind::Check(_) => (),
+        match &element.hierarchical_requirements[0].kind {
+            HierarchicalRequirementKind::Check(_) => (),
             _ => panic!("Expected check requirement"),
         }
     }
@@ -1154,10 +1154,10 @@ element service:
         let program = program.unwrap();
         assert_eq!(program.elements.len(), 1);
         let element = &program.elements[0];
-        assert_eq!(element.transitive_requirements.len(), 1);
+        assert_eq!(element.hierarchical_requirements.len(), 1);
         
-        match &element.transitive_requirements[0].kind {
-            TransitiveRequirementKind::Element(elem) => {
+        match &element.hierarchical_requirements[0].kind {
+            HierarchicalRequirementKind::Element(elem) => {
                 assert_eq!(elem.name.name, "metrics");
                 assert_eq!(elem.scopes.len(), 1);
                 assert_eq!(elem.connection_points.len(), 1);
@@ -1224,7 +1224,7 @@ element service:
         assert_eq!(program.templates.len(), 1);
         let template = &program.templates[0];
         assert_eq!(template.name.name, "dockerized");
-        assert_eq!(template.transitive_requirements.len(), 2);
+        assert_eq!(template.hierarchical_requirements.len(), 2);
         assert_eq!(template.connection_boundaries.len(), 1);
     }
 

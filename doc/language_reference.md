@@ -70,7 +70,7 @@ The following are reserved keywords:
 | `from` | Selective import |
 | `true` | Boolean literal |
 | `false` | Boolean literal |
-| `requires_descendant` | Declares a transitive requirement |
+| `requires_descendant` | Declares a hierarchical requirement |
 | `allows_connection` | Declares an allowed architectural connection target |
 | `forbids_connection` | Declares a forbidden architectural connection target |
 | `requires_connection` | Declares a required architectural connection target |
@@ -699,11 +699,11 @@ External libraries can provide templates via the library protocol. See the [Exte
 - Templates **cannot be nested** (a template cannot implement another template)
 - Template names must be **unique** within their scope
 
-### 8.9 Top-Down Transitivity
+### 8.9 Hierarchical Checks
 
-Top-down transitivity allows parent elements to prescribe requirements that must be satisfied by at least one of their descendants (children, grandchildren, etc.). This is useful for expressing architectural constraints that span multiple levels of the hierarchy.
+Hierarchical checks allow parent elements to prescribe requirements that must be satisfied by at least one of their descendants (children, grandchildren, etc.). This is useful for expressing architectural constraints that span multiple levels of the hierarchy.
 
-#### Transitive Requirements
+#### Hierarchical Requirements
 
 Use `requires_descendant` to specify that somewhere in the element's descendant hierarchy, a specific property must exist:
 
@@ -722,9 +722,9 @@ template observable:
         connection_point prometheus: MetricsHandler = rust.function_selector(module, 'handler')
 ```
 
-#### Satisfying Transitive Requirements
+#### Satisfying Hierarchical Requirements
 
-When an element implements a template with transitive requirements, at least one of its descendants must satisfy each requirement:
+When an element implements a template with hierarchical requirements, at least one of its descendants must satisfy each requirement:
 
 ```hielements
 element my_app implements dockerized:
@@ -732,14 +732,14 @@ element my_app implements dockerized:
     element frontend:
         scope src = files.folder_selector('frontend')
     
-    ## Backend - satisfies the dockerized requirement!
+    ## Backend - satisfies the hierarchical requirement!
     element backend:
         scope src = files.folder_selector('backend')
         scope dockerfile = docker.file_selector('Dockerfile')  ## Matches!
         check docker.has_healthcheck(dockerfile)               ## Matches!
 ```
 
-#### Transitive Requirement Kinds
+#### Hierarchical Requirement Kinds
 
 | Kind | Syntax | Description |
 |------|--------|-------------|
@@ -1155,7 +1155,7 @@ template_item        ::= scope_declaration
                        | connection_point_declaration
                        | check_declaration
                        | element_declaration
-                       | transitive_requirement
+                       | hierarchical_requirement
                        | connection_boundary
 
 (* Elements *)
@@ -1167,15 +1167,15 @@ element_item        ::= scope_declaration
                       | check_declaration
                       | element_declaration
                       | template_binding
-                      | transitive_requirement
+                      | hierarchical_requirement
                       | connection_boundary
 
 (* Template Bindings *)
 template_binding    ::= qualified_identifier '=' expression NEWLINE
 qualified_identifier ::= identifier ('.' identifier)+
 
-(* Transitive Requirements - top-down transitivity *)
-transitive_requirement ::= 'requires_descendant' (scope_declaration | check_declaration | element_declaration)
+(* Hierarchical Requirements - hierarchical checks *)
+hierarchical_requirement ::= 'requires_descendant' (scope_declaration | check_declaration | element_declaration)
 
 (* Connection Boundaries - architectural dependency constraints *)
 connection_boundary    ::= ('allows_connection' | 'forbids_connection' | 'requires_connection') 'to' connection_pattern NEWLINE
