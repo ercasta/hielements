@@ -51,8 +51,8 @@ pub struct Template {
     pub connection_points: Vec<ConnectionPointDeclaration>,
     /// Check declarations
     pub checks: Vec<CheckDeclaration>,
-    /// Transitive requirements (requires_descendant)
-    pub transitive_requirements: Vec<TransitiveRequirement>,
+    /// Hierarchical requirements (requires_descendant)
+    pub hierarchical_requirements: Vec<HierarchicalRequirement>,
     /// Connection boundaries (allows_connection/forbids_connection)
     pub connection_boundaries: Vec<ConnectionBoundary>,
     /// Nested elements
@@ -98,8 +98,8 @@ pub struct Element {
     pub checks: Vec<CheckDeclaration>,
     /// Template bindings (when implementing templates)
     pub template_bindings: Vec<TemplateBinding>,
-    /// Transitive requirements (requires_descendant)
-    pub transitive_requirements: Vec<TransitiveRequirement>,
+    /// Hierarchical requirements (requires_descendant)
+    pub hierarchical_requirements: Vec<HierarchicalRequirement>,
     /// Connection boundaries (allows_connection/forbids_connection)
     pub connection_boundaries: Vec<ConnectionBoundary>,
     /// Nested elements
@@ -252,19 +252,19 @@ impl BooleanLiteral {
     }
 }
 
-/// A transitive requirement that must be satisfied by at least one descendant.
+/// A hierarchical requirement that must be satisfied by at least one descendant.
 /// Used with `requires_descendant` keyword.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TransitiveRequirement {
+pub struct HierarchicalRequirement {
     /// Kind of requirement (scope, check, or element)
-    pub kind: TransitiveRequirementKind,
+    pub kind: HierarchicalRequirementKind,
     /// Source span
     pub span: Span,
 }
 
-/// Types of transitive requirements.
+/// Types of hierarchical requirements.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum TransitiveRequirementKind {
+pub enum HierarchicalRequirementKind {
     /// Requires a descendant with a matching scope
     Scope(ScopeDeclaration),
     /// Requires a descendant with a matching check

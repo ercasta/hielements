@@ -138,9 +138,9 @@ impl Interpreter {
             self.validate_expression(&check.expression, file_path, diagnostics);
         }
 
-        // Validate transitive requirements
-        for req in &template.transitive_requirements {
-            self.validate_transitive_requirement(req, file_path, diagnostics);
+        // Validate hierarchical requirements
+        for req in &template.hierarchical_requirements {
+            self.validate_hierarchical_requirement(req, file_path, diagnostics);
         }
 
         // Connection boundaries don't need expression validation
@@ -190,9 +190,9 @@ impl Interpreter {
             self.validate_expression(&binding.expression, file_path, diagnostics);
         }
 
-        // Validate transitive requirements
-        for req in &element.transitive_requirements {
-            self.validate_transitive_requirement(req, file_path, diagnostics);
+        // Validate hierarchical requirements
+        for req in &element.hierarchical_requirements {
+            self.validate_hierarchical_requirement(req, file_path, diagnostics);
         }
 
         // Connection boundaries don't need expression validation, just structural
@@ -204,21 +204,21 @@ impl Interpreter {
         }
     }
 
-    /// Validate a transitive requirement.
-    fn validate_transitive_requirement(
+    /// Validate a hierarchical requirement.
+    fn validate_hierarchical_requirement(
         &self,
-        req: &TransitiveRequirement,
+        req: &HierarchicalRequirement,
         file_path: &str,
         diagnostics: &mut Diagnostics,
     ) {
         match &req.kind {
-            TransitiveRequirementKind::Scope(scope) => {
+            HierarchicalRequirementKind::Scope(scope) => {
                 self.validate_expression(&scope.expression, file_path, diagnostics);
             }
-            TransitiveRequirementKind::Check(check) => {
+            HierarchicalRequirementKind::Check(check) => {
                 self.validate_expression(&check.expression, file_path, diagnostics);
             }
-            TransitiveRequirementKind::Element(element) => {
+            HierarchicalRequirementKind::Element(element) => {
                 self.validate_element(element, file_path, diagnostics, &[]);
             }
         }

@@ -66,9 +66,9 @@ element hielements:
             check rust.struct_exists('TemplateImplementation')
             check rust.struct_exists('TemplateBinding')
             
-            ## Top-down transitivity structures
-            check rust.struct_exists('TransitiveRequirement')
-            check rust.enum_exists('TransitiveRequirementKind')
+            ## Top-down hierarchical check structures
+            check rust.struct_exists('HierarchicalRequirement')
+            check rust.enum_exists('HierarchicalRequirementKind')
             check rust.struct_exists('ConnectionBoundary')
             check rust.enum_exists('ConnectionBoundaryKind')
             check rust.struct_exists('ConnectionPattern')
@@ -260,7 +260,7 @@ element hielements:
         check files.exists(examples, 'hybrid_plugins.hie')
         check files.exists(examples, 'template_compiler.hie')
         check files.exists(examples, 'template_microservice.hie')
-        check files.exists(examples, 'transitivity.hie')
+        check files.exists(examples, 'hierarchical.hie')
         check files.exists(examples, 'hielements.toml')
         check files.exists(examples, 'hielements_hybrid.toml')
     

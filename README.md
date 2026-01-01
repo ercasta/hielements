@@ -18,6 +18,7 @@ Modern software systems are complex. As codebases grow, their actual structure d
 - ✅ **Enforcing architectural rules** via static checks
 - 🔗 **Making relationships explicit** between components
 - 🏗️ **Supporting hierarchical composition** for complex systems
+- 🌲 **Providing hierarchical checks** that compose through element hierarchies
 - 🎨 **Enabling reusable templates** for consistent architectural patterns
 - 🌐 **Working across languages** (Python, Docker, Terraform, and more)
 - 🤝 **Enabling human-AI collaboration** through structured specifications
@@ -113,6 +114,45 @@ element api_service:
 ```
 
 Mandatory types provide safety and serve as inline documentation of interfaces.
+
+### 🌲 Hierarchical Checks
+
+Define requirements that must be satisfied somewhere in your element hierarchy, enabling flexible yet enforceable architectural constraints:
+
+```hielements
+template dockerized:
+    ## At least one descendant must have a docker configuration
+    requires_descendant scope dockerfile = docker.file_selector('Dockerfile')
+    requires_descendant check docker.has_healthcheck(dockerfile)
+
+element my_app implements dockerized:
+    element frontend:
+        scope src = files.folder_selector('frontend')
+        # Not dockerized - that's OK
+    
+    element backend:
+        scope dockerfile = docker.file_selector('Dockerfile.backend')
+        check docker.has_healthcheck(dockerfile)
+        # This satisfies the hierarchical requirement!
+```
+
+Hierarchical checks also support **connection boundaries** to control architectural dependencies:
+
+```hielements
+element frontend_zone:
+    ## Code in this zone may only import from API gateway
+    allows_connection to api_gateway.public_api
+    forbids_connection to database.*
+    
+    element web_app:
+        scope src = files.folder_selector('frontend/web')
+        # Inherits connection boundaries - cannot access database
+```
+
+Benefits:
+- **Flexible enforcement**: Requirements can be satisfied by any descendant
+- **Architectural boundaries**: Control dependencies between system layers
+- **Composable constraints**: Boundaries inherit through element hierarchy
 
 ### 🎯 Cross-Technology Elements
 

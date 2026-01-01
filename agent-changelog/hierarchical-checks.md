@@ -1,12 +1,12 @@
-# Top-Down Transitivity Feature Design
+# Hierarchical Checks Feature Design
 
-**Issue:** Evolve element templates for top-down transitivity  
+**Issue:** Evolve element templates for hierarchical checks  
 **Date:** 2026-01-01  
 **Updated:** 2026-01-01 (Revised based on clarifications about architectural connections)
 
 ## Summary
 
-This document describes the design for implementing "top-down transitivity" in Hielements element templates. This feature allows parent elements to prescribe requirements that must be satisfied by one or more of their descendants (children, grandchildren, etc.). Additionally, it introduces **architectural connection boundaries** to control which elements descendants can have logical dependencies on.
+This document describes the design for implementing "hierarchical checks" in Hielements element templates. This feature allows parent elements to prescribe requirements that must be satisfied by one or more of their descendants (children, grandchildren, etc.). Additionally, it introduces **architectural connection boundaries** to control which elements descendants can have logical dependencies on.
 
 ## Key Clarification: Architectural Connections
 
@@ -21,7 +21,7 @@ These are NOT network connections or URLs. The actual verification that code res
 
 Currently, Hielements templates define structure that elements must implement with concrete bindings. However, there's no way to express:
 
-1. **Transitive requirements**: A parent element should be able to declare that somewhere in its descendant hierarchy, a specific property must exist. For example:
+1. **Hierarchical requirements**: A parent element should be able to declare that somewhere in its descendant hierarchy, a specific property must exist. For example:
    - An element is "dockerized" if one of its descendants has a docker scope or check
    - A system is "observable" if one of its descendants exposes metrics
 
@@ -34,14 +34,14 @@ Currently, Hielements templates define structure that elements must implement wi
 
 1. **Descendant requirements** (`requires_descendant`): Specify that at least one descendant must satisfy a condition
 2. **Connection boundaries** (`allows_connection`, `forbids_connection`, `requires_connection`): Specify architectural dependency constraints
-3. **Transitive validation**: The interpreter must traverse the element hierarchy to validate these requirements
+3. **Hierarchical validation**: The interpreter must traverse the element hierarchy to validate these requirements
 4. **Template integration**: These features should work with existing element templates
 5. **Language-agnostic**: Connection semantics are opaque to hielements; actual checking is library-specific
 6. **Scope aggregation**: Scopes should expose information that can be aggregated bottom-up for parent elements
 
 ## Design Principles
 
-### Transitive Dependency Composition
+### Hierarchical Dependency Composition
 
 When boundaries apply recursively within the parent/child hierarchy:
 - If module A is only allowed to connect to B
@@ -66,7 +66,7 @@ Libraries are responsible for:
 
 ### 1. New Syntax
 
-#### Transitive Requirements
+#### Hierarchical Requirements
 
 ```hielements
 template dockerized:
@@ -123,18 +123,18 @@ element security_zone:
 Add new types to `ast.rs`:
 
 ```rust
-/// A transitive requirement that must be satisfied by at least one descendant.
+/// A hierarchical requirement that must be satisfied by at least one descendant.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TransitiveRequirement {
+pub struct HierarchicalRequirement {
     /// Kind of requirement
-    pub kind: TransitiveRequirementKind,
+    pub kind: HierarchicalRequirementKind,
     /// Source span
     pub span: Span,
 }
 
-/// Types of transitive requirements.
+/// Types of hierarchical requirements.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum TransitiveRequirementKind {
+pub enum HierarchicalRequirementKind {
     /// Requires a descendant with a matching scope
     Scope(ScopeDeclaration),
     /// Requires a descendant with a matching check
@@ -168,8 +168,8 @@ pub enum ConnectionBoundaryKind {
 ### 3. Grammar Additions
 
 ```ebnf
-(* Transitive requirements *)
-transitive_requirement ::= 'requires_descendant' (scope_declaration | check_declaration | element_declaration)
+(* Hierarchical requirements *)
+hierarchical_requirement ::= 'requires_descendant' (scope_declaration | check_declaration | element_declaration)
 
 (* Connection boundaries - now includes requires_connection *)
 connection_boundary ::= ('allows_connection' | 'forbids_connection' | 'requires_connection') 'to' connection_pattern
@@ -181,26 +181,26 @@ element_item        ::= scope_declaration
                       | check_declaration
                       | element_declaration
                       | template_binding
-                      | transitive_requirement      (* NEW *)
+                      | hierarchical_requirement      (* NEW *)
                       | connection_boundary         (* NEW *)
 ```
 
 ### 4. Interpreter Changes
 
-#### Transitive Requirement Validation
+#### Hierarchical Requirement Validation
 
-The interpreter needs to traverse the element hierarchy to validate transitive requirements:
+The interpreter needs to traverse the element hierarchy to validate hierarchical requirements:
 
 ```rust
-fn validate_transitive_requirements(&self, element: &Element) -> Vec<Diagnostic> {
+fn validate_hierarchical_requirements(&self, element: &Element) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
     
-    for req in &element.transitive_requirements {
+    for req in &element.hierarchical_requirements {
         let satisfied = self.find_matching_descendant(element, &req.kind);
         if !satisfied {
             diagnostics.push(Diagnostic::error(
                 "E300",
-                format!("Transitive requirement not satisfied: no descendant matches {:?}", req.kind)
+                format!("Hierarchical requirement not satisfied: no descendant matches {:?}", req.kind)
             ));
         }
     }
@@ -319,7 +319,7 @@ element payment_processor implements secure_processing:
 
 ### 6. Validation Rules
 
-1. **Transitive Requirements**:
+1. **Hierarchical Requirements**:
    - At least one descendant must satisfy each `requires_descendant`
    - The match can be a direct child or any level of nesting
    - Multiple descendants can satisfy the same requirement
@@ -332,13 +332,13 @@ element payment_processor implements secure_processing:
    - Boundaries are inherited by all descendants within the parent/child hierarchy
    - Connection patterns support wildcards (`*`) - interpretation is library-specific
 
-3. **Transitive Dependency Composition**:
+3. **Hierarchical Dependency Composition**:
    - If A is only allowed to connect to B, and B is only allowed to connect to C
    - Then A→B→C is allowed (each hop respects its own boundary)
    - This enables construction of complex layered architectures
 
 4. **Template Integration**:
-   - Templates can define transitive requirements
+   - Templates can define hierarchical requirements
    - Elements implementing templates inherit those requirements
    - Concrete element hierarchies must satisfy all requirements
 
@@ -370,15 +370,15 @@ element payment_processor implements secure_processing:
 element core:
     # ... existing elements ...
     
-    ## Transitive requirement support
-    element transitivity:
-        scope ast_transitivity = rust.module_selector('ast')
+    ## Hierarchical requirement support
+    element hierarchical_checks:
+        scope ast_hierarchical = rust.module_selector('ast')
         
-        check rust.struct_exists('TransitiveRequirement')
-        check rust.enum_exists('TransitiveRequirementKind')
+        check rust.struct_exists('HierarchicalRequirement')
+        check rust.enum_exists('HierarchicalRequirementKind')
         check rust.struct_exists('ConnectionBoundary')
         check rust.enum_exists('ConnectionBoundaryKind')
-        check rust.function_exists('validate_transitive_requirements')
+        check rust.function_exists('validate_hierarchical_requirements')
         check rust.function_exists('validate_connection_boundaries')
 ```
 
@@ -390,9 +390,9 @@ element core:
    - Error cases (malformed syntax)
 
 2. **Validation Tests**:
-   - Transitive requirement satisfied at child level
-   - Transitive requirement satisfied at grandchild level
-   - Transitive requirement not satisfied (error)
+   - Hierarchical requirement satisfied at child level
+   - Hierarchical requirement satisfied at grandchild level
+   - Hierarchical requirement not satisfied (error)
    - Connection boundary allows (pass)
    - Connection boundary forbids (fail)
    - Connection boundary requires (check)
@@ -434,4 +434,4 @@ When checking `frontend`, the library receives:
 
 ## Conclusion
 
-The top-down transitivity feature extends Hielements' declarative architecture description capabilities by allowing parent elements to express requirements that must be satisfied somewhere in their descendant hierarchy, and to control architectural dependencies (imports/dependencies) between elements. The actual verification is delegated to language-specific libraries, keeping hielements language-agnostic while enabling powerful architectural constraints.
+The hierarchical checks feature extends Hielements' declarative architecture description capabilities by allowing parent elements to express requirements that must be satisfied somewhere in their descendant hierarchy, and to control architectural dependencies (imports/dependencies) between elements. The actual verification is delegated to language-specific libraries, keeping hielements language-agnostic while enabling powerful architectural constraints.
