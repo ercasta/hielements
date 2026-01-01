@@ -699,7 +699,50 @@ External libraries can provide templates via the library protocol. See the [Exte
 - Templates **cannot be nested** (a template cannot implement another template)
 - Template names must be **unique** within their scope
 
-### 8.9 Hierarchical Checks
+### 8.9 Template-Level Connection Points
+
+Templates can declare connection points at the template level (not just within child elements). These connection points can be used in template checks and must be bound when implementing the template.
+
+**Example:**
+
+```hielements
+template microservice:
+    element api:
+        scope module = rust.module_selector('api')
+    
+    element container:
+        scope dockerfile = files.file_selector('Dockerfile')
+    
+    ## Template-level connection point
+    connection_point port: integer = rust.const_selector('PORT')
+    
+    ## Template checks can reference the template-level connection point
+    check files.exists(container.dockerfile, 'Dockerfile')
+    check rust.function_exists(api.module, 'start_server')
+
+## When implementing, bind the template-level connection point
+element orders_service implements microservice:
+    microservice.api.module = rust.module_selector('orders::api')
+    microservice.container.dockerfile = files.file_selector('orders.dockerfile')
+    
+    ## Bind the template-level port to a specific value
+    microservice.port = rust.const_selector('ORDERS_PORT')
+
+element payments_service implements microservice:
+    microservice.api.module = rust.module_selector('payments::api')
+    microservice.container.dockerfile = files.file_selector('payments.dockerfile')
+    
+    ## Different service, different port
+    microservice.port = rust.const_selector('PAYMENTS_PORT')
+```
+
+**Benefits:**
+- **Parameterization**: Templates can be parameterized without hardcoding values
+- **Reusability**: Same template structure with different concrete values
+- **Type Safety**: Connection points have type annotations ensuring correctness
+- **Clarity**: Makes template dependencies and parameters explicit
+
+### 8.10 Hierarchical Checks
 
 Hierarchical checks allow parent elements to prescribe requirements that must be satisfied by at least one of their descendants (children, grandchildren, etc.). This is useful for expressing architectural constraints that span multiple levels of the hierarchy.
 
@@ -720,6 +763,13 @@ template observable:
     requires_descendant element metrics:
         scope module = rust.module_selector('metrics')
         connection_point prometheus: MetricsHandler = rust.function_selector(module, 'handler')
+
+template production_ready:
+    ## At least one descendant must implement the dockerized template
+    requires_descendant implements dockerized
+    
+    ## At least one descendant must implement the observable template
+    requires_descendant implements observable
 ```
 
 #### Satisfying Hierarchical Requirements
@@ -737,6 +787,21 @@ element my_app implements dockerized:
         scope src = files.folder_selector('backend')
         scope dockerfile = docker.file_selector('Dockerfile')  ## Matches!
         check docker.has_healthcheck(dockerfile)               ## Matches!
+
+## Template implementation requirements
+element ecommerce_platform implements production_ready:
+    ## Frontend - neither dockerized nor observable
+    element frontend:
+        scope src = files.folder_selector('frontend')
+    
+    ## Orders - implements dockerized (satisfies first requirement)
+    element orders implements dockerized:
+        dockerized.container.dockerfile = files.file_selector('orders/Dockerfile')
+    
+    ## Monitoring - implements observable (satisfies second requirement)
+    element monitoring implements observable:
+        observable.metrics.module = rust.module_selector('monitoring::metrics')
+        observable.metrics.prometheus = rust.function_selector(observable.metrics.module, 'handler')
 ```
 
 #### Hierarchical Requirement Kinds
@@ -746,8 +811,9 @@ element my_app implements dockerized:
 | Scope | `requires_descendant scope name = expr` | A descendant must have a matching scope |
 | Check | `requires_descendant check expr` | A descendant must satisfy this check |
 | Element | `requires_descendant element name: ...` | A descendant must have an element with this structure |
+| Template Implementation | `requires_descendant implements template_name` | A descendant must implement the specified template |
 
-### 8.10 Connection Boundaries
+### 8.11 Connection Boundaries
 
 Connection boundaries allow specifying constraints on architectural dependencies (imports/dependencies) between elements. These boundaries are inherited by all descendants. **Note**: "Connections" refer to logical/architectural dependencies like module imports, not network connections.
 
@@ -1175,7 +1241,8 @@ template_binding    ::= qualified_identifier '=' expression NEWLINE
 qualified_identifier ::= identifier ('.' identifier)+
 
 (* Hierarchical Requirements - hierarchical checks *)
-hierarchical_requirement ::= 'requires_descendant' (scope_declaration | check_declaration | element_declaration)
+hierarchical_requirement ::= 'requires_descendant' (scope_declaration | check_declaration | element_declaration | template_implementation_requirement)
+template_implementation_requirement ::= 'implements' identifier
 
 (* Connection Boundaries - architectural dependency constraints *)
 connection_boundary    ::= ('allows_connection' | 'forbids_connection' | 'requires_connection') 'to' connection_pattern NEWLINE

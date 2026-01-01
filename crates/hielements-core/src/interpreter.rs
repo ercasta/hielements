@@ -221,6 +221,11 @@ impl Interpreter {
             HierarchicalRequirementKind::Element(element) => {
                 self.validate_element(element, file_path, diagnostics, &[]);
             }
+            HierarchicalRequirementKind::ImplementsTemplate(_template_name) => {
+                // Template name validation - just ensure it's a valid identifier
+                // Actual template existence check happens during element implementation validation
+                // No further validation needed here during parse-time validation
+            }
         }
     }
 
