@@ -106,28 +106,32 @@ pub struct Element {
     pub span: Span,
 }
 
-/// A scope declaration.
+/// A scope declaration (V2 supports unbounded scopes and bindings).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScopeDeclaration {
     /// Scope name
     pub name: Identifier,
-    /// Optional language type annotation (e.g., `scope x : python = ...`)
+    /// Optional language type annotation using angular brackets (e.g., `scope x<python> = ...`)
     pub language: Option<Identifier>,
-    /// Scope expression (selector)
-    pub expression: Expression,
+    /// Optional binding path for template scope binding (e.g., `binds template.element.scope`)
+    pub binds: Option<Vec<Identifier>>,
+    /// Scope expression (selector) - None for unbounded scopes in templates
+    pub expression: Option<Expression>,
     /// Source span
     pub span: Span,
 }
 
-/// A connection point declaration.
+/// A connection point declaration (V2 supports unbounded connection points and bindings).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConnectionPointDeclaration {
     /// Connection point name
     pub name: Identifier,
     /// Type annotation (mandatory)
     pub type_annotation: TypeAnnotation,
-    /// Expression defining the connection point
-    pub expression: Expression,
+    /// Optional binding path for template connection point binding (e.g., `binds template.element.cp`)
+    pub binds: Option<Vec<Identifier>>,
+    /// Expression defining the connection point - None for unbounded in templates
+    pub expression: Option<Expression>,
     /// Source span
     pub span: Span,
 }
