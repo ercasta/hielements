@@ -325,7 +325,8 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse an element declaration.
-    fn parse_element(&mut self, doc_comment: Option<String>) -> Result<Element, Diagnostic> {
+    /// `in_template` indicates whether this element is inside a template (allows unbounded scopes).
+    fn parse_element_with_context(&mut self, doc_comment: Option<String>, in_template: bool) -> Result<Element, Diagnostic> {
         let start_span = self.current_span();
         self.expect(TokenKind::Element)?;
         let name = self.parse_identifier()?;
@@ -376,7 +377,7 @@ impl<'a> Parser<'a> {
             } else if self.check(TokenKind::Check) {
                 checks.push(self.parse_check()?);
             } else if self.check(TokenKind::Element) {
-                children.push(self.parse_element(child_doc)?);
+                children.push(self.parse_element_with_context(child_doc, in_template)?);
             // Note: requires/allows/forbids are NOT allowed in regular elements
             // They are only allowed in templates. Provide helpful error message.
             } else if self.check(TokenKind::Requires) || self.check(TokenKind::Allows) || self.check(TokenKind::Forbids) {
@@ -447,6 +448,44 @@ impl<'a> Parser<'a> {
 
         let end_span = self.previous_span();
 
+        // Validate: unbounded scopes (no expression) are NOT allowed in regular elements
+        // They are only allowed in templates. Provide helpful error message.
+        // Skip validation if we're inside a template (in_template = true)
+        if !in_template {
+            for scope in &scopes {
+                if scope.expression.is_none() {
+                    return Err(Diagnostic::error(
+                        "E014",
+                        format!(
+                            "Unbounded scope '{}' is only allowed in templates, not in regular elements. \
+                            Provide an expression: `scope {} = <expression>`",
+                            scope.name.name, scope.name.name
+                        ),
+                    )
+                    .with_file(&self.file_path)
+                    .with_span(scope.span)
+                    .build());
+                }
+            }
+
+            // Validate: unbounded connection points (no expression) are NOT allowed in regular elements
+            for cp in &connection_points {
+                if cp.expression.is_none() {
+                    return Err(Diagnostic::error(
+                        "E015",
+                        format!(
+                            "Unbounded connection point '{}' is only allowed in templates, not in regular elements. \
+                            Provide an expression: `connection_point {}: {} = <expression>`",
+                            cp.name.name, cp.name.name, cp.type_annotation.type_name.name
+                        ),
+                    )
+                    .with_file(&self.file_path)
+                    .with_span(cp.span)
+                    .build());
+                }
+            }
+        }
+
         Ok(Element {
             doc_comment,
             name,
@@ -459,6 +498,11 @@ impl<'a> Parser<'a> {
             children,
             span: start_span.merge(&end_span),
         })
+    }
+
+    /// Convenience wrapper to parse element at top level (not in template)
+    fn parse_element(&mut self, doc_comment: Option<String>) -> Result<Element, Diagnostic> {
+        self.parse_element_with_context(doc_comment, false)
     }
 
     /// Parse a template declaration.
@@ -493,7 +537,8 @@ impl<'a> Parser<'a> {
             } else if self.check(TokenKind::Check) {
                 checks.push(self.parse_check()?);
             } else if self.check(TokenKind::Element) {
-                elements.push(self.parse_element(child_doc)?);
+                // Elements inside templates can have unbounded scopes
+                elements.push(self.parse_element_with_context(child_doc, true)?);
             // Unified syntax: requires/allows/forbids [descendant] ...
             } else if self.check(TokenKind::Requires) {
                 component_requirements.push(self.parse_component_requirement(RequirementAction::Requires)?);
@@ -2186,5 +2231,35 @@ element observable_component implements observable:
         let cp = &element.connection_points[0];
         assert!(cp.binds.is_some());
         assert!(cp.expression.is_some());
+    }
+
+    #[test]
+    fn test_parse_v2_unbounded_scope_in_element_fails() {
+        // Unbounded scopes are only allowed in templates, not in regular elements
+        let source = r#"element test:
+    scope src<rust>
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (_program, diagnostics) = parser.parse();
+
+        // Should have errors because unbounded scope is not allowed in elements
+        assert!(diagnostics.has_errors(), "Expected error for unbounded scope in element");
+        let error_msg = diagnostics.iter().next().unwrap().message.clone();
+        assert!(error_msg.contains("only allowed in templates"), "Error message should mention templates: {}", error_msg);
+    }
+
+    #[test]
+    fn test_parse_v2_unbounded_connection_point_in_element_fails() {
+        // Unbounded connection points are only allowed in templates, not in regular elements
+        let source = r#"element test:
+    connection_point api: HttpHandler
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (_program, diagnostics) = parser.parse();
+
+        // Should have errors because unbounded connection point is not allowed in elements
+        assert!(diagnostics.has_errors(), "Expected error for unbounded connection point in element");
+        let error_msg = diagnostics.iter().next().unwrap().message.clone();
+        assert!(error_msg.contains("only allowed in templates"), "Error message should mention templates: {}", error_msg);
     }
 }
