@@ -716,9 +716,9 @@ template microservice:
     ## Template-level connection point
     connection_point port: integer = rust.const_selector('PORT')
     
-    ## Template checks can use the template-level connection point
-    check microservice.container.exposes_port(port)
-    check microservice.api.listens_on(port)
+    ## Template checks can reference the template-level connection point
+    check files.exists(container.dockerfile, 'Dockerfile')
+    check rust.function_exists(api.module, 'start_server')
 
 ## When implementing, bind the template-level connection point
 element orders_service implements microservice:
