@@ -502,7 +502,7 @@ impl<'a> Parser<'a> {
         let start_span = self.current_span();
         self.expect(TokenKind::RequiresDescendant)?;
 
-        // Next token determines the kind: scope, check, or element
+        // Next token determines the kind: scope, check, element, or implements
         let kind = if self.check(TokenKind::Scope) {
             HierarchicalRequirementKind::Scope(self.parse_scope()?)
         } else if self.check(TokenKind::Check) {
@@ -510,12 +510,16 @@ impl<'a> Parser<'a> {
         } else if self.check(TokenKind::Element) {
             let child_doc = self.parse_doc_comment();
             HierarchicalRequirementKind::Element(Box::new(self.parse_element(child_doc)?))
+        } else if self.check(TokenKind::Implements) {
+            self.advance(); // consume 'implements'
+            let template_name = self.parse_identifier()?;
+            HierarchicalRequirementKind::ImplementsTemplate(template_name)
         } else {
             let token = self.current();
             return Err(Diagnostic::error(
                 "E010",
                 format!(
-                    "Expected 'scope', 'check', or 'element' after 'requires_descendant', found {:?}",
+                    "Expected 'scope', 'check', 'element', or 'implements' after 'requires_descendant', found {:?}",
                     token.kind
                 ),
             )
@@ -1163,6 +1167,32 @@ element service:
                 assert_eq!(elem.connection_points.len(), 1);
             }
             _ => panic!("Expected element requirement"),
+        }
+    }
+
+    #[test]
+    fn test_parse_requires_descendant_implements() {
+        let source = r#"template production_ready:
+    requires_descendant implements dockerized
+
+element app implements production_ready:
+    scope root = files.folder_selector('.')
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.templates.len(), 1);
+        let template = &program.templates[0];
+        assert_eq!(template.name.name, "production_ready");
+        assert_eq!(template.hierarchical_requirements.len(), 1);
+        
+        match &template.hierarchical_requirements[0].kind {
+            HierarchicalRequirementKind::ImplementsTemplate(template_name) => {
+                assert_eq!(template_name.name, "dockerized");
+            }
+            _ => panic!("Expected implements template requirement"),
         }
     }
 

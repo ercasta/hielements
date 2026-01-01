@@ -271,6 +271,8 @@ pub enum HierarchicalRequirementKind {
     Check(CheckDeclaration),
     /// Requires a descendant element with specific structure
     Element(Box<Element>),
+    /// Requires a descendant that implements a specific template
+    ImplementsTemplate(Identifier),
 }
 
 /// A connection boundary constraint that applies to this element and all descendants.

@@ -1,0 +1,122 @@
+# Example: Advanced Template Features
+# Demonstrates:
+# 1. Template-level connection points that can be used in checks
+# 2. requires_descendant implements <template> for hierarchical template requirements
+
+import files
+import rust
+
+## Dockerized Template
+## Requires a docker configuration with health checks
+template dockerized:
+    element container:
+        scope dockerfile = files.file_selector('Dockerfile')
+    
+    check files.exists(container.dockerfile, 'Dockerfile')
+
+## Observable Template
+## Requires metrics and logging capabilities
+template observable:
+    element metrics:
+        scope module = rust.module_selector('metrics')
+        connection_point prometheus: MetricsHandler = rust.function_selector(module, 'handler')
+    
+    element logging:
+        scope module = rust.module_selector('logging')
+
+## Microservice Template with Parameterized Port
+## Demonstrates template-level connection points
+template microservice:
+    element api:
+        scope module = rust.module_selector('api')
+        connection_point rest_endpoint: HttpHandler = rust.function_selector(module, 'routes')
+    
+    element database:
+        scope module = rust.module_selector('db')
+        connection_point connection: DbConnection = rust.struct_selector(module, 'Connection')
+    
+    element container:
+        scope dockerfile = files.file_selector('Dockerfile')
+    
+    ## Template-level connection point for the service port
+    ## This can be bound to different values for each implementation
+    connection_point service_port: integer = rust.const_selector('PORT')
+    
+    ## Template checks using the template-level connection point
+    ## These checks will use the bound port value for each implementation
+    check files.exists(container.dockerfile, 'Dockerfile')
+    check rust.struct_exists(database.module, 'Connection')
+
+## Production Ready Template
+## Requires descendants to implement both dockerized and observable templates
+template production_ready:
+    ## This template requires that at least one descendant implements dockerized
+    requires_descendant implements dockerized
+    
+    ## And at least one descendant implements observable
+    requires_descendant implements observable
+    
+    ## Connection boundaries for production services
+    forbids_connection to external.untrusted.*
+    requires_connection to logging.*
+
+## Orders Service - A complete microservice implementation
+## Implements microservice template with a specific port
+element orders_service implements microservice:
+    ## Bind the microservice template elements to concrete modules
+    microservice.api.module = rust.module_selector('orders::api')
+    microservice.api.rest_endpoint = rust.function_selector(microservice.api.module, 'create_routes')
+    
+    microservice.database.module = rust.module_selector('orders::db')
+    microservice.database.connection = rust.struct_selector(microservice.database.module, 'Connection')
+    
+    microservice.container.dockerfile = files.file_selector('orders/Dockerfile')
+    
+    ## Bind the template-level connection point to port 8001
+    microservice.service_port = rust.const_selector('ORDERS_PORT')
+    
+    check rust.has_tests(microservice.api.module)
+
+## Payments Service - Another microservice with different port
+element payments_service implements microservice:
+    microservice.api.module = rust.module_selector('payments::api')
+    microservice.api.rest_endpoint = rust.function_selector(microservice.api.module, 'payment_routes')
+    
+    microservice.database.module = rust.module_selector('payments::db')
+    microservice.database.connection = rust.struct_selector(microservice.database.module, 'PaymentConnection')
+    
+    microservice.container.dockerfile = files.file_selector('payments/Dockerfile')
+    
+    ## Bind the template-level connection point to port 8002
+    microservice.service_port = rust.const_selector('PAYMENTS_PORT')
+
+## E-Commerce Platform - Implements production_ready
+## This requires that at least one descendant implements dockerized
+## and at least one implements observable
+element ecommerce_platform implements production_ready:
+    scope root = files.folder_selector('.')
+    
+    ## Frontend service - not dockerized or observable
+    element frontend:
+        scope src = files.folder_selector('frontend')
+        check files.exists(src, 'index.html')
+    
+    ## Orders service - implements dockerized (satisfies first requirement)
+    element orders implements dockerized:
+        dockerized.container.dockerfile = files.file_selector('orders/Dockerfile')
+        
+        scope src = files.folder_selector('orders/src')
+        check files.exists(src, 'main.rs')
+    
+    ## Monitoring service - implements observable (satisfies second requirement)
+    element monitoring implements observable:
+        observable.metrics.module = rust.module_selector('monitoring::metrics')
+        observable.metrics.prometheus = rust.function_selector(observable.metrics.module, 'metrics_handler')
+        
+        observable.logging.module = rust.module_selector('monitoring::logging')
+        
+        check rust.function_exists(observable.metrics.module, 'collect_metrics')
+    
+    ## Both requirements are satisfied by having descendants that implement
+    ## the required templates. This provides flexibility in how the requirements
+    ## are met while still enforcing architectural constraints.
