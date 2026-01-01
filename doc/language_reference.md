@@ -70,11 +70,16 @@ The following are reserved keywords:
 | `from` | Selective import |
 | `true` | Boolean literal |
 | `false` | Boolean literal |
-| `requires_descendant` | Declares a hierarchical requirement |
-| `allows_connection` | Declares an allowed architectural connection target |
-| `forbids_connection` | Declares a forbidden architectural connection target |
-| `requires_connection` | Declares a required architectural connection target |
+| `requires` | Declares a required component (new unified syntax) |
+| `allows` | Declares an allowed component (new unified syntax) |
+| `forbids` | Declares a forbidden component (new unified syntax) |
+| `descendant` | Modifier for hierarchical requirements (applies to descendants) |
+| `connection` | Specifies a connection requirement |
 | `to` | Specifies connection target |
+| `requires_descendant` | Declares a hierarchical requirement (legacy syntax) |
+| `allows_connection` | Declares an allowed architectural connection target (legacy syntax) |
+| `forbids_connection` | Declares a forbidden architectural connection target (legacy syntax) |
+| `requires_connection` | Declares a required architectural connection target (legacy syntax) |
 
 ### 1.4 Literals
 
@@ -748,7 +753,29 @@ Hierarchical checks allow parent elements to prescribe requirements that must be
 
 #### Hierarchical Requirements
 
-Use `requires_descendant` to specify that somewhere in the element's descendant hierarchy, a specific property must exist:
+The new unified syntax uses `requires`, `allows`, and `forbids` keywords with an optional `descendant` modifier:
+
+```hielements
+template dockerized:
+    ## At least one descendant must have a docker scope (new syntax)
+    requires descendant scope dockerfile = docker.file_selector('Dockerfile')
+    
+    ## At least one descendant must satisfy this check (new syntax)
+    requires descendant check docker.has_healthcheck(dockerfile)
+
+template observable:
+    ## At least one descendant must have a metrics element with implements (new syntax)
+    requires descendant element metrics_service implements metrics_provider
+
+template production_ready:
+    ## At least one descendant must implement the dockerized template (new syntax)
+    requires descendant implements dockerized
+    
+    ## At least one descendant must implement the observable template (new syntax)
+    requires descendant implements observable
+```
+
+**Legacy syntax** (still supported for backwards compatibility):
 
 ```hielements
 template dockerized:
@@ -806,6 +833,18 @@ element ecommerce_platform implements production_ready:
 
 #### Hierarchical Requirement Kinds
 
+**New unified syntax:**
+
+| Kind | Syntax | Description |
+|------|--------|-------------|
+| Scope | `requires descendant scope name = expr` | A descendant must have a matching scope |
+| Check | `requires descendant check expr` | A descendant must satisfy this check |
+| Element | `requires descendant element name [implements template]` | A descendant must have an element with this structure |
+| Template Implementation | `requires descendant implements template_name` | A descendant must implement the specified template |
+| Connection Point | `requires descendant connection_point name: Type` | A descendant must have a connection point |
+
+**Legacy syntax:**
+
 | Kind | Syntax | Description |
 |------|--------|-------------|
 | Scope | `requires_descendant scope name = expr` | A descendant must have a matching scope |
@@ -813,11 +852,34 @@ element ecommerce_platform implements production_ready:
 | Element | `requires_descendant element name: ...` | A descendant must have an element with this structure |
 | Template Implementation | `requires_descendant implements template_name` | A descendant must implement the specified template |
 
+#### Immediate vs Descendant Requirements
+
+The `descendant` modifier determines whether the requirement applies to any descendant in the hierarchy or only to immediate children:
+
+```hielements
+template microservice:
+    ## Immediate child requirement (no descendant modifier)
+    requires element api implements api_handler
+    
+    ## Any descendant requirement (with descendant modifier)
+    requires descendant element metrics implements observable
+```
+
 ### 8.11 Connection Boundaries
 
 Connection boundaries allow specifying constraints on architectural dependencies (imports/dependencies) between elements. These boundaries are inherited by all descendants. **Note**: "Connections" refer to logical/architectural dependencies like module imports, not network connections.
 
 #### Allowing Connections
+
+**New unified syntax:**
+
+```hielements
+element frontend_zone:
+    ## Code in this zone may only import from api_gateway (new syntax)
+    allows connection to api_gateway.public_api
+```
+
+**Legacy syntax:**
 
 Use `allows_connection to` to whitelist specific connection targets:
 
@@ -1221,6 +1283,7 @@ template_item        ::= scope_declaration
                        | connection_point_declaration
                        | check_declaration
                        | element_declaration
+                       | component_requirement
                        | hierarchical_requirement
                        | connection_boundary
 
@@ -1233,6 +1296,7 @@ element_item        ::= scope_declaration
                       | check_declaration
                       | element_declaration
                       | template_binding
+                      | component_requirement
                       | hierarchical_requirement
                       | connection_boundary
 
@@ -1240,11 +1304,23 @@ element_item        ::= scope_declaration
 template_binding    ::= qualified_identifier '=' expression NEWLINE
 qualified_identifier ::= identifier ('.' identifier)+
 
-(* Hierarchical Requirements - hierarchical checks *)
+(* Component Requirements - new unified syntax *)
+component_requirement ::= ('requires' | 'allows' | 'forbids') ['descendant'] component_spec
+component_spec        ::= scope_declaration
+                        | check_declaration
+                        | element_spec
+                        | connection_spec
+                        | connection_point_spec
+
+element_spec          ::= 'element' identifier [':' type_name] ['implements' identifier] [':' NEWLINE INDENT element_body DEDENT]
+connection_spec       ::= 'connection' ['to'] connection_pattern NEWLINE
+connection_point_spec ::= 'connection_point' identifier ':' type_name ['=' expression] NEWLINE
+
+(* Hierarchical Requirements - hierarchical checks (legacy syntax) *)
 hierarchical_requirement ::= 'requires_descendant' (scope_declaration | check_declaration | element_declaration | template_implementation_requirement)
 template_implementation_requirement ::= 'implements' identifier
 
-(* Connection Boundaries - architectural dependency constraints *)
+(* Connection Boundaries - architectural dependency constraints (legacy syntax) *)
 connection_boundary    ::= ('allows_connection' | 'forbids_connection' | 'requires_connection') 'to' connection_pattern NEWLINE
 connection_pattern     ::= identifier ('.' identifier)* ('.' '*')?
 

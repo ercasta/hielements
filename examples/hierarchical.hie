@@ -1,10 +1,53 @@
 # Example: Hierarchical Checks
 # Demonstrates hierarchical requirements and connection boundaries
+# Uses both new unified syntax and legacy syntax for comparison
 
 import files
 import rust
 
-## Dockerized Template
+## ============================================================================
+## Templates using NEW UNIFIED SYNTAX
+## ============================================================================
+
+## Dockerized Template (NEW SYNTAX)
+## Requires that at least one descendant element has a docker configuration.
+template dockerized_new:
+    ## At least one descendant must have a docker scope (new syntax)
+    requires descendant scope dockerfile = docker.file_selector('Dockerfile')
+    
+    ## At least one descendant must have health check configured (new syntax)
+    requires descendant check docker.has_healthcheck(dockerfile)
+
+## Observable Template (NEW SYNTAX)
+## Requires that at least one descendant exposes metrics for monitoring.
+template observable_new:
+    ## At least one descendant must have metrics endpoint (new syntax with named element and implements)
+    requires descendant element metrics_service implements metrics_provider
+
+## Secure Zone Template (NEW SYNTAX)
+## Defines connection boundaries that apply to all descendants.
+template secure_zone_new:
+    forbids connection to external.*
+    forbids connection to public_network.*
+
+## Frontend Zone Template (NEW SYNTAX)
+## Frontend components can only connect to API gateway.
+template frontend_zone_new:
+    allows connection to api_gateway.public_api
+    forbids connection to database.*
+    forbids connection to internal_services.*
+
+## Production Ready Template (NEW SYNTAX)
+## Demonstrates requires descendant implements shorthand
+template production_ready_new:
+    requires descendant implements dockerized_new
+    requires descendant implements observable_new
+
+## ============================================================================
+## Templates using LEGACY SYNTAX (for backwards compatibility)
+## ============================================================================
+
+## Dockerized Template (LEGACY SYNTAX)
 ## Requires that at least one descendant element has a docker configuration.
 ## This is useful for ensuring that an application is properly containerized.
 template dockerized:
@@ -14,7 +57,7 @@ template dockerized:
     ## At least one descendant must have health check configured
     requires_descendant check docker.has_healthcheck(dockerfile)
 
-## Observable Template
+## Observable Template (LEGACY SYNTAX)
 ## Requires that at least one descendant exposes metrics for monitoring.
 template observable:
     ## At least one descendant must have metrics endpoint
@@ -22,19 +65,23 @@ template observable:
         scope module = rust.module_selector('metrics')
         connection_point prometheus: MetricsHandler = rust.function_selector(module, 'handler')
 
-## Secure Zone Template
+## Secure Zone Template (LEGACY SYNTAX)
 ## Defines connection boundaries that apply to all descendants.
 ## Descendants cannot connect to external or public networks.
 template secure_zone:
     forbids_connection to external.*
     forbids_connection to public_network.*
 
-## Frontend Zone Template
+## Frontend Zone Template (LEGACY SYNTAX)
 ## Frontend components can only connect to API gateway.
 template frontend_zone:
     allows_connection to api_gateway.public_api
     forbids_connection to database.*
     forbids_connection to internal_services.*
+
+## ============================================================================
+## Elements implementing templates
+## ============================================================================
 
 ## My Application
 ## A production-ready application that satisfies dockerized requirements.
@@ -66,10 +113,10 @@ element my_app implements dockerized, observable:
 ## Demonstrates connection boundaries at different levels.
 element ecommerce_platform:
     
-    ## Public frontend zone - restricted connections
+    ## Public frontend zone - restricted connections (using NEW syntax)
     element frontend_zone:
-        allows_connection to api_gateway.public_api
-        forbids_connection to database.*
+        allows connection to api_gateway.public_api
+        forbids connection to database.*
         
         element web_app:
             scope src = files.folder_selector('frontend/web')
@@ -82,7 +129,7 @@ element ecommerce_platform:
         scope src = files.folder_selector('gateway/src')
         connection_point public_api: HttpHandler = rust.function_selector(src, 'routes')
     
-    ## Secure backend zone - no external connections allowed
+    ## Secure backend zone - no external connections allowed (using LEGACY syntax)
     element backend_zone:
         forbids_connection to external.*
         
@@ -122,16 +169,16 @@ element payment_processor implements secure_zone:
 
 ## Service Mesh Zone
 ## Demonstrates requires_connection - all services in this zone
-## MUST have a dependency on the logging module
+## MUST have a dependency on the logging module (using NEW syntax)
 element service_mesh:
-    ## All services in this mesh must import from logging module
-    requires_connection to logging.*
+    ## All services in this mesh must import from logging module (new syntax)
+    requires connection to logging.*
     
-    ## Services may connect to other services in the mesh
-    allows_connection to mesh_internal.*
+    ## Services may connect to other services in the mesh (new syntax)
+    allows connection to mesh_internal.*
     
-    ## Services cannot connect directly to external APIs
-    forbids_connection to external_api.*
+    ## Services cannot connect directly to external APIs (new syntax)
+    forbids connection to external_api.*
     
     element user_service:
         scope src = files.folder_selector('services/user')

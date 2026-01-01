@@ -44,7 +44,26 @@ pub enum TokenKind {
     #[token("false")]
     False,
 
-    // Hierarchical check keywords
+    // Hierarchical check keywords (new unified syntax)
+    #[token("requires")]
+    Requires,
+
+    #[token("allows")]
+    Allows,
+
+    #[token("forbids")]
+    Forbids,
+
+    #[token("descendant")]
+    Descendant,
+
+    #[token("connection")]
+    Connection,
+
+    #[token("to")]
+    To,
+
+    // Legacy keywords (kept for backwards compatibility)
     #[token("requires_descendant")]
     RequiresDescendant,
 
@@ -56,9 +75,6 @@ pub enum TokenKind {
 
     #[token("requires_connection")]
     RequiresConnection,
-
-    #[token("to")]
-    To,
 
     // Punctuation
     #[token(":")]
@@ -425,6 +441,20 @@ mod tests {
         assert!(kinds.contains(&&TokenKind::ForbidsConnection));
         assert!(kinds.contains(&&TokenKind::RequiresConnection));
         assert!(kinds.contains(&&TokenKind::To));
+    }
+
+    #[test]
+    fn test_new_unified_keywords() {
+        let source = "requires allows forbids descendant connection";
+        let mut lexer = Lexer::new(source);
+        let tokens = lexer.tokenize();
+
+        let kinds: Vec<_> = tokens.iter().map(|t| &t.kind).collect();
+        assert!(kinds.contains(&&TokenKind::Requires));
+        assert!(kinds.contains(&&TokenKind::Allows));
+        assert!(kinds.contains(&&TokenKind::Forbids));
+        assert!(kinds.contains(&&TokenKind::Descendant));
+        assert!(kinds.contains(&&TokenKind::Connection));
     }
 
     #[test]

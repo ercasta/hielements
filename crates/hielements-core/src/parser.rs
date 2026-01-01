@@ -6,10 +6,10 @@ use crate::lexer::{Lexer, Token, TokenKind};
 use crate::span::Span;
 
 /// Expected tokens in element body for error messages.
-const EXPECTED_ELEMENT_BODY_TOKENS: &str = "'scope', 'connection_point', 'check', 'element', 'requires_descendant', 'allows_connection', 'forbids_connection', or 'requires_connection'";
+const EXPECTED_ELEMENT_BODY_TOKENS: &str = "'scope', 'connection_point', 'check', 'element', 'requires', 'allows', 'forbids', 'requires_descendant', 'allows_connection', 'forbids_connection', or 'requires_connection'";
 
 /// Expected tokens in template body for error messages.
-const EXPECTED_TEMPLATE_BODY_TOKENS: &str = "'scope', 'connection_point', 'check', 'element', 'requires_descendant', 'allows_connection', 'forbids_connection', or 'requires_connection'";
+const EXPECTED_TEMPLATE_BODY_TOKENS: &str = "'scope', 'connection_point', 'check', 'element', 'requires', 'allows', 'forbids', 'requires_descendant', 'allows_connection', 'forbids_connection', or 'requires_connection'";
 
 /// Parser for the Hielements language.
 pub struct Parser<'a> {
@@ -220,6 +220,7 @@ impl<'a> Parser<'a> {
         let mut template_bindings = Vec::new();
         let mut hierarchical_requirements = Vec::new();
         let mut connection_boundaries = Vec::new();
+        let mut component_requirements = Vec::new();
         let mut children = Vec::new();
 
         loop {
@@ -240,6 +241,14 @@ impl<'a> Parser<'a> {
                 checks.push(self.parse_check()?);
             } else if self.check(TokenKind::Element) {
                 children.push(self.parse_element(child_doc)?);
+            // New unified syntax: requires/allows/forbids [descendant] ...
+            } else if self.check(TokenKind::Requires) {
+                component_requirements.push(self.parse_component_requirement(RequirementAction::Requires)?);
+            } else if self.check(TokenKind::Allows) {
+                component_requirements.push(self.parse_component_requirement(RequirementAction::Allows)?);
+            } else if self.check(TokenKind::Forbids) {
+                component_requirements.push(self.parse_component_requirement(RequirementAction::Forbids)?);
+            // Legacy syntax: requires_descendant, allows_connection, etc.
             } else if self.check(TokenKind::RequiresDescendant) {
                 hierarchical_requirements.push(self.parse_hierarchical_requirement()?);
             } else if self.check(TokenKind::AllowsConnection) {
@@ -270,7 +279,8 @@ impl<'a> Parser<'a> {
                     return Err(Diagnostic::error(
                         "E002",
                         format!(
-                            "Expected 'scope', 'connection_point', 'check', 'element', 'requires_descendant', 'allows_connection', or 'forbids_connection', found {:?}",
+                            "Expected {}, found {:?}",
+                            EXPECTED_ELEMENT_BODY_TOKENS,
                             token.kind
                         ),
                     )
@@ -313,6 +323,7 @@ impl<'a> Parser<'a> {
             template_bindings,
             hierarchical_requirements,
             connection_boundaries,
+            component_requirements,
             children,
             span: start_span.merge(&end_span),
         })
@@ -332,6 +343,7 @@ impl<'a> Parser<'a> {
         let mut checks = Vec::new();
         let mut hierarchical_requirements = Vec::new();
         let mut connection_boundaries = Vec::new();
+        let mut component_requirements = Vec::new();
         let mut elements = Vec::new();
 
         loop {
@@ -352,6 +364,14 @@ impl<'a> Parser<'a> {
                 checks.push(self.parse_check()?);
             } else if self.check(TokenKind::Element) {
                 elements.push(self.parse_element(child_doc)?);
+            // New unified syntax: requires/allows/forbids [descendant] ...
+            } else if self.check(TokenKind::Requires) {
+                component_requirements.push(self.parse_component_requirement(RequirementAction::Requires)?);
+            } else if self.check(TokenKind::Allows) {
+                component_requirements.push(self.parse_component_requirement(RequirementAction::Allows)?);
+            } else if self.check(TokenKind::Forbids) {
+                component_requirements.push(self.parse_component_requirement(RequirementAction::Forbids)?);
+            // Legacy syntax: requires_descendant, allows_connection, etc.
             } else if self.check(TokenKind::RequiresDescendant) {
                 hierarchical_requirements.push(self.parse_hierarchical_requirement()?);
             } else if self.check(TokenKind::AllowsConnection) {
@@ -393,6 +413,7 @@ impl<'a> Parser<'a> {
             checks,
             hierarchical_requirements,
             connection_boundaries,
+            component_requirements,
             elements,
             span: start_span.merge(&end_span),
         })
@@ -588,6 +609,254 @@ impl<'a> Parser<'a> {
         })
     }
 
+    /// Parse a component requirement (new unified syntax).
+    /// Syntax: (requires | allows | forbids) [descendant] (scope | check | element | connection | connection_point)
+    fn parse_component_requirement(&mut self, action: RequirementAction) -> Result<ComponentRequirement, Diagnostic> {
+        let start_span = self.current_span();
+        
+        // Consume the action keyword (requires, allows, or forbids)
+        self.advance();
+        
+        // Check for optional 'descendant' modifier
+        let is_descendant = if self.check(TokenKind::Descendant) {
+            self.advance();
+            true
+        } else {
+            false
+        };
+        
+        // Parse the component specification
+        let component = if self.check(TokenKind::Scope) {
+            ComponentSpec::Scope(self.parse_scope()?)
+        } else if self.check(TokenKind::Check) {
+            ComponentSpec::Check(self.parse_check()?)
+        } else if self.check(TokenKind::Element) {
+            self.parse_element_component_spec()?
+        } else if self.check(TokenKind::Connection) {
+            self.advance(); // consume 'connection'
+            // Optional 'to' keyword
+            if self.check(TokenKind::To) {
+                self.advance();
+            }
+            let pattern = self.parse_connection_pattern()?;
+            self.expect_newline()?;
+            ComponentSpec::Connection(pattern)
+        } else if self.check(TokenKind::ConnectionPoint) {
+            self.parse_connection_point_component_spec()?
+        } else if self.check(TokenKind::Implements) {
+            // Support for shorthand: `requires descendant implements template_name`
+            self.advance(); // consume 'implements'
+            let template_name = self.parse_identifier()?;
+            self.expect_newline()?;
+            // Create an element spec with just implements
+            ComponentSpec::Element {
+                name: Identifier::new("_", template_name.span),
+                type_annotation: None,
+                implements: Some(template_name),
+                body: None,
+            }
+        } else {
+            let token = self.current();
+            return Err(Diagnostic::error(
+                "E011",
+                format!(
+                    "Expected 'scope', 'check', 'element', 'connection', 'connection_point', or 'implements' after '{} {}', found {:?}",
+                    match action {
+                        RequirementAction::Requires => "requires",
+                        RequirementAction::Allows => "allows",
+                        RequirementAction::Forbids => "forbids",
+                    },
+                    if is_descendant { "descendant" } else { "" },
+                    token.kind
+                ),
+            )
+            .with_file(&self.file_path)
+            .with_span(token.span)
+            .build());
+        };
+
+        let end_span = self.previous_span();
+        Ok(ComponentRequirement {
+            action,
+            is_descendant,
+            component,
+            span: start_span.merge(&end_span),
+        })
+    }
+
+    /// Parse an element component specification.
+    /// Syntax: element name [: Type] [implements template] [: body]
+    fn parse_element_component_spec(&mut self) -> Result<ComponentSpec, Diagnostic> {
+        self.advance(); // consume 'element'
+        
+        let name = self.parse_identifier()?;
+        
+        // Optional type annotation: `: Type`
+        let type_annotation = if self.check(TokenKind::Colon) {
+            // Peek ahead to see if this is a type annotation or element body
+            // A type annotation is followed by an identifier (the type name)
+            // An element body is followed by NEWLINE/INDENT
+            let pos = self.pos;
+            self.advance(); // consume ':'
+            
+            if self.check(TokenKind::Identifier) {
+                // This could be either a type annotation or the start of a body with scope/element
+                // We need to check if the identifier is followed by NEWLINE (body) or something else (type)
+                let id = self.parse_identifier()?;
+                
+                // If next is newline and then indent, this identifier might be a type
+                // But we also need to handle `implements` after the type
+                if self.check(TokenKind::Implements) || self.check(TokenKind::Newline) || self.check(TokenKind::Colon) {
+                    Some(TypeAnnotation {
+                        type_name: id.clone(),
+                        span: id.span,
+                    })
+                } else {
+                    // Restore and treat as no type annotation
+                    self.pos = pos;
+                    None
+                }
+            } else {
+                // Not a type annotation, restore position
+                self.pos = pos;
+                None
+            }
+        } else {
+            None
+        };
+        
+        // Optional implements: `implements template_name`
+        let implements = if self.check(TokenKind::Implements) {
+            self.advance();
+            Some(self.parse_identifier()?)
+        } else {
+            None
+        };
+        
+        // Check for element body (colon followed by newline and indent)
+        let body = if self.check(TokenKind::Colon) {
+            let doc_comment = None;
+            // Put back the position before the colon, parse full element
+            // But we've already consumed 'element name', so we need to manually create the element
+            self.expect(TokenKind::Colon)?;
+            self.skip_newlines();
+            
+            if self.check(TokenKind::Indent) {
+                self.expect(TokenKind::Indent)?;
+                
+                // Parse element body contents
+                let mut scopes = Vec::new();
+                let mut connection_points = Vec::new();
+                let mut checks = Vec::new();
+                let mut children = Vec::new();
+                let mut hierarchical_requirements = Vec::new();
+                let mut connection_boundaries = Vec::new();
+                let mut component_requirements = Vec::new();
+
+                loop {
+                    self.skip_newlines();
+
+                    if self.check(TokenKind::Dedent) || self.is_at_end() {
+                        break;
+                    }
+
+                    let child_doc = self.parse_doc_comment();
+
+                    if self.check(TokenKind::Scope) {
+                        scopes.push(self.parse_scope()?);
+                    } else if self.check(TokenKind::ConnectionPoint) {
+                        connection_points.push(self.parse_connection_point()?);
+                    } else if self.check(TokenKind::Check) {
+                        checks.push(self.parse_check()?);
+                    } else if self.check(TokenKind::Element) {
+                        children.push(self.parse_element(child_doc)?);
+                    } else if self.check(TokenKind::Requires) {
+                        component_requirements.push(self.parse_component_requirement(RequirementAction::Requires)?);
+                    } else if self.check(TokenKind::Allows) {
+                        component_requirements.push(self.parse_component_requirement(RequirementAction::Allows)?);
+                    } else if self.check(TokenKind::Forbids) {
+                        component_requirements.push(self.parse_component_requirement(RequirementAction::Forbids)?);
+                    } else if self.check(TokenKind::RequiresDescendant) {
+                        hierarchical_requirements.push(self.parse_hierarchical_requirement()?);
+                    } else if self.check(TokenKind::AllowsConnection) {
+                        connection_boundaries.push(self.parse_connection_boundary(ConnectionBoundaryKind::Allows)?);
+                    } else if self.check(TokenKind::ForbidsConnection) {
+                        connection_boundaries.push(self.parse_connection_boundary(ConnectionBoundaryKind::Forbids)?);
+                    } else if self.check(TokenKind::RequiresConnection) {
+                        connection_boundaries.push(self.parse_connection_boundary(ConnectionBoundaryKind::Requires)?);
+                    } else {
+                        break;
+                    }
+                }
+
+                if self.check(TokenKind::Dedent) {
+                    self.advance();
+                }
+
+                let span = name.span.merge(&self.previous_span());
+                Some(Box::new(Element {
+                    doc_comment,
+                    name: name.clone(),
+                    implements: if let Some(ref impl_name) = implements {
+                        vec![TemplateImplementation {
+                            template_name: impl_name.clone(),
+                            span: impl_name.span,
+                        }]
+                    } else {
+                        Vec::new()
+                    },
+                    scopes,
+                    connection_points,
+                    checks,
+                    template_bindings: Vec::new(),
+                    hierarchical_requirements,
+                    connection_boundaries,
+                    component_requirements,
+                    children,
+                    span,
+                }))
+            } else {
+                None
+            }
+        } else {
+            self.expect_newline()?;
+            None
+        };
+        
+        Ok(ComponentSpec::Element {
+            name,
+            type_annotation,
+            implements,
+            body,
+        })
+    }
+
+    /// Parse a connection point component specification.
+    /// Syntax: connection_point name: Type [= expression]
+    fn parse_connection_point_component_spec(&mut self) -> Result<ComponentSpec, Diagnostic> {
+        self.advance(); // consume 'connection_point'
+        
+        let name = self.parse_identifier()?;
+        self.expect(TokenKind::Colon)?;
+        let type_annotation = self.parse_type_annotation()?;
+        
+        // Optional expression: `= expression`
+        let expression = if self.check(TokenKind::Equals) {
+            self.advance();
+            Some(self.parse_expression()?)
+        } else {
+            None
+        };
+        
+        self.expect_newline()?;
+        
+        Ok(ComponentSpec::ConnectionPoint {
+            name,
+            type_annotation,
+            expression,
+        })
+    }
+
     /// Parse a type annotation.
     fn parse_type_annotation(&mut self) -> Result<TypeAnnotation, Diagnostic> {
         let type_name = self.parse_identifier()?;
@@ -712,7 +981,10 @@ impl<'a> Parser<'a> {
                 TokenKind::ConnectionPoint | TokenKind::Template | TokenKind::Implements |
                 TokenKind::To | TokenKind::RequiresDescendant | 
                 TokenKind::AllowsConnection | TokenKind::ForbidsConnection |
-                TokenKind::RequiresConnection => {
+                TokenKind::RequiresConnection |
+                // New unified keywords can also be used as identifiers in some contexts
+                TokenKind::Requires | TokenKind::Allows | TokenKind::Forbids |
+                TokenKind::Descendant | TokenKind::Connection => {
                     let token = self.advance();
                     Ok(Identifier::new(token.text, token.span))
                 }
@@ -1322,5 +1594,279 @@ element app implements production_ready:
         
         // The requires_connection should not have wildcard
         assert!(!element.connection_boundaries[2].target_pattern.wildcard);
+    }
+
+    // ========================================================================
+    // Tests for new unified syntax: requires/allows/forbids [descendant] ...
+    // ========================================================================
+
+    #[test]
+    fn test_parse_requires_descendant_scope_new_syntax() {
+        let source = r#"template dockerized:
+    requires descendant scope dockerfile = docker.file_selector('Dockerfile')
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.templates.len(), 1);
+        let template = &program.templates[0];
+        assert_eq!(template.component_requirements.len(), 1);
+        
+        let req = &template.component_requirements[0];
+        assert!(matches!(req.action, RequirementAction::Requires));
+        assert!(req.is_descendant);
+        
+        match &req.component {
+            ComponentSpec::Scope(scope) => {
+                assert_eq!(scope.name.name, "dockerfile");
+            }
+            _ => panic!("Expected scope component"),
+        }
+    }
+
+    #[test]
+    fn test_parse_requires_descendant_element_new_syntax() {
+        let source = r#"template observable:
+    requires descendant element metrics_service implements metrics_provider
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.templates.len(), 1);
+        let template = &program.templates[0];
+        assert_eq!(template.component_requirements.len(), 1);
+        
+        let req = &template.component_requirements[0];
+        assert!(matches!(req.action, RequirementAction::Requires));
+        assert!(req.is_descendant);
+        
+        match &req.component {
+            ComponentSpec::Element { name, implements, .. } => {
+                assert_eq!(name.name, "metrics_service");
+                assert_eq!(implements.as_ref().unwrap().name, "metrics_provider");
+            }
+            _ => panic!("Expected element component"),
+        }
+    }
+
+    #[test]
+    fn test_parse_forbids_descendant_connection_point() {
+        let source = r#"template secure_zone:
+    forbids descendant connection_point external_api: HttpHandler
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.templates.len(), 1);
+        let template = &program.templates[0];
+        assert_eq!(template.component_requirements.len(), 1);
+        
+        let req = &template.component_requirements[0];
+        assert!(matches!(req.action, RequirementAction::Forbids));
+        assert!(req.is_descendant);
+        
+        match &req.component {
+            ComponentSpec::ConnectionPoint { name, type_annotation, .. } => {
+                assert_eq!(name.name, "external_api");
+                assert_eq!(type_annotation.type_name.name, "HttpHandler");
+            }
+            _ => panic!("Expected connection_point component"),
+        }
+    }
+
+    #[test]
+    fn test_parse_allows_connection_new_syntax() {
+        let source = r#"template frontend_zone:
+    allows connection to api_gateway.public_api
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.templates.len(), 1);
+        let template = &program.templates[0];
+        assert_eq!(template.component_requirements.len(), 1);
+        
+        let req = &template.component_requirements[0];
+        assert!(matches!(req.action, RequirementAction::Allows));
+        assert!(!req.is_descendant);
+        
+        match &req.component {
+            ComponentSpec::Connection(pattern) => {
+                assert_eq!(pattern.path.len(), 2);
+                assert_eq!(pattern.path[0].name, "api_gateway");
+                assert_eq!(pattern.path[1].name, "public_api");
+                assert!(!pattern.wildcard);
+            }
+            _ => panic!("Expected connection component"),
+        }
+    }
+
+    #[test]
+    fn test_parse_forbids_connection_wildcard_new_syntax() {
+        let source = r#"template secure_zone:
+    forbids connection to external.*
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.templates.len(), 1);
+        let template = &program.templates[0];
+        assert_eq!(template.component_requirements.len(), 1);
+        
+        let req = &template.component_requirements[0];
+        assert!(matches!(req.action, RequirementAction::Forbids));
+        assert!(!req.is_descendant);
+        
+        match &req.component {
+            ComponentSpec::Connection(pattern) => {
+                assert_eq!(pattern.path.len(), 1);
+                assert_eq!(pattern.path[0].name, "external");
+                assert!(pattern.wildcard);
+            }
+            _ => panic!("Expected connection component"),
+        }
+    }
+
+    #[test]
+    fn test_parse_requires_element_immediate() {
+        // Without 'descendant' modifier - requires immediate child
+        let source = r#"template microservice:
+    requires element api implements api_handler
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.templates.len(), 1);
+        let template = &program.templates[0];
+        assert_eq!(template.component_requirements.len(), 1);
+        
+        let req = &template.component_requirements[0];
+        assert!(matches!(req.action, RequirementAction::Requires));
+        assert!(!req.is_descendant); // Not descendant - immediate child
+        
+        match &req.component {
+            ComponentSpec::Element { name, implements, .. } => {
+                assert_eq!(name.name, "api");
+                assert_eq!(implements.as_ref().unwrap().name, "api_handler");
+            }
+            _ => panic!("Expected element component"),
+        }
+    }
+
+    #[test]
+    fn test_parse_requires_descendant_implements_shorthand() {
+        // Shorthand: requires descendant implements template_name
+        let source = r#"template production_ready:
+    requires descendant implements dockerized
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.templates.len(), 1);
+        let template = &program.templates[0];
+        assert_eq!(template.component_requirements.len(), 1);
+        
+        let req = &template.component_requirements[0];
+        assert!(matches!(req.action, RequirementAction::Requires));
+        assert!(req.is_descendant);
+        
+        match &req.component {
+            ComponentSpec::Element { implements, .. } => {
+                assert_eq!(implements.as_ref().unwrap().name, "dockerized");
+            }
+            _ => panic!("Expected element component with implements"),
+        }
+    }
+
+    #[test]
+    fn test_parse_mixed_new_and_legacy_syntax() {
+        // Test that both old and new syntax work together
+        let source = r#"template mixed:
+    requires descendant scope config = files.file_selector('config.yaml')
+    requires_descendant check files.exists(config, 'required.txt')
+    allows connection to api.*
+    forbids_connection to external.*
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.templates.len(), 1);
+        let template = &program.templates[0];
+        
+        // New syntax
+        assert_eq!(template.component_requirements.len(), 2);
+        // Legacy syntax
+        assert_eq!(template.hierarchical_requirements.len(), 1);
+        assert_eq!(template.connection_boundaries.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_element_with_body_new_syntax() {
+        let source = r#"template observable:
+    requires descendant element metrics:
+        scope module = rust.module_selector('metrics')
+        connection_point handler: MetricsHandler = rust.function_selector(module, 'handler')
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.templates.len(), 1);
+        let template = &program.templates[0];
+        assert_eq!(template.component_requirements.len(), 1);
+        
+        let req = &template.component_requirements[0];
+        assert!(req.is_descendant);
+        
+        match &req.component {
+            ComponentSpec::Element { name, body, .. } => {
+                assert_eq!(name.name, "metrics");
+                let body = body.as_ref().expect("Expected element body");
+                assert_eq!(body.scopes.len(), 1);
+                assert_eq!(body.connection_points.len(), 1);
+            }
+            _ => panic!("Expected element component with body"),
+        }
+    }
+
+    #[test]
+    fn test_parse_requires_check_new_syntax() {
+        let source = r#"template validated:
+    requires descendant check files.exists(src, 'README.md')
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.templates.len(), 1);
+        let template = &program.templates[0];
+        assert_eq!(template.component_requirements.len(), 1);
+        
+        let req = &template.component_requirements[0];
+        assert!(matches!(req.action, RequirementAction::Requires));
+        assert!(req.is_descendant);
+        
+        match &req.component {
+            ComponentSpec::Check(_) => (),
+            _ => panic!("Expected check component"),
+        }
     }
 }
