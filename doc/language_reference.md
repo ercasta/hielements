@@ -70,6 +70,10 @@ The following are reserved keywords:
 | `from` | Selective import |
 | `true` | Boolean literal |
 | `false` | Boolean literal |
+| `requires_descendant` | Declares a transitive requirement |
+| `allows_connection` | Declares an allowed connection target |
+| `forbids_connection` | Declares a forbidden connection target |
+| `to` | Specifies connection target |
 
 ### 1.4 Literals
 
@@ -694,6 +698,124 @@ External libraries can provide templates via the library protocol. See the [Exte
 - Templates **cannot be nested** (a template cannot implement another template)
 - Template names must be **unique** within their scope
 
+### 8.9 Top-Down Transitivity
+
+Top-down transitivity allows parent elements to prescribe requirements that must be satisfied by at least one of their descendants (children, grandchildren, etc.). This is useful for expressing architectural constraints that span multiple levels of the hierarchy.
+
+#### Transitive Requirements
+
+Use `requires_descendant` to specify that somewhere in the element's descendant hierarchy, a specific property must exist:
+
+```hielements
+template dockerized:
+    ## At least one descendant must have a docker scope
+    requires_descendant scope dockerfile = docker.file_selector('Dockerfile')
+    
+    ## At least one descendant must satisfy this check
+    requires_descendant check docker.has_healthcheck(dockerfile)
+
+template observable:
+    ## At least one descendant must have a metrics element
+    requires_descendant element metrics:
+        scope module = rust.module_selector('metrics')
+        connection_point prometheus: MetricsHandler = rust.function_selector(module, 'handler')
+```
+
+#### Satisfying Transitive Requirements
+
+When an element implements a template with transitive requirements, at least one of its descendants must satisfy each requirement:
+
+```hielements
+element my_app implements dockerized:
+    ## Frontend - not dockerized
+    element frontend:
+        scope src = files.folder_selector('frontend')
+    
+    ## Backend - satisfies the dockerized requirement!
+    element backend:
+        scope src = files.folder_selector('backend')
+        scope dockerfile = docker.file_selector('Dockerfile')  ## Matches!
+        check docker.has_healthcheck(dockerfile)               ## Matches!
+```
+
+#### Transitive Requirement Kinds
+
+| Kind | Syntax | Description |
+|------|--------|-------------|
+| Scope | `requires_descendant scope name = expr` | A descendant must have a matching scope |
+| Check | `requires_descendant check expr` | A descendant must satisfy this check |
+| Element | `requires_descendant element name: ...` | A descendant must have an element with this structure |
+
+### 8.10 Connection Boundaries
+
+Connection boundaries allow specifying constraints on which elements descendants can connect to. These boundaries are inherited by all descendants.
+
+#### Allowing Connections
+
+Use `allows_connection to` to whitelist specific connection targets:
+
+```hielements
+element frontend_zone:
+    ## Descendants can only connect to api_gateway's public_api
+    allows_connection to api_gateway.public_api
+    
+    element web_app:
+        scope src = files.folder_selector('frontend/web')
+        ## Any connection_points here are checked against the boundary
+    
+    element mobile_api:
+        scope src = files.folder_selector('frontend/mobile')
+```
+
+#### Forbidding Connections
+
+Use `forbids_connection to` to blacklist specific connection targets:
+
+```hielements
+element secure_zone:
+    ## Descendants cannot connect to external networks
+    forbids_connection to external.*
+    forbids_connection to public_network.*
+    
+    element internal_service:
+        scope src = files.folder_selector('internal')
+        ## This element and all its children inherit the constraint
+```
+
+#### Wildcard Patterns
+
+Connection patterns support wildcards with `.*` to match any sub-path:
+
+```hielements
+forbids_connection to database.*       ## Matches database.connection, database.pool, etc.
+forbids_connection to external.*       ## Matches anything under external
+allows_connection to api.public.*      ## Matches api.public.users, api.public.orders, etc.
+```
+
+#### Combined Boundaries
+
+Multiple boundaries can be combined - allows create a whitelist, forbids create a blacklist:
+
+```hielements
+element secure_service:
+    allows_connection to api.endpoint
+    allows_connection to logging.output
+    forbids_connection to database.*
+    forbids_connection to external.network
+    
+    ## Children inherit ALL of these boundaries
+    element child_service:
+        scope src = files.folder_selector('child')
+```
+
+#### Boundary Semantics
+
+- `allows_connection` boundaries create a **whitelist** - only listed targets are permitted
+- `forbids_connection` boundaries create a **blacklist** - listed targets are prohibited
+- Boundaries are **inherited** by all descendants
+- Multiple boundaries are **combined** (both allows AND forbids apply)
+- Wildcards (`.*`) match **any path suffix**
+
 ---
 
 ## 9. Imports and Modules
@@ -1007,6 +1129,8 @@ template_item        ::= scope_declaration
                        | connection_point_declaration
                        | check_declaration
                        | element_declaration
+                       | transitive_requirement
+                       | connection_boundary
 
 (* Elements *)
 element_declaration ::= doc_comment? 'element' identifier template_implementation? ':' NEWLINE INDENT element_body DEDENT
@@ -1017,10 +1141,19 @@ element_item        ::= scope_declaration
                       | check_declaration
                       | element_declaration
                       | template_binding
+                      | transitive_requirement
+                      | connection_boundary
 
 (* Template Bindings *)
 template_binding    ::= qualified_identifier '=' expression NEWLINE
 qualified_identifier ::= identifier ('.' identifier)+
+
+(* Transitive Requirements - top-down transitivity *)
+transitive_requirement ::= 'requires_descendant' (scope_declaration | check_declaration | element_declaration)
+
+(* Connection Boundaries - connection constraints *)
+connection_boundary    ::= ('allows_connection' | 'forbids_connection') 'to' connection_pattern NEWLINE
+connection_pattern     ::= identifier ('.' identifier)* ('.' '*')?
 
 (* Declarations *)
 scope_declaration           ::= 'scope' identifier '=' expression NEWLINE

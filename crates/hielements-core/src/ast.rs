@@ -51,6 +51,10 @@ pub struct Template {
     pub connection_points: Vec<ConnectionPointDeclaration>,
     /// Check declarations
     pub checks: Vec<CheckDeclaration>,
+    /// Transitive requirements (requires_descendant)
+    pub transitive_requirements: Vec<TransitiveRequirement>,
+    /// Connection boundaries (allows_connection/forbids_connection)
+    pub connection_boundaries: Vec<ConnectionBoundary>,
     /// Nested elements
     pub elements: Vec<Element>,
     /// Source span
@@ -94,6 +98,10 @@ pub struct Element {
     pub checks: Vec<CheckDeclaration>,
     /// Template bindings (when implementing templates)
     pub template_bindings: Vec<TemplateBinding>,
+    /// Transitive requirements (requires_descendant)
+    pub transitive_requirements: Vec<TransitiveRequirement>,
+    /// Connection boundaries (allows_connection/forbids_connection)
+    pub connection_boundaries: Vec<ConnectionBoundary>,
     /// Nested elements
     pub children: Vec<Element>,
     /// Source span
@@ -242,4 +250,57 @@ impl BooleanLiteral {
     pub fn new(value: bool, span: Span) -> Self {
         Self { value, span }
     }
+}
+
+/// A transitive requirement that must be satisfied by at least one descendant.
+/// Used with `requires_descendant` keyword.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransitiveRequirement {
+    /// Kind of requirement (scope, check, or element)
+    pub kind: TransitiveRequirementKind,
+    /// Source span
+    pub span: Span,
+}
+
+/// Types of transitive requirements.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TransitiveRequirementKind {
+    /// Requires a descendant with a matching scope
+    Scope(ScopeDeclaration),
+    /// Requires a descendant with a matching check
+    Check(CheckDeclaration),
+    /// Requires a descendant element with specific structure
+    Element(Box<Element>),
+}
+
+/// A connection boundary constraint that applies to this element and all descendants.
+/// Used with `allows_connection` and `forbids_connection` keywords.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConnectionBoundary {
+    /// Whether this allows or forbids the connection
+    pub kind: ConnectionBoundaryKind,
+    /// Target pattern (e.g., "api_gateway.*", "database.connection")
+    pub target_pattern: ConnectionPattern,
+    /// Source span
+    pub span: Span,
+}
+
+/// Types of connection boundaries.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ConnectionBoundaryKind {
+    /// Allows connections only to matching targets
+    Allows,
+    /// Forbids connections to matching targets
+    Forbids,
+}
+
+/// A connection pattern for matching connection targets.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConnectionPattern {
+    /// Path components (e.g., ["api_gateway", "public_api"])
+    pub path: Vec<Identifier>,
+    /// Whether this is a wildcard match (ends with .*)
+    pub wildcard: bool,
+    /// Source span
+    pub span: Span,
 }
