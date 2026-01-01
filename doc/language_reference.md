@@ -807,7 +807,7 @@ forbids_connection to external.*       ## Matches anything under external
 allows_connection to api.public.*      ## Matches api.public.users, api.public.orders, etc.
 ```
 
-**Note**: Wildcard interpretation is library-specific. Some libraries may treat wildcards as violations of strict boundaries or not sufficient for `requires_connection` rules.
+**Note**: Wildcard interpretation is library-specific. For example, a Python library might expand `logging.*` to all modules in the logging package.
 
 #### Combined Boundaries
 

@@ -5,6 +5,12 @@ use crate::diagnostics::{Diagnostic, Diagnostics};
 use crate::lexer::{Lexer, Token, TokenKind};
 use crate::span::Span;
 
+/// Expected tokens in element body for error messages.
+const EXPECTED_ELEMENT_BODY_TOKENS: &str = "'scope', 'connection_point', 'check', 'element', 'requires_descendant', 'allows_connection', 'forbids_connection', or 'requires_connection'";
+
+/// Expected tokens in template body for error messages.
+const EXPECTED_TEMPLATE_BODY_TOKENS: &str = "'scope', 'connection_point', 'check', 'element', 'requires_descendant', 'allows_connection', 'forbids_connection', or 'requires_connection'";
+
 /// Parser for the Hielements language.
 pub struct Parser<'a> {
     #[allow(dead_code)]
@@ -279,7 +285,8 @@ impl<'a> Parser<'a> {
                 return Err(Diagnostic::error(
                     "E002",
                     format!(
-                        "Expected 'scope', 'connection_point', 'check', 'element', 'requires_descendant', 'allows_connection', 'forbids_connection', or 'requires_connection', found {:?}",
+                        "Expected {}, found {:?}",
+                        EXPECTED_ELEMENT_BODY_TOKENS,
                         token.kind
                     ),
                 )
@@ -360,7 +367,8 @@ impl<'a> Parser<'a> {
                 return Err(Diagnostic::error(
                     "E002",
                     format!(
-                        "Expected 'scope', 'connection_point', 'check', 'element', 'requires_descendant', 'allows_connection', 'forbids_connection', or 'requires_connection' in template, found {:?}",
+                        "Expected {} in template, found {:?}",
+                        EXPECTED_TEMPLATE_BODY_TOKENS,
                         token.kind
                     ),
                 )
