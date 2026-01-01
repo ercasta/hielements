@@ -70,9 +70,9 @@ The following are reserved keywords:
 | `from` | Selective import |
 | `true` | Boolean literal |
 | `false` | Boolean literal |
-| `requires` | Declares a required component |
-| `allows` | Declares an allowed component |
-| `forbids` | Declares a forbidden component |
+| `requires` | Declares a required component (templates only) |
+| `allows` | Declares an allowed component (templates only) |
+| `forbids` | Declares a forbidden component (templates only) |
 | `descendant` | Modifier for hierarchical requirements (applies to descendants) |
 | `connection` | Specifies a connection requirement |
 | `to` | Specifies connection target |
@@ -830,15 +830,18 @@ template microservice:
 
 Connection boundaries allow specifying constraints on architectural dependencies (imports/dependencies) between elements. These boundaries are inherited by all descendants. **Note**: "Connections" refer to logical/architectural dependencies like module imports, not network connections.
 
+**Important**: Connection boundaries (`allows connection`, `forbids connection`, `requires connection`) are **only allowed in templates**, not in regular elements. Elements can inherit these constraints by implementing templates that define them.
+
 #### Allowing Connections
 
-Use `allows connection to` to whitelist specific connection targets:
+Use `allows connection to` in templates to whitelist specific connection targets:
 
 ```hielements
-element frontend_zone:
+template frontend_zone:
     ## Code in this zone may only import from api_gateway
     allows connection to api_gateway.public_api
-    
+
+element my_frontend implements frontend_zone:
     element web_app:
         scope src = files.folder_selector('frontend/web')
         ## Any imports from this scope are checked against the boundary
@@ -849,28 +852,29 @@ element frontend_zone:
 
 #### Forbidding Connections
 
-Use `forbids connection to` to blacklist specific connection targets:
+Use `forbids connection to` in templates to blacklist specific connection targets:
 
 ```hielements
-element secure_zone:
+template secure_zone:
     ## Code in this zone cannot import from external modules
     forbids connection to external.*
     forbids connection to public_network.*
-    
-    element internal_service:
-        scope src = files.folder_selector('internal')
-        ## This element and all its children inherit the constraint
+
+element internal_service implements secure_zone:
+    scope src = files.folder_selector('internal')
+    ## This element and all its children inherit the constraint
 ```
 
 #### Requiring Connections
 
-Use `requires connection to` to mandate that code MUST have a dependency:
+Use `requires connection to` in templates to mandate that code MUST have a dependency:
 
 ```hielements
-element service_mesh:
+template service_mesh_zone:
     ## All services in this mesh must import from logging module
     requires connection to logging.*
-    
+
+element service_mesh implements service_mesh_zone:
     element user_service:
         scope src = files.folder_selector('services/user')
         # This service must import from logging.* to satisfy the constraint
@@ -881,6 +885,7 @@ element service_mesh:
 Connection patterns support wildcards with `.*` to match any sub-path:
 
 ```hielements
+## In templates:
 forbids connection to database.*       ## Matches database.connection, database.pool, etc.
 forbids connection to external.*       ## Matches anything under external
 allows connection to api.public.*      ## Matches api.public.users, api.public.orders, etc.
@@ -893,13 +898,14 @@ allows connection to api.public.*      ## Matches api.public.users, api.public.o
 Multiple boundaries can be combined - allows create a whitelist, forbids create a blacklist, requires create mandatory dependencies:
 
 ```hielements
-element secure_service:
+template secure_service:
     allows connection to api.endpoint
     allows connection to logging.output
     forbids connection to database.*
     forbids connection to external.network
     requires connection to audit.*
-    
+
+element my_secure_service implements secure_service:
     ## Children inherit ALL of these boundaries
     element child_service:
         scope src = files.folder_selector('child')
@@ -916,6 +922,7 @@ When A is allowed to connect to B, and B is allowed to connect to C:
 - `allows connection` boundaries create a **whitelist** - only listed targets are permitted
 - `forbids connection` boundaries create a **blacklist** - listed targets are prohibited
 - `requires connection` boundaries create a **mandate** - dependencies MUST exist
+- **Connection boundaries are only allowed in templates** - elements inherit them via `implements`
 - Boundaries are **inherited** by all descendants within the parent/child hierarchy
 - Multiple boundaries are **combined** (allows AND forbids AND requires apply)
 - Wildcards (`.*`) match **any path suffix** (library-specific interpretation)
@@ -1235,10 +1242,9 @@ template_item        ::= scope_declaration
                        | check_declaration
                        | element_declaration
                        | component_requirement
-                       | hierarchical_requirement
-                       | connection_boundary
 
 (* Elements *)
+(* Note: Elements do NOT support component_requirement - requires/allows/forbids are only in templates *)
 element_declaration ::= doc_comment? 'element' identifier template_implementation? ':' NEWLINE INDENT element_body DEDENT
 template_implementation ::= 'implements' identifier (',' identifier)*
 element_body        ::= element_item+
@@ -1247,13 +1253,12 @@ element_item        ::= scope_declaration
                       | check_declaration
                       | element_declaration
                       | template_binding
-                      | component_requirement
 
 (* Template Bindings *)
 template_binding    ::= qualified_identifier '=' expression NEWLINE
 qualified_identifier ::= identifier ('.' identifier)+
 
-(* Component Requirements - unified syntax *)
+(* Component Requirements - unified syntax - ONLY allowed in templates *)
 component_requirement ::= ('requires' | 'allows' | 'forbids') ['descendant'] component_spec
 component_spec        ::= scope_declaration
                         | check_declaration

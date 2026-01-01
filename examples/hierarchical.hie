@@ -1,6 +1,7 @@
 # Example: Hierarchical Checks
 # Demonstrates hierarchical requirements and connection boundaries
 # Using the unified syntax: requires/allows/forbids [descendant] ...
+# Note: These keywords are only allowed in templates, not regular elements.
 
 import files
 import rust
@@ -42,6 +43,24 @@ template frontend_zone:
     forbids connection to database.*
     forbids connection to internal_services.*
 
+## Backend Zone Template
+## Backend components cannot access external systems.
+template backend_zone:
+    forbids connection to external.*
+
+## Service Mesh Zone Template
+## Demonstrates requires connection - all services in this zone
+## MUST have a dependency on the logging module
+template service_mesh_zone:
+    ## All services in this mesh must import from logging module
+    requires connection to logging.*
+    
+    ## Services may connect to other services in the mesh
+    allows connection to mesh_internal.*
+    
+    ## Services cannot connect directly to external APIs
+    forbids connection to external_api.*
+
 ## Production Ready Template
 ## Demonstrates requires descendant implements shorthand
 template production_ready:
@@ -79,14 +98,11 @@ element my_app implements dockerized, observable:
         check rust.function_exists(module, 'collect_metrics')
 
 ## E-Commerce Platform
-## Demonstrates connection boundaries at different levels.
+## Demonstrates connection boundaries through template implementation.
 element ecommerce_platform:
     
-    ## Public frontend zone - restricted connections
-    element frontend_zone:
-        allows connection to api_gateway.public_api
-        forbids connection to database.*
-        
+    ## Public frontend zone - restricted connections via template
+    element frontend implements frontend_zone:
         element web_app:
             scope src = files.folder_selector('frontend/web')
             
@@ -98,18 +114,14 @@ element ecommerce_platform:
         scope src = files.folder_selector('gateway/src')
         connection_point public_api: HttpHandler = rust.function_selector(src, 'routes')
     
-    ## Secure backend zone - no external connections allowed
-    element backend_zone:
-        forbids connection to external.*
-        
+    ## Secure backend zone - no external connections allowed via template
+    element backend implements backend_zone:
         element order_service:
             scope src = files.folder_selector('services/orders')
             connection_point orders_api: HttpHandler = rust.function_selector(src, 'orders')
         
-        element payment_service:
+        element payment_service implements secure_zone:
             scope src = files.folder_selector('services/payments')
-            forbids connection to public_network.*
-            
             connection_point payments_api: HttpHandler = rust.function_selector(src, 'payments')
         
         element database:
@@ -136,19 +148,9 @@ element payment_processor implements secure_zone:
         scope src = files.folder_selector('payment/audit')
         check rust.function_exists(src, 'log_transaction')
 
-## Service Mesh Zone
-## Demonstrates requires connection - all services in this zone
-## MUST have a dependency on the logging module
-element service_mesh:
-    ## All services in this mesh must import from logging module
-    requires connection to logging.*
-    
-    ## Services may connect to other services in the mesh
-    allows connection to mesh_internal.*
-    
-    ## Services cannot connect directly to external APIs
-    forbids connection to external_api.*
-    
+## Service Mesh
+## Implements service_mesh_zone template for logging requirements.
+element service_mesh implements service_mesh_zone:
     element user_service:
         scope src = files.folder_selector('services/user')
         # This service must import from logging.* to satisfy requires connection

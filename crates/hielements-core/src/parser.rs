@@ -6,7 +6,8 @@ use crate::lexer::{Lexer, Token, TokenKind};
 use crate::span::Span;
 
 /// Expected tokens in element body for error messages.
-const EXPECTED_ELEMENT_BODY_TOKENS: &str = "'scope', 'connection_point', 'check', 'element', 'requires', 'allows', or 'forbids'";
+/// Note: 'requires', 'allows', 'forbids' are only allowed in templates, not elements.
+const EXPECTED_ELEMENT_BODY_TOKENS: &str = "'scope', 'connection_point', 'check', or 'element'";
 
 /// Expected tokens in template body for error messages.
 const EXPECTED_TEMPLATE_BODY_TOKENS: &str = "'scope', 'connection_point', 'check', 'element', 'requires', 'allows', or 'forbids'";
@@ -218,7 +219,6 @@ impl<'a> Parser<'a> {
         let mut connection_points = Vec::new();
         let mut checks = Vec::new();
         let mut template_bindings = Vec::new();
-        let mut component_requirements = Vec::new();
         let mut children = Vec::new();
 
         loop {
@@ -239,13 +239,20 @@ impl<'a> Parser<'a> {
                 checks.push(self.parse_check()?);
             } else if self.check(TokenKind::Element) {
                 children.push(self.parse_element(child_doc)?);
-            // Unified syntax: requires/allows/forbids [descendant] ...
-            } else if self.check(TokenKind::Requires) {
-                component_requirements.push(self.parse_component_requirement(RequirementAction::Requires)?);
-            } else if self.check(TokenKind::Allows) {
-                component_requirements.push(self.parse_component_requirement(RequirementAction::Allows)?);
-            } else if self.check(TokenKind::Forbids) {
-                component_requirements.push(self.parse_component_requirement(RequirementAction::Forbids)?);
+            // Note: requires/allows/forbids are NOT allowed in regular elements
+            // They are only allowed in templates. Provide helpful error message.
+            } else if self.check(TokenKind::Requires) || self.check(TokenKind::Allows) || self.check(TokenKind::Forbids) {
+                let token = self.current();
+                return Err(Diagnostic::error(
+                    "E012",
+                    format!(
+                        "'{}' is only allowed in templates, not in regular elements. Define a template with this constraint and have the element implement it.",
+                        token.text
+                    ),
+                )
+                .with_file(&self.file_path)
+                .with_span(token.span)
+                .build());
             } else if self.check(TokenKind::Identifier) {
                 // Could be a template binding (e.g., template.element.scope = ...)
                 // Peek ahead to see if this looks like a template binding (has a dot after the identifier)
@@ -310,7 +317,7 @@ impl<'a> Parser<'a> {
             connection_points,
             checks,
             template_bindings,
-            component_requirements,
+            component_requirements: Vec::new(), // Always empty - requires/allows/forbids only allowed in templates
             children,
             span: start_span.merge(&end_span),
         })
@@ -658,11 +665,11 @@ impl<'a> Parser<'a> {
                 self.expect(TokenKind::Indent)?;
                 
                 // Parse element body contents
+                // Note: requires/allows/forbids are NOT allowed in element bodies
                 let mut scopes = Vec::new();
                 let mut connection_points = Vec::new();
                 let mut checks = Vec::new();
                 let mut children = Vec::new();
-                let mut component_requirements = Vec::new();
 
                 loop {
                     self.skip_newlines();
@@ -681,12 +688,18 @@ impl<'a> Parser<'a> {
                         checks.push(self.parse_check()?);
                     } else if self.check(TokenKind::Element) {
                         children.push(self.parse_element(child_doc)?);
-                    } else if self.check(TokenKind::Requires) {
-                        component_requirements.push(self.parse_component_requirement(RequirementAction::Requires)?);
-                    } else if self.check(TokenKind::Allows) {
-                        component_requirements.push(self.parse_component_requirement(RequirementAction::Allows)?);
-                    } else if self.check(TokenKind::Forbids) {
-                        component_requirements.push(self.parse_component_requirement(RequirementAction::Forbids)?);
+                    } else if self.check(TokenKind::Requires) || self.check(TokenKind::Allows) || self.check(TokenKind::Forbids) {
+                        let token = self.current();
+                        return Err(Diagnostic::error(
+                            "E012",
+                            format!(
+                                "'{}' is only allowed in templates, not in regular elements.",
+                                token.text
+                            ),
+                        )
+                        .with_file(&self.file_path)
+                        .with_span(token.span)
+                        .build());
                     } else {
                         break;
                     }
@@ -712,7 +725,7 @@ impl<'a> Parser<'a> {
                     connection_points,
                     checks,
                     template_bindings: Vec::new(),
-                    component_requirements,
+                    component_requirements: Vec::new(), // Always empty - requires/allows/forbids only allowed in templates
                     children,
                     span,
                 }))
@@ -1540,5 +1553,48 @@ element service:
             ComponentSpec::Check(_) => (),
             _ => panic!("Expected check component"),
         }
+    }
+
+    #[test]
+    fn test_parse_requires_in_element_fails() {
+        // requires/allows/forbids should only be allowed in templates, not elements
+        let source = r#"element test_element:
+    scope src = files.folder_selector('src')
+    requires connection to logging.*
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (_program, diagnostics) = parser.parse();
+
+        // Should have errors because requires is not allowed in elements
+        assert!(diagnostics.has_errors(), "Expected error for 'requires' in element");
+        // Check that the error message mentions templates
+        let error_msg = diagnostics.iter().next().unwrap().message.clone();
+        assert!(error_msg.contains("template"), "Error message should mention templates: {}", error_msg);
+    }
+
+    #[test]
+    fn test_parse_allows_in_element_fails() {
+        // requires/allows/forbids should only be allowed in templates, not elements
+        let source = r#"element test_element:
+    allows connection to api.*
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (_program, diagnostics) = parser.parse();
+
+        // Should have errors because allows is not allowed in elements
+        assert!(diagnostics.has_errors(), "Expected error for 'allows' in element");
+    }
+
+    #[test]
+    fn test_parse_forbids_in_element_fails() {
+        // requires/allows/forbids should only be allowed in templates, not elements
+        let source = r#"element test_element:
+    forbids connection to external.*
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (_program, diagnostics) = parser.parse();
+
+        // Should have errors because forbids is not allowed in elements
+        assert!(diagnostics.has_errors(), "Expected error for 'forbids' in element");
     }
 }
