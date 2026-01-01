@@ -41,6 +41,7 @@ impl<'a> Parser<'a> {
         let start_span = self.current_span();
 
         let mut imports = Vec::new();
+        let mut languages = Vec::new();
         let mut templates = Vec::new();
         let mut elements = Vec::new();
 
@@ -59,7 +60,7 @@ impl<'a> Parser<'a> {
             self.skip_newlines_and_comments();
         }
 
-        // Parse templates and top-level elements
+        // Parse templates, elements, and language declarations
         while !self.is_at_end() {
             self.skip_newlines();
             if self.is_at_end() {
@@ -85,10 +86,18 @@ impl<'a> Parser<'a> {
                         self.recover_to_element();
                     }
                 }
+            } else if self.check(TokenKind::Language) {
+                match self.parse_language_declaration() {
+                    Ok(lang) => languages.push(lang),
+                    Err(diag) => {
+                        self.diagnostics.push(diag);
+                        self.recover_to_newline();
+                    }
+                }
             } else if !self.is_at_end() {
                 let token = self.current();
                 self.diagnostics.push(
-                    Diagnostic::error("E001", format!("Expected 'template' or 'element', found {:?}", token.kind))
+                    Diagnostic::error("E001", format!("Expected 'template', 'element', or 'language', found {:?}", token.kind))
                         .with_file(&self.file_path)
                         .with_span(token.span)
                         .build(),
@@ -100,6 +109,7 @@ impl<'a> Parser<'a> {
         let end_span = self.previous_span();
         let program = Program {
             imports,
+            languages,
             templates,
             elements,
             span: start_span.merge(&end_span),
@@ -184,6 +194,134 @@ impl<'a> Parser<'a> {
             }
             Ok(ImportPath::Identifier(parts))
         }
+    }
+
+    /// Parse a language declaration.
+    /// Syntax: `language <name>` or `language <name>:` followed by connection_check definitions
+    fn parse_language_declaration(&mut self) -> Result<LanguageDeclaration, Diagnostic> {
+        let start_span = self.current_span();
+        self.expect(TokenKind::Language)?;
+        let name = self.parse_identifier()?;
+        
+        // Check if this is a simple declaration or has a body
+        if self.check(TokenKind::Colon) {
+            self.advance(); // consume ':'
+            self.skip_newlines();
+            self.expect(TokenKind::Indent)?;
+            
+            let mut connection_checks = Vec::new();
+            
+            loop {
+                self.skip_newlines();
+                
+                // Skip doc comments before connection checks
+                let _ = self.parse_doc_comment();
+                
+                if self.check(TokenKind::Dedent) || self.is_at_end() {
+                    break;
+                }
+                
+                if self.check(TokenKind::ConnectionCheck) {
+                    connection_checks.push(self.parse_connection_check()?);
+                } else {
+                    let token = self.current();
+                    return Err(Diagnostic::error(
+                        "E013",
+                        format!("Expected 'connection_check' in language body, found {:?}", token.kind),
+                    )
+                    .with_file(&self.file_path)
+                    .with_span(token.span)
+                    .build());
+                }
+            }
+            
+            // Consume DEDENT if present
+            if self.check(TokenKind::Dedent) {
+                self.advance();
+            }
+            
+            let end_span = self.previous_span();
+            Ok(LanguageDeclaration {
+                name,
+                connection_checks,
+                span: start_span.merge(&end_span),
+            })
+        } else {
+            // Simple declaration without body
+            self.expect_newline()?;
+            let end_span = self.previous_span();
+            Ok(LanguageDeclaration {
+                name,
+                connection_checks: Vec::new(),
+                span: start_span.merge(&end_span),
+            })
+        }
+    }
+
+    /// Parse a connection check declaration.
+    /// Syntax: `connection_check <name>(<params>):` followed by indented body
+    fn parse_connection_check(&mut self) -> Result<ConnectionCheckDeclaration, Diagnostic> {
+        let start_span = self.current_span();
+        self.expect(TokenKind::ConnectionCheck)?;
+        let name = self.parse_identifier()?;
+        
+        // Parse parameters
+        self.expect(TokenKind::LParen)?;
+        let mut parameters = Vec::new();
+        
+        if !self.check(TokenKind::RParen) {
+            parameters.push(self.parse_connection_check_parameter()?);
+            while self.check(TokenKind::Comma) {
+                self.advance();
+                if self.check(TokenKind::RParen) {
+                    break; // Allow trailing comma
+                }
+                parameters.push(self.parse_connection_check_parameter()?);
+            }
+        }
+        
+        self.expect(TokenKind::RParen)?;
+        self.expect(TokenKind::Colon)?;
+        self.skip_newlines();
+        self.expect(TokenKind::Indent)?;
+        
+        // Parse body - for now we expect a single expression (like `return expr`)
+        self.skip_newlines();
+        let body = self.parse_expression()?;
+        self.expect_newline()?;
+        
+        // Consume DEDENT
+        self.skip_newlines();
+        if self.check(TokenKind::Dedent) {
+            self.advance();
+        }
+        
+        let end_span = self.previous_span();
+        Ok(ConnectionCheckDeclaration {
+            name,
+            parameters,
+            body,
+            span: start_span.merge(&end_span),
+        })
+    }
+
+    /// Parse a connection check parameter.
+    /// Syntax: `<name>: scope[]`
+    fn parse_connection_check_parameter(&mut self) -> Result<ConnectionCheckParameter, Diagnostic> {
+        let start_span = self.current_span();
+        let name = self.parse_identifier()?;
+        self.expect(TokenKind::Colon)?;
+        
+        // Expect "scope[]"
+        self.expect(TokenKind::Scope)?;
+        self.expect(TokenKind::LBracket)?;
+        self.expect(TokenKind::RBracket)?;
+        
+        let end_span = self.previous_span();
+        Ok(ConnectionCheckParameter {
+            name,
+            span: start_span.merge(&end_span),
+        })
     }
 
     /// Parse an element declaration.
@@ -446,10 +584,20 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse a scope declaration.
+    /// Syntax: `scope <name> [: <language>] = <expression>`
     fn parse_scope(&mut self) -> Result<ScopeDeclaration, Diagnostic> {
         let start_span = self.current_span();
         self.expect(TokenKind::Scope)?;
         let name = self.parse_identifier()?;
+        
+        // Check for optional language annotation: `: <language>`
+        let language = if self.check(TokenKind::Colon) {
+            self.advance(); // consume ':'
+            Some(self.parse_identifier()?)
+        } else {
+            None
+        };
+        
         self.expect(TokenKind::Equals)?;
         let expression = self.parse_expression()?;
         self.expect_newline()?;
@@ -457,6 +605,7 @@ impl<'a> Parser<'a> {
 
         Ok(ScopeDeclaration {
             name,
+            language,
             expression,
             span: start_span.merge(&end_span),
         })
@@ -575,12 +724,18 @@ impl<'a> Parser<'a> {
                 implements: Some(template_name),
                 body: None,
             }
+        } else if self.check(TokenKind::Language) {
+            // Language constraint: `requires language <name>`
+            self.advance(); // consume 'language'
+            let lang_name = self.parse_identifier()?;
+            self.expect_newline()?;
+            ComponentSpec::Language(lang_name)
         } else {
             let token = self.current();
             return Err(Diagnostic::error(
                 "E011",
                 format!(
-                    "Expected 'scope', 'check', 'element', 'connection', 'connection_point', or 'implements' after '{} {}', found {:?}",
+                    "Expected 'scope', 'check', 'element', 'connection', 'connection_point', 'implements', or 'language' after '{} {}', found {:?}",
                     match action {
                         RequirementAction::Requires => "requires",
                         RequirementAction::Allows => "allows",
@@ -896,7 +1051,9 @@ impl<'a> Parser<'a> {
                 TokenKind::To |
                 // Unified keywords can also be used as identifiers in some contexts
                 TokenKind::Requires | TokenKind::Allows | TokenKind::Forbids |
-                TokenKind::Descendant | TokenKind::Connection => {
+                TokenKind::Descendant | TokenKind::Connection |
+                // Language keywords can also be used as identifiers
+                TokenKind::Language | TokenKind::ConnectionCheck => {
                     let token = self.advance();
                     Ok(Identifier::new(token.text, token.span))
                 }
@@ -1596,5 +1753,218 @@ element service:
 
         // Should have errors because forbids is not allowed in elements
         assert!(diagnostics.has_errors(), "Expected error for 'forbids' in element");
+    }
+
+    // ========================================================================
+    // Tests for language declarations and connection checks
+    // ========================================================================
+
+    #[test]
+    fn test_parse_simple_language_declaration() {
+        let source = r#"language python
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.languages.len(), 1);
+        assert_eq!(program.languages[0].name.name, "python");
+        assert!(program.languages[0].connection_checks.is_empty());
+    }
+
+    #[test]
+    fn test_parse_multiple_language_declarations() {
+        let source = r#"language python
+language rust
+language java
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.languages.len(), 3);
+        assert_eq!(program.languages[0].name.name, "python");
+        assert_eq!(program.languages[1].name.name, "rust");
+        assert_eq!(program.languages[2].name.name, "java");
+    }
+
+    #[test]
+    fn test_parse_language_with_connection_check() {
+        let source = r#"language python:
+    connection_check can_import(source: scope[], target: scope[]):
+        python.imports_allowed(source, target)
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.languages.len(), 1);
+        assert_eq!(program.languages[0].name.name, "python");
+        assert_eq!(program.languages[0].connection_checks.len(), 1);
+        
+        let check = &program.languages[0].connection_checks[0];
+        assert_eq!(check.name.name, "can_import");
+        assert_eq!(check.parameters.len(), 2);
+        assert_eq!(check.parameters[0].name.name, "source");
+        assert_eq!(check.parameters[1].name.name, "target");
+    }
+
+    #[test]
+    fn test_parse_scope_with_language() {
+        let source = r#"element test:
+    scope src : python = python.module_selector('test')
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.elements.len(), 1);
+        assert_eq!(program.elements[0].scopes.len(), 1);
+        
+        let scope = &program.elements[0].scopes[0];
+        assert_eq!(scope.name.name, "src");
+        assert!(scope.language.is_some());
+        assert_eq!(scope.language.as_ref().unwrap().name, "python");
+    }
+
+    #[test]
+    fn test_parse_scope_without_language() {
+        // Should still work without language annotation
+        let source = r#"element test:
+    scope src = files.folder_selector('src')
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.elements.len(), 1);
+        assert_eq!(program.elements[0].scopes.len(), 1);
+        
+        let scope = &program.elements[0].scopes[0];
+        assert_eq!(scope.name.name, "src");
+        assert!(scope.language.is_none());
+    }
+
+    #[test]
+    fn test_parse_requires_language() {
+        let source = r#"template python_only:
+    requires language python
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.templates.len(), 1);
+        let template = &program.templates[0];
+        assert_eq!(template.component_requirements.len(), 1);
+        
+        let req = &template.component_requirements[0];
+        assert!(matches!(req.action, RequirementAction::Requires));
+        assert!(!req.is_descendant);
+        
+        match &req.component {
+            ComponentSpec::Language(lang) => {
+                assert_eq!(lang.name, "python");
+            }
+            _ => panic!("Expected language component"),
+        }
+    }
+
+    #[test]
+    fn test_parse_forbids_language() {
+        let source = r#"template no_rust:
+    forbids language rust
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.templates.len(), 1);
+        let template = &program.templates[0];
+        assert_eq!(template.component_requirements.len(), 1);
+        
+        let req = &template.component_requirements[0];
+        assert!(matches!(req.action, RequirementAction::Forbids));
+        
+        match &req.component {
+            ComponentSpec::Language(lang) => {
+                assert_eq!(lang.name, "rust");
+            }
+            _ => panic!("Expected language component"),
+        }
+    }
+
+    #[test]
+    fn test_parse_allows_language() {
+        let source = r#"template multilingual:
+    allows language python
+    allows language rust
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.templates.len(), 1);
+        let template = &program.templates[0];
+        assert_eq!(template.component_requirements.len(), 2);
+        
+        // Check first requirement
+        assert!(matches!(template.component_requirements[0].action, RequirementAction::Allows));
+        match &template.component_requirements[0].component {
+            ComponentSpec::Language(lang) => assert_eq!(lang.name, "python"),
+            _ => panic!("Expected language component"),
+        }
+        
+        // Check second requirement
+        assert!(matches!(template.component_requirements[1].action, RequirementAction::Allows));
+        match &template.component_requirements[1].component {
+            ComponentSpec::Language(lang) => assert_eq!(lang.name, "rust"),
+            _ => panic!("Expected language component"),
+        }
+    }
+
+    #[test]
+    fn test_parse_complete_language_example() {
+        let source = r#"language python:
+    connection_check can_import(source: scope[], target: scope[]):
+        python.imports_allowed(source, target)
+    connection_check no_circular(scopes: scope[]):
+        python.no_circular_imports(scopes)
+
+template python_service:
+    requires language python
+    forbids language rust
+
+element my_api implements python_service:
+    scope src : python = python.module_selector('my_api')
+    check python.has_docstrings(src)
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        
+        // Check language declaration
+        assert_eq!(program.languages.len(), 1);
+        assert_eq!(program.languages[0].name.name, "python");
+        assert_eq!(program.languages[0].connection_checks.len(), 2);
+        
+        // Check template
+        assert_eq!(program.templates.len(), 1);
+        assert_eq!(program.templates[0].component_requirements.len(), 2);
+        
+        // Check element
+        assert_eq!(program.elements.len(), 1);
+        assert_eq!(program.elements[0].scopes.len(), 1);
+        assert!(program.elements[0].scopes[0].language.is_some());
     }
 }

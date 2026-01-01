@@ -1,0 +1,51 @@
+# Example: Language Declarations and Connection Checks
+# Demonstrates the language keyword and connection verification
+
+import files
+import rust
+
+# Python Language Declaration with Connection Checks
+language python:
+    connection_check can_import(source: scope[], target: scope[]):
+        python.imports_allowed(source, target)
+
+    connection_check no_circular(scopes: scope[]):
+        python.no_circular_imports(scopes)
+
+# Rust Language Declaration with Dependency Checks
+language rust:
+    connection_check depends_on(source: scope[], target: scope[]):
+        rust.dependency_exists(source, target)
+
+## Template requiring Python language
+template python_service:
+    requires language python
+    forbids language rust
+
+## Template allowing multiple languages
+template multilingual_app:
+    allows language python
+    allows language rust
+
+## A Python-only service implementing the python_service template
+element api_service implements python_service:
+    scope src : python = files.folder_selector('src/api')
+    scope tests : python = files.folder_selector('tests/api')
+
+    check files.exists(src, '__init__.py')
+
+## A multi-language system implementing the multilingual_app template
+element full_stack_app implements multilingual_app:
+    element frontend:
+        scope src : python = files.folder_selector('frontend')
+
+    element backend:
+        scope src : rust = files.folder_selector('backend')
+
+        element api:
+            scope src : rust = files.folder_selector('backend/api')
+            check files.exists(src, 'lib.rs')
+
+        element db:
+            scope src : rust = files.folder_selector('backend/db')
+            check files.exists(src, 'mod.rs')

@@ -226,6 +226,10 @@ impl Interpreter {
                     self.validate_expression(expr, file_path, diagnostics);
                 }
             }
+            ComponentSpec::Language(_) => {
+                // Language constraints are validated by name - just need to check if declared
+                // For now, we don't validate against declared languages
+            }
         }
     }
 
