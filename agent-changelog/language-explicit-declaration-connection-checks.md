@@ -123,8 +123,6 @@ pub struct ConnectionCheckDeclaration {
 pub struct ConnectionCheckParameter {
     /// Parameter name
     pub name: Identifier,
-    /// Whether it's a scope array (always true for now)
-    pub is_scope_array: bool,
     /// Source span
     pub span: Span,
 }
@@ -136,8 +134,8 @@ pub struct ConnectionCheckParameter {
 pub struct ScopeDeclaration {
     /// Scope name
     pub name: Identifier,
-    /// Language type annotation (mandatory)
-    pub language: Identifier,
+    /// Optional language type annotation (e.g., `scope x : python = ...`)
+    pub language: Option<Identifier>,
     /// Scope expression (selector)
     pub expression: Expression,
     /// Source span
