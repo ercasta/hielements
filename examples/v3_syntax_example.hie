@@ -1,0 +1,91 @@
+# Example: Hielements V3 Syntax
+# Demonstrates the new V3 language features:
+# - Curly brackets { } for block delimiters instead of colons and indentation
+# - 'ref' keyword instead of 'connection_point'
+# - 'uses' keyword for declaring dependencies between elements/scopes
+
+import files
+import rust
+
+###
+Compiler Core
+Demonstrates the new V3 syntax with curly brackets and uses declarations.
+###
+element core {
+    ## Lexer - tokenizes .hie source files
+    element lexer {
+        scope module = rust.module_selector('lexer')
+        
+        # Refs (formerly connection_point) - what the lexer produces
+        ref token_output: Token = rust.struct_selector('Token')
+        ref token_kinds: TokenKind = rust.enum_selector('TokenKind')
+        
+        check rust.struct_exists('Lexer')
+        check rust.enum_exists('TokenKind')
+    }
+    
+    ## Parser - produces AST from token stream
+    element parser {
+        scope module = rust.module_selector('parser')
+        scope lexer_module = rust.module_selector('lexer')
+        
+        # The parser module uses (depends on) the lexer element
+        lexer_module uses lexer
+        
+        ref ast_output: Program = rust.struct_selector('Program')
+        
+        check rust.struct_exists('Parser')
+        check rust.function_exists('parse')
+    }
+    
+    ## Interpreter - semantic validation and check execution
+    element interpreter {
+        scope module = rust.module_selector('interpreter')
+        
+        # Interpreter uses parser (for AST types)
+        module uses parser
+        
+        ref check_output: CheckResult = rust.enum_selector('CheckResult')
+        
+        check rust.struct_exists('Interpreter')
+    }
+}
+
+###
+Template with V3 syntax
+Shows that templates also work with curly brackets
+###
+template observable {
+    allows language rust
+    
+    element metrics {
+        # Unbounded scope in template
+        scope module<rust>
+        # Unbounded ref in template
+        ref prometheus: MetricsHandler
+        
+        check rust.function_exists(module, 'metrics_handler')
+    }
+}
+
+###
+Element implementing template with V3 syntax
+###
+element payments_service implements observable {
+    scope root = files.folder_selector('src/payments')
+    
+    # Bind scope using new syntax
+    scope metrics_mod<rust> binds observable.metrics.module = rust.module_selector('payments::metrics')
+    
+    # Bind ref (not connection_point)
+    ref handler: MetricsHandler binds observable.metrics.prometheus = rust.function_selector(metrics_mod, 'handler')
+    
+    element api {
+        scope module<rust> = rust.module_selector('payments::api')
+        
+        # API uses the metrics module
+        module uses metrics_mod
+        
+        check rust.function_exists(module, 'process_payment')
+    }
+}

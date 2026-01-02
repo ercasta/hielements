@@ -49,8 +49,8 @@ pub struct Template {
     pub name: Identifier,
     /// Scope declarations
     pub scopes: Vec<ScopeDeclaration>,
-    /// Connection point declarations
-    pub connection_points: Vec<ConnectionPointDeclaration>,
+    /// Ref declarations (formerly connection_point)
+    pub refs: Vec<RefDeclaration>,
     /// Check declarations
     pub checks: Vec<CheckDeclaration>,
     /// Component requirements (requires/allows/forbids [descendant] ...)
@@ -92,8 +92,10 @@ pub struct Element {
     pub implements: Vec<TemplateImplementation>,
     /// Scope declarations
     pub scopes: Vec<ScopeDeclaration>,
-    /// Connection point declarations
-    pub connection_points: Vec<ConnectionPointDeclaration>,
+    /// Ref declarations (formerly connection_point, renamed to avoid confusion with uses)
+    pub refs: Vec<RefDeclaration>,
+    /// Uses declarations - dependencies on other elements or scopes
+    pub uses: Vec<UsesDeclaration>,
     /// Check declarations
     pub checks: Vec<CheckDeclaration>,
     /// Template bindings (when implementing templates)
@@ -121,17 +123,33 @@ pub struct ScopeDeclaration {
     pub span: Span,
 }
 
-/// A connection point declaration (V2 supports unbounded connection points and bindings).
+/// A ref declaration (V2 supports unbounded refs and bindings).
+/// Renamed from connection_point to avoid confusion with 'uses' declarations.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConnectionPointDeclaration {
-    /// Connection point name
+pub struct RefDeclaration {
+    /// Ref name
     pub name: Identifier,
     /// Type annotation (mandatory)
     pub type_annotation: TypeAnnotation,
-    /// Optional binding path for template connection point binding (e.g., `binds template.element.cp`)
+    /// Optional binding path for template ref binding (e.g., `binds template.element.ref`)
     pub binds: Option<Vec<Identifier>>,
-    /// Expression defining the connection point - None for unbounded in templates
+    /// Expression defining the ref - None for unbounded in templates
     pub expression: Option<Expression>,
+    /// Source span
+    pub span: Span,
+}
+
+/// Type alias for backward compatibility
+pub type ConnectionPointDeclaration = RefDeclaration;
+
+/// A uses declaration - declares that this element/scope uses another element or scope.
+/// This represents a dependency relationship (calling/importing).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UsesDeclaration {
+    /// The source scope or element that has the dependency
+    pub source: Identifier,
+    /// The target element or scope being used (can be qualified path)
+    pub target: Vec<Identifier>,
     /// Source span
     pub span: Span,
 }
@@ -305,11 +323,11 @@ pub enum ComponentSpec {
         /// Optional element body (nested scopes, checks, etc.)
         body: Option<Box<Element>>,
     },
-    /// Connection requirement: `connection to pattern`
+    /// Connection requirement: `connection to pattern` (deprecated, use UsesDeclaration)
     Connection(ConnectionPattern),
-    /// Connection point requirement: `connection_point name: Type [= expr]`
-    ConnectionPoint {
-        /// Connection point name
+    /// Ref requirement: `ref name: Type [= expr]` (formerly connection_point)
+    Ref {
+        /// Ref name
         name: Identifier,
         /// Type annotation
         type_annotation: TypeAnnotation,

@@ -7,10 +7,10 @@ use crate::span::Span;
 
 /// Expected tokens in element body for error messages.
 /// Note: 'requires', 'allows', 'forbids' are only allowed in templates, not elements.
-const EXPECTED_ELEMENT_BODY_TOKENS: &str = "'scope', 'connection_point', 'check', or 'element'";
+const EXPECTED_ELEMENT_BODY_TOKENS: &str = "'scope', 'ref', 'uses', 'check', or 'element'";
 
 /// Expected tokens in template body for error messages.
-const EXPECTED_TEMPLATE_BODY_TOKENS: &str = "'scope', 'connection_point', 'check', 'element', 'requires', 'allows', or 'forbids'";
+const EXPECTED_TEMPLATE_BODY_TOKENS: &str = "'scope', 'ref', 'check', 'element', 'requires', 'allows', or 'forbids'";
 
 /// Parser for the Hielements language.
 pub struct Parser<'a> {
@@ -326,6 +326,7 @@ impl<'a> Parser<'a> {
 
     /// Parse an element declaration.
     /// `in_template` indicates whether this element is inside a template (allows unbounded scopes).
+    /// Supports both curly bracket syntax `element name { ... }` and indentation syntax `element name:\n    ...`
     fn parse_element_with_context(&mut self, doc_comment: Option<String>, in_template: bool) -> Result<Element, Diagnostic> {
         let start_span = self.current_span();
         self.expect(TokenKind::Element)?;
@@ -350,21 +351,41 @@ impl<'a> Parser<'a> {
             }
         }
         
-        self.expect(TokenKind::Colon)?;
-        self.skip_newlines();
-        self.expect(TokenKind::Indent)?;
+        // Support both curly bracket syntax `{ ... }` and colon/indent syntax `: ...`
+        let use_braces = self.check(TokenKind::LBrace);
+        if use_braces {
+            self.advance(); // consume '{'
+            self.skip_newlines_and_indents();
+        } else {
+            self.expect(TokenKind::Colon)?;
+            self.skip_newlines();
+            self.expect(TokenKind::Indent)?;
+        }
 
         let mut scopes = Vec::new();
-        let mut connection_points = Vec::new();
+        let mut refs = Vec::new();
+        let mut uses = Vec::new();
         let mut checks = Vec::new();
         let mut template_bindings = Vec::new();
         let mut children = Vec::new();
 
         loop {
-            self.skip_newlines();
+            // Use different skip strategy based on syntax
+            if use_braces {
+                self.skip_newlines_and_indents();
+            } else {
+                self.skip_newlines();
+            }
 
-            if self.check(TokenKind::Dedent) || self.is_at_end() {
-                break;
+            // Check for end of block (depends on syntax used)
+            if use_braces {
+                if self.check(TokenKind::RBrace) || self.is_at_end() {
+                    break;
+                }
+            } else {
+                if self.check(TokenKind::Dedent) || self.is_at_end() {
+                    break;
+                }
             }
 
             // Handle doc comments for nested elements
@@ -372,8 +393,12 @@ impl<'a> Parser<'a> {
 
             if self.check(TokenKind::Scope) {
                 scopes.push(self.parse_scope()?);
-            } else if self.check(TokenKind::ConnectionPoint) {
-                connection_points.push(self.parse_connection_point()?);
+            } else if self.check(TokenKind::Ref) || self.check(TokenKind::ConnectionPoint) {
+                // Support both 'ref' and 'connection_point' keywords
+                refs.push(self.parse_ref()?);
+            } else if self.check(TokenKind::Uses) {
+                // Parse uses declaration: `source uses target`
+                uses.push(self.parse_uses()?);
             } else if self.check(TokenKind::Check) {
                 checks.push(self.parse_check()?);
             } else if self.check(TokenKind::Element) {
@@ -393,11 +418,17 @@ impl<'a> Parser<'a> {
                 .with_span(token.span)
                 .build());
             } else if self.check(TokenKind::Identifier) {
-                // Could be a template binding (e.g., template.element.scope = ...)
-                // Peek ahead to see if this looks like a template binding (has a dot after the identifier)
+                // Could be:
+                // 1. A uses declaration: `identifier uses target`
+                // 2. A template binding: `template.element.scope = ...`
                 let pos = self.pos;
                 self.advance(); // consume identifier
-                if self.check(TokenKind::Dot) {
+                
+                if self.check(TokenKind::Uses) {
+                    // This is a uses declaration with the identifier as the source
+                    self.pos = pos; // restore position
+                    uses.push(self.parse_uses()?);
+                } else if self.check(TokenKind::Dot) {
                     // Looks like a template binding, restore and try to parse it
                     self.pos = pos;
                     match self.try_parse_template_binding() {
@@ -408,7 +439,7 @@ impl<'a> Parser<'a> {
                         }
                     }
                 } else {
-                    // Not a template binding (no dot after identifier)
+                    // Not a template binding or uses (no dot or uses keyword after identifier)
                     self.pos = pos; // restore
                     let token = self.current();
                     return Err(Diagnostic::error(
@@ -423,7 +454,9 @@ impl<'a> Parser<'a> {
                     .with_span(token.span)
                     .build());
                 }
-            } else if self.check(TokenKind::Dedent) || self.is_at_end() {
+            } else if (use_braces && self.check(TokenKind::RBrace)) || 
+                      (!use_braces && self.check(TokenKind::Dedent)) || 
+                      self.is_at_end() {
                 break;
             } else {
                 let token = self.current();
@@ -441,9 +474,15 @@ impl<'a> Parser<'a> {
             }
         }
 
-        // Consume DEDENT if present
-        if self.check(TokenKind::Dedent) {
-            self.advance();
+        // Consume end of block (depends on syntax used)
+        if use_braces {
+            if self.check(TokenKind::RBrace) {
+                self.advance();
+            }
+        } else {
+            if self.check(TokenKind::Dedent) {
+                self.advance();
+            }
         }
 
         let end_span = self.previous_span();
@@ -468,19 +507,19 @@ impl<'a> Parser<'a> {
                 }
             }
 
-            // Validate: unbounded connection points (no expression) are NOT allowed in regular elements
-            for cp in &connection_points {
-                if cp.expression.is_none() {
+            // Validate: unbounded refs (no expression) are NOT allowed in regular elements
+            for r in &refs {
+                if r.expression.is_none() {
                     return Err(Diagnostic::error(
                         "E015",
                         format!(
-                            "Unbounded connection point '{}' is only allowed in templates, not in regular elements. \
-                            Provide an expression: `connection_point {}: {} = <expression>`",
-                            cp.name.name, cp.name.name, cp.type_annotation.type_name.name
+                            "Unbounded ref '{}' is only allowed in templates, not in regular elements. \
+                            Provide an expression: `ref {}: {} = <expression>`",
+                            r.name.name, r.name.name, r.type_annotation.type_name.name
                         ),
                     )
                     .with_file(&self.file_path)
-                    .with_span(cp.span)
+                    .with_span(r.span)
                     .build());
                 }
             }
@@ -491,7 +530,8 @@ impl<'a> Parser<'a> {
             name,
             implements,
             scopes,
-            connection_points,
+            refs,
+            uses,
             checks,
             template_bindings,
             component_requirements: Vec::new(), // Always empty - requires/allows/forbids only allowed in templates
@@ -506,25 +546,46 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse a template declaration.
+    /// Supports both curly bracket syntax `template name { ... }` and indentation syntax `template name:\n    ...`
     fn parse_template(&mut self, doc_comment: Option<String>) -> Result<Template, Diagnostic> {
         let start_span = self.current_span();
         self.expect(TokenKind::Template)?;
         let name = self.parse_identifier()?;
-        self.expect(TokenKind::Colon)?;
-        self.skip_newlines();
-        self.expect(TokenKind::Indent)?;
+        
+        // Support both curly bracket syntax `{ ... }` and colon/indent syntax `: ...`
+        let use_braces = self.check(TokenKind::LBrace);
+        if use_braces {
+            self.advance(); // consume '{'
+            self.skip_newlines_and_indents();
+        } else {
+            self.expect(TokenKind::Colon)?;
+            self.skip_newlines();
+            self.expect(TokenKind::Indent)?;
+        }
 
         let mut scopes = Vec::new();
-        let mut connection_points = Vec::new();
+        let mut refs = Vec::new();
         let mut checks = Vec::new();
         let mut component_requirements = Vec::new();
         let mut elements = Vec::new();
 
         loop {
-            self.skip_newlines();
+            // Use different skip strategy based on syntax
+            if use_braces {
+                self.skip_newlines_and_indents();
+            } else {
+                self.skip_newlines();
+            }
 
-            if self.check(TokenKind::Dedent) || self.is_at_end() {
-                break;
+            // Check for end of block (depends on syntax used)
+            if use_braces {
+                if self.check(TokenKind::RBrace) || self.is_at_end() {
+                    break;
+                }
+            } else {
+                if self.check(TokenKind::Dedent) || self.is_at_end() {
+                    break;
+                }
             }
 
             // Handle doc comments for nested elements
@@ -532,8 +593,9 @@ impl<'a> Parser<'a> {
 
             if self.check(TokenKind::Scope) {
                 scopes.push(self.parse_scope()?);
-            } else if self.check(TokenKind::ConnectionPoint) {
-                connection_points.push(self.parse_connection_point()?);
+            } else if self.check(TokenKind::Ref) || self.check(TokenKind::ConnectionPoint) {
+                // Support both 'ref' and 'connection_point' keywords
+                refs.push(self.parse_ref()?);
             } else if self.check(TokenKind::Check) {
                 checks.push(self.parse_check()?);
             } else if self.check(TokenKind::Element) {
@@ -546,7 +608,9 @@ impl<'a> Parser<'a> {
                 component_requirements.push(self.parse_component_requirement(RequirementAction::Allows)?);
             } else if self.check(TokenKind::Forbids) {
                 component_requirements.push(self.parse_component_requirement(RequirementAction::Forbids)?);
-            } else if self.check(TokenKind::Dedent) || self.is_at_end() {
+            } else if (use_braces && self.check(TokenKind::RBrace)) || 
+                      (!use_braces && self.check(TokenKind::Dedent)) || 
+                      self.is_at_end() {
                 break;
             } else {
                 let token = self.current();
@@ -564,9 +628,15 @@ impl<'a> Parser<'a> {
             }
         }
 
-        // Consume DEDENT if present
-        if self.check(TokenKind::Dedent) {
-            self.advance();
+        // Consume end of block (depends on syntax used)
+        if use_braces {
+            if self.check(TokenKind::RBrace) {
+                self.advance();
+            }
+        } else {
+            if self.check(TokenKind::Dedent) {
+                self.advance();
+            }
         }
 
         let end_span = self.previous_span();
@@ -575,7 +645,7 @@ impl<'a> Parser<'a> {
             doc_comment,
             name,
             scopes,
-            connection_points,
+            refs,
             checks,
             component_requirements,
             elements,
@@ -678,19 +748,25 @@ impl<'a> Parser<'a> {
         })
     }
 
-    /// Parse a connection point declaration (V2 syntax).
-    /// Syntax: `connection_point <name> : <type> [binds <path>] [= <expression>]`
-    /// Unbounded connection points (no `=`) are allowed in templates.
-    fn parse_connection_point(&mut self) -> Result<ConnectionPointDeclaration, Diagnostic> {
+    /// Parse a ref declaration (V2 syntax - renamed from connection_point).
+    /// Syntax: `ref <name> : <type> [binds <path>] [= <expression>]`
+    /// Also accepts `connection_point` for backward compatibility.
+    /// Unbounded refs (no `=`) are allowed in templates.
+    fn parse_ref(&mut self) -> Result<RefDeclaration, Diagnostic> {
         let start_span = self.current_span();
-        self.expect(TokenKind::ConnectionPoint)?;
+        // Accept both 'ref' and 'connection_point' keywords
+        if self.check(TokenKind::Ref) {
+            self.advance();
+        } else {
+            self.expect(TokenKind::ConnectionPoint)?;
+        }
         let name = self.parse_identifier()?;
         
         // Parse mandatory type annotation: `: <type>`
         self.expect(TokenKind::Colon)?;
         let type_annotation = self.parse_type_annotation()?;
         
-        // Check for optional binds clause: `binds template.element.connection_point`
+        // Check for optional binds clause: `binds template.element.ref`
         let binds = if self.check(TokenKind::Binds) {
             self.advance(); // consume 'binds'
             Some(self.parse_qualified_path()?)
@@ -698,7 +774,7 @@ impl<'a> Parser<'a> {
             None
         };
         
-        // Expression is optional for unbounded connection points in templates
+        // Expression is optional for unbounded refs in templates
         let expression = if self.check(TokenKind::Equals) {
             self.expect(TokenKind::Equals)?;
             Some(self.parse_expression()?)
@@ -709,11 +785,57 @@ impl<'a> Parser<'a> {
         self.expect_newline()?;
         let end_span = self.previous_span();
 
-        Ok(ConnectionPointDeclaration {
+        Ok(RefDeclaration {
             name,
             type_annotation,
             binds,
             expression,
+            span: start_span.merge(&end_span),
+        })
+    }
+
+    /// Parse a uses declaration.
+    /// Syntax: `<source> uses <target>` where target is a qualified identifier (e.g., `lexer` or `core.lexer`)
+    /// This declares that the source scope/element has a dependency on the target element/scope.
+    fn parse_uses(&mut self) -> Result<UsesDeclaration, Diagnostic> {
+        let start_span = self.current_span();
+        
+        // Parse the source identifier (if not already consumed by caller checking for uses)
+        let source = if self.check(TokenKind::Uses) {
+            // Caller has already identified this is a 'uses' keyword at start
+            // This shouldn't happen based on current parsing logic, but handle it
+            return Err(Diagnostic::error(
+                "E016",
+                "Uses declaration requires a source identifier before 'uses' keyword",
+            )
+            .with_file(&self.file_path)
+            .with_span(start_span)
+            .build());
+        } else if self.check(TokenKind::Identifier) {
+            self.parse_identifier()?
+        } else {
+            let token = self.current();
+            return Err(Diagnostic::error(
+                "E016",
+                format!("Expected identifier for uses source, found {:?}", token.kind),
+            )
+            .with_file(&self.file_path)
+            .with_span(token.span)
+            .build());
+        };
+        
+        // Expect 'uses' keyword
+        self.expect(TokenKind::Uses)?;
+        
+        // Parse the target (qualified identifier like 'lexer' or 'core.lexer')
+        let target = self.parse_qualified_path()?;
+        
+        self.expect_newline()?;
+        let end_span = self.previous_span();
+
+        Ok(UsesDeclaration {
+            source,
+            target,
             span: start_span.merge(&end_span),
         })
     }
@@ -804,8 +926,9 @@ impl<'a> Parser<'a> {
             let pattern = self.parse_connection_pattern()?;
             self.expect_newline()?;
             ComponentSpec::Connection(pattern)
-        } else if self.check(TokenKind::ConnectionPoint) {
-            self.parse_connection_point_component_spec()?
+        } else if self.check(TokenKind::Ref) || self.check(TokenKind::ConnectionPoint) {
+            // Support both 'ref' and 'connection_point' keywords
+            self.parse_ref_component_spec()?
         } else if self.check(TokenKind::Implements) {
             // Support for shorthand: `requires descendant implements template_name`
             self.advance(); // consume 'implements'
@@ -829,7 +952,7 @@ impl<'a> Parser<'a> {
             return Err(Diagnostic::error(
                 "E011",
                 format!(
-                    "Expected 'scope', 'check', 'element', 'connection', 'connection_point', 'implements', or 'language' after '{} {}', found {:?}",
+                    "Expected 'scope', 'check', 'element', 'connection', 'ref', 'implements', or 'language' after '{} {}', found {:?}",
                     match action {
                         RequirementAction::Requires => "requires",
                         RequirementAction::Allows => "allows",
@@ -916,7 +1039,8 @@ impl<'a> Parser<'a> {
                 // Parse element body contents
                 // Note: requires/allows/forbids are NOT allowed in element bodies
                 let mut scopes = Vec::new();
-                let mut connection_points = Vec::new();
+                let mut refs = Vec::new();
+                let uses = Vec::new(); // Uses not yet parsed in element_component_spec body
                 let mut checks = Vec::new();
                 let mut children = Vec::new();
 
@@ -931,8 +1055,8 @@ impl<'a> Parser<'a> {
 
                     if self.check(TokenKind::Scope) {
                         scopes.push(self.parse_scope()?);
-                    } else if self.check(TokenKind::ConnectionPoint) {
-                        connection_points.push(self.parse_connection_point()?);
+                    } else if self.check(TokenKind::Ref) || self.check(TokenKind::ConnectionPoint) {
+                        refs.push(self.parse_ref()?);
                     } else if self.check(TokenKind::Check) {
                         checks.push(self.parse_check()?);
                     } else if self.check(TokenKind::Element) {
@@ -971,7 +1095,8 @@ impl<'a> Parser<'a> {
                         Vec::new()
                     },
                     scopes,
-                    connection_points,
+                    refs,
+                    uses,
                     checks,
                     template_bindings: Vec::new(),
                     component_requirements: Vec::new(), // Always empty - requires/allows/forbids only allowed in templates
@@ -994,10 +1119,11 @@ impl<'a> Parser<'a> {
         })
     }
 
-    /// Parse a connection point component specification.
-    /// Syntax: connection_point name: Type [= expression]
-    fn parse_connection_point_component_spec(&mut self) -> Result<ComponentSpec, Diagnostic> {
-        self.advance(); // consume 'connection_point'
+    /// Parse a ref component specification (formerly connection_point).
+    /// Syntax: ref name: Type [= expression]
+    /// Also accepts connection_point for backward compatibility.
+    fn parse_ref_component_spec(&mut self) -> Result<ComponentSpec, Diagnostic> {
+        self.advance(); // consume 'ref' or 'connection_point'
         
         let name = self.parse_identifier()?;
         self.expect(TokenKind::Colon)?;
@@ -1013,7 +1139,7 @@ impl<'a> Parser<'a> {
         
         self.expect_newline()?;
         
-        Ok(ComponentSpec::ConnectionPoint {
+        Ok(ComponentSpec::Ref {
             name,
             type_annotation,
             expression,
@@ -1141,7 +1267,8 @@ impl<'a> Parser<'a> {
             let token = self.current();
             match token.kind {
                 TokenKind::Scope | TokenKind::Element | TokenKind::Check | 
-                TokenKind::ConnectionPoint | TokenKind::Template | TokenKind::Implements |
+                TokenKind::ConnectionPoint | TokenKind::Ref | TokenKind::Uses |
+                TokenKind::Template | TokenKind::Implements |
                 TokenKind::Binds | TokenKind::To |
                 // Unified keywords can also be used as identifiers in some contexts
                 TokenKind::Requires | TokenKind::Allows | TokenKind::Forbids |
@@ -1286,6 +1413,13 @@ impl<'a> Parser<'a> {
 
     fn skip_newlines(&mut self) {
         while self.check(TokenKind::Newline) {
+            self.advance();
+        }
+    }
+
+    /// Skip newlines, indents, and dedents - used when parsing inside curly brackets
+    fn skip_newlines_and_indents(&mut self) {
+        while self.check(TokenKind::Newline) || self.check(TokenKind::Indent) || self.check(TokenKind::Dedent) {
             self.advance();
         }
     }
@@ -1482,19 +1616,19 @@ element service:
         let program = program.unwrap();
         assert_eq!(program.elements.len(), 1);
         let element = &program.elements[0];
-        assert_eq!(element.connection_points.len(), 3);
+        assert_eq!(element.refs.len(), 3);
         
         // Check first connection point with type
-        assert_eq!(element.connection_points[0].name.name, "port");
-        assert_eq!(element.connection_points[0].type_annotation.type_name.name, "integer");
+        assert_eq!(element.refs[0].name.name, "port");
+        assert_eq!(element.refs[0].type_annotation.type_name.name, "integer");
         
         // Check second connection point with type
-        assert_eq!(element.connection_points[1].name.name, "url");
-        assert_eq!(element.connection_points[1].type_annotation.type_name.name, "string");
+        assert_eq!(element.refs[1].name.name, "url");
+        assert_eq!(element.refs[1].type_annotation.type_name.name, "string");
         
         // Check third connection point with type
-        assert_eq!(element.connection_points[2].name.name, "enabled");
-        assert_eq!(element.connection_points[2].type_annotation.type_name.name, "boolean");
+        assert_eq!(element.refs[2].name.name, "enabled");
+        assert_eq!(element.refs[2].type_annotation.type_name.name, "boolean");
     }
 
     #[test]
@@ -1528,13 +1662,13 @@ element service:
         
         // Check lexer connection point with custom type
         let lexer = &template.elements[0];
-        assert_eq!(lexer.connection_points[0].name.name, "tokens");
-        assert_eq!(lexer.connection_points[0].type_annotation.type_name.name, "TokenStream");
+        assert_eq!(lexer.refs[0].name.name, "tokens");
+        assert_eq!(lexer.refs[0].type_annotation.type_name.name, "TokenStream");
         
         // Check parser connection point with custom type
         let parser_elem = &template.elements[1];
-        assert_eq!(parser_elem.connection_points[0].name.name, "ast");
-        assert_eq!(parser_elem.connection_points[0].type_annotation.type_name.name, "AbstractSyntaxTree");
+        assert_eq!(parser_elem.refs[0].name.name, "ast");
+        assert_eq!(parser_elem.refs[0].type_annotation.type_name.name, "AbstractSyntaxTree");
     }
 
     // ========================================================================
@@ -1613,7 +1747,7 @@ element service:
         assert!(req.is_descendant);
         
         match &req.component {
-            ComponentSpec::ConnectionPoint { name, type_annotation, .. } => {
+            ComponentSpec::Ref { name, type_annotation, .. } => {
                 assert_eq!(name.name, "external_api");
                 assert_eq!(type_annotation.type_name.name, "HttpHandler");
             }
@@ -1776,7 +1910,7 @@ element service:
                 assert_eq!(name.name, "metrics");
                 let body = body.as_ref().expect("Expected element body");
                 assert_eq!(body.scopes.len(), 1);
-                assert_eq!(body.connection_points.len(), 1);
+                assert_eq!(body.refs.len(), 1);
             }
             _ => panic!("Expected element component with body"),
         }
@@ -2113,8 +2247,8 @@ element my_api implements python_service:
         assert!(scope.expression.is_none());
         
         // Connection point - unbounded
-        assert_eq!(metrics.connection_points.len(), 1);
-        let cp = &metrics.connection_points[0];
+        assert_eq!(metrics.refs.len(), 1);
+        let cp = &metrics.refs[0];
         assert_eq!(cp.name.name, "prometheus");
         assert_eq!(cp.type_annotation.type_name.name, "MetricsHandler");
         assert!(cp.expression.is_none());
@@ -2165,9 +2299,9 @@ element my_api implements python_service:
         assert_eq!(program.elements.len(), 1);
         
         let element = &program.elements[0];
-        assert_eq!(element.connection_points.len(), 1);
+        assert_eq!(element.refs.len(), 1);
         
-        let cp = &element.connection_points[0];
+        let cp = &element.refs[0];
         assert_eq!(cp.name.name, "handler");
         assert_eq!(cp.type_annotation.type_name.name, "MetricsHandler");
         
@@ -2211,7 +2345,7 @@ element observable_component implements observable:
         // Check template element has unbounded scope
         let template_metrics = &template.elements[0];
         assert!(template_metrics.scopes[0].expression.is_none());
-        assert!(template_metrics.connection_points[0].expression.is_none());
+        assert!(template_metrics.refs[0].expression.is_none());
         
         // Check element implementation
         assert_eq!(program.elements.len(), 1);
@@ -2227,8 +2361,8 @@ element observable_component implements observable:
         assert!(scope.expression.is_some());
         
         // Check element has bound connection point
-        assert_eq!(element.connection_points.len(), 1);
-        let cp = &element.connection_points[0];
+        assert_eq!(element.refs.len(), 1);
+        let cp = &element.refs[0];
         assert!(cp.binds.is_some());
         assert!(cp.expression.is_some());
     }
@@ -2261,5 +2395,173 @@ element observable_component implements observable:
         assert!(diagnostics.has_errors(), "Expected error for unbounded connection point in element");
         let error_msg = diagnostics.iter().next().unwrap().message.clone();
         assert!(error_msg.contains("only allowed in templates"), "Error message should mention templates: {}", error_msg);
+    }
+
+    // ========================================================================
+    // Tests for V3 syntax: curly brackets, ref keyword, uses keyword
+    // ========================================================================
+
+    #[test]
+    fn test_parse_curly_brackets_element() {
+        let source = r#"element test {
+    scope src = files.folder_selector('src')
+    check files.exists(src, 'main.py')
+}
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.elements.len(), 1);
+        assert_eq!(program.elements[0].name.name, "test");
+        assert_eq!(program.elements[0].scopes.len(), 1);
+        assert_eq!(program.elements[0].checks.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_curly_brackets_template() {
+        let source = r#"template observable {
+    element metrics {
+        scope module<rust>
+        ref prometheus: MetricsHandler
+    }
+}
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.templates.len(), 1);
+        assert_eq!(program.templates[0].name.name, "observable");
+        assert_eq!(program.templates[0].elements.len(), 1);
+        
+        let metrics = &program.templates[0].elements[0];
+        assert_eq!(metrics.scopes.len(), 1);
+        assert_eq!(metrics.refs.len(), 1);
+        assert_eq!(metrics.refs[0].name.name, "prometheus");
+    }
+
+    #[test]
+    fn test_parse_ref_keyword() {
+        let source = r#"element api_service {
+    ref port: integer = docker.exposed_port(dockerfile)
+    ref url: string = config.get_api_url()
+}
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.elements.len(), 1);
+        let element = &program.elements[0];
+        assert_eq!(element.refs.len(), 2);
+        
+        assert_eq!(element.refs[0].name.name, "port");
+        assert_eq!(element.refs[0].type_annotation.type_name.name, "integer");
+        
+        assert_eq!(element.refs[1].name.name, "url");
+        assert_eq!(element.refs[1].type_annotation.type_name.name, "string");
+    }
+
+    #[test]
+    fn test_parse_uses_declaration() {
+        let source = r#"element core {
+    element lexer {
+        scope module = rust.module_selector('lexer')
+    }
+    element parser {
+        scope module = rust.module_selector('parser')
+        scope lexer_module = rust.module_selector('lexer')
+        lexer_module uses lexer
+    }
+}
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.elements.len(), 1);
+        
+        let core = &program.elements[0];
+        assert_eq!(core.children.len(), 2);
+        
+        let parser_elem = &core.children[1];
+        assert_eq!(parser_elem.uses.len(), 1);
+        assert_eq!(parser_elem.uses[0].source.name, "lexer_module");
+        assert_eq!(parser_elem.uses[0].target.len(), 1);
+        assert_eq!(parser_elem.uses[0].target[0].name, "lexer");
+    }
+
+    #[test]
+    fn test_parse_uses_qualified_target() {
+        let source = r#"element parser {
+    scope module = rust.module_selector('parser')
+    module uses core.lexer
+}
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.elements.len(), 1);
+        
+        let parser_elem = &program.elements[0];
+        assert_eq!(parser_elem.uses.len(), 1);
+        assert_eq!(parser_elem.uses[0].source.name, "module");
+        assert_eq!(parser_elem.uses[0].target.len(), 2);
+        assert_eq!(parser_elem.uses[0].target[0].name, "core");
+        assert_eq!(parser_elem.uses[0].target[1].name, "lexer");
+    }
+
+    #[test]
+    fn test_parse_mixed_syntax() {
+        // Test that curly brackets work within indentation-based templates
+        let source = r#"element outer:
+    element inner {
+        scope src = files.folder_selector('src')
+    }
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.elements.len(), 1);
+        assert_eq!(program.elements[0].children.len(), 1);
+        assert_eq!(program.elements[0].children[0].name.name, "inner");
+    }
+
+    #[test]
+    fn test_parse_nested_curly_brackets() {
+        let source = r#"element system {
+    element frontend {
+        scope src = files.folder_selector('frontend')
+    }
+    element backend {
+        scope src = files.folder_selector('backend')
+        element api {
+            scope module = rust.module_selector('api')
+        }
+    }
+}
+"#;
+        let parser = Parser::new(source, "test.hie");
+        let (program, diagnostics) = parser.parse();
+
+        assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
+        let program = program.unwrap();
+        assert_eq!(program.elements.len(), 1);
+        
+        let system = &program.elements[0];
+        assert_eq!(system.children.len(), 2);
+        
+        let backend = &system.children[1];
+        assert_eq!(backend.children.len(), 1);
+        assert_eq!(backend.children[0].name.name, "api");
     }
 }

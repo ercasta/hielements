@@ -29,6 +29,12 @@ pub enum TokenKind {
     #[token("connection_point")]
     ConnectionPoint,
 
+    #[token("ref")]
+    Ref,
+
+    #[token("uses")]
+    Uses,
+
     #[token("check")]
     Check,
 
@@ -97,6 +103,12 @@ pub enum TokenKind {
 
     #[token("]")]
     RBracket,
+
+    #[token("{")]
+    LBrace,
+
+    #[token("}")]
+    RBrace,
 
     #[token("<")]
     LAngle,
@@ -540,5 +552,41 @@ mod tests {
         assert!(kinds.contains(&&TokenKind::RAngle));
         assert!(kinds.contains(&&TokenKind::Binds));
         assert!(kinds.contains(&&TokenKind::Equals));
+    }
+
+    #[test]
+    fn test_curly_brackets() {
+        let source = "element test { scope src = files.folder_selector('src') }";
+        let mut lexer = Lexer::new(source);
+        let tokens = lexer.tokenize();
+
+        let kinds: Vec<_> = tokens.iter().map(|t| &t.kind).collect();
+        assert!(kinds.contains(&&TokenKind::Element));
+        assert!(kinds.contains(&&TokenKind::LBrace));
+        assert!(kinds.contains(&&TokenKind::RBrace));
+        assert!(kinds.contains(&&TokenKind::Scope));
+    }
+
+    #[test]
+    fn test_ref_keyword() {
+        let source = "ref port: integer = docker.exposed_port()";
+        let mut lexer = Lexer::new(source);
+        let tokens = lexer.tokenize();
+
+        let kinds: Vec<_> = tokens.iter().map(|t| &t.kind).collect();
+        assert!(kinds.contains(&&TokenKind::Ref));
+        assert!(kinds.contains(&&TokenKind::Colon));
+        assert!(kinds.contains(&&TokenKind::Equals));
+    }
+
+    #[test]
+    fn test_uses_keyword() {
+        let source = "lexer_module uses lexer";
+        let mut lexer = Lexer::new(source);
+        let tokens = lexer.tokenize();
+
+        let kinds: Vec<_> = tokens.iter().map(|t| &t.kind).collect();
+        assert!(kinds.contains(&&TokenKind::Identifier));
+        assert!(kinds.contains(&&TokenKind::Uses));
     }
 }

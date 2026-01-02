@@ -130,9 +130,9 @@ impl Interpreter {
             }
         }
 
-        // Validate connection points (expression is optional for unbounded in V2)
-        for cp in &template.connection_points {
-            if let Some(ref expr) = cp.expression {
+        // Validate refs (expression is optional for unbounded in V2)
+        for r in &template.refs {
+            if let Some(ref expr) = r.expression {
                 self.validate_expression(expr, file_path, diagnostics);
             }
         }
@@ -179,11 +179,17 @@ impl Interpreter {
             }
         }
 
-        // Validate connection points (expression is optional for unbounded in V2)
-        for cp in &element.connection_points {
-            if let Some(ref expr) = cp.expression {
+        // Validate refs (expression is optional for unbounded in V2)
+        for r in &element.refs {
+            if let Some(ref expr) = r.expression {
                 self.validate_expression(expr, file_path, diagnostics);
             }
+        }
+
+        // Validate uses declarations
+        for _u in &element.uses {
+            // Uses declarations are validated by their target path
+            // Full validation would require resolving the target element/scope
         }
 
         // Validate checks
@@ -231,7 +237,7 @@ impl Interpreter {
             ComponentSpec::Connection(_) => {
                 // Connection patterns are already validated during parsing
             }
-            ComponentSpec::ConnectionPoint { expression, .. } => {
+            ComponentSpec::Ref { expression, .. } => {
                 if let Some(expr) = expression {
                     self.validate_expression(expr, file_path, diagnostics);
                 }
