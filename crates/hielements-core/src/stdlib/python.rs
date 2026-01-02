@@ -1,7 +1,12 @@
 //! Python language library for Hielements.
 //!
 //! Provides selectors and checks for Python code analysis.
-//! Uses simple regex-based parsing for common Python constructs.
+//! Uses regex-based pattern matching for common Python constructs.
+//!
+//! ## Limitations
+//! - Text-based analysis (not AST-based) means patterns in comments or strings will match
+//! - For production use, consider using AST-based tools like `ast` module or external analyzers
+//! - Word boundaries are enforced to avoid substring false positives (e.g., 'os' won't match 'osmesa')
 
 use std::fs;
 use std::path::PathBuf;
@@ -112,12 +117,22 @@ impl PythonLibrary {
         let scope = Scope::new(ScopeKind::File(format!("fn:{}", func_name)));
         let mut found_paths = Vec::new();
         
+        // Use regex for more precise matching with word boundaries
+        let pattern = format!(r"\bdef\s+{}[(]|\basync\s+def\s+{}[(]", regex::escape(func_name), regex::escape(func_name));
+        let re = regex::Regex::new(&pattern).ok();
+        
         for entry in find_python_files(workspace) {
             if let Ok(content) = fs::read_to_string(&entry) {
-                // Match "def func_name(" or "async def func_name("
-                if content.contains(&format!("def {}(", func_name))
-                    || content.contains(&format!("async def {}(", func_name)) {
-                    found_paths.push(entry.to_string_lossy().to_string());
+                if let Some(ref regex) = re {
+                    if regex.is_match(&content) {
+                        found_paths.push(entry.to_string_lossy().to_string());
+                    }
+                } else {
+                    // Fallback to exact pattern matching
+                    if content.contains(&format!("def {}(", func_name))
+                        || content.contains(&format!("async def {}(", func_name)) {
+                        found_paths.push(entry.to_string_lossy().to_string());
+                    }
                 }
             }
         }
@@ -148,13 +163,21 @@ impl PythonLibrary {
     /// Check that a scope imports a module (import checks).
     /// Checks for "import module_name" or "from module_name import ..."
     fn check_imports(&self, scope: &Scope, module_name: &str, _workspace: &str) -> CheckResult {
+        // Use regex for more precise matching with word boundaries
+        let patterns = [
+            format!(r"\bimport\s+{}\b", regex::escape(module_name)),
+            format!(r"\bfrom\s+{}\s+import\b", regex::escape(module_name)),
+            format!(r"\bfrom\s+{}\..*\s+import\b", regex::escape(module_name)),
+        ];
+        
         for path in &scope.paths {
             if let Ok(content) = fs::read_to_string(path) {
-                // Match "import module_name" or "from module_name import"
-                if content.contains(&format!("import {}", module_name))
-                    || content.contains(&format!("from {} import", module_name))
-                    || content.contains(&format!("from {}.", module_name)) {
-                    return CheckResult::Pass;
+                for pattern in &patterns {
+                    if let Ok(re) = regex::Regex::new(pattern) {
+                        if re.is_match(&content) {
+                            return CheckResult::Pass;
+                        }
+                    }
                 }
             }
         }
@@ -240,13 +263,20 @@ impl PythonLibrary {
     /// Check that a scope calls something from another scope or module.
     /// Looks for function calls like "module.function()" or "object.method()"
     fn check_calls(&self, scope: &Scope, target: &str, _workspace: &str) -> CheckResult {
+        // Use regex for more precise matching with word boundaries
+        let patterns = [
+            format!(r"\b{}[(]", regex::escape(target)),  // Direct call: target(
+            format!(r"\b{}\.", regex::escape(target)),   // Module/object access: target.
+        ];
+        
         for path in &scope.paths {
             if let Ok(content) = fs::read_to_string(path) {
-                // Match "target(" for direct function calls
-                // or "target." for module/object method calls
-                if content.contains(&format!("{}(", target))
-                    || content.contains(&format!("{}.", target)) {
-                    return CheckResult::Pass;
+                for pattern in &patterns {
+                    if let Ok(re) = regex::Regex::new(pattern) {
+                        if re.is_match(&content) {
+                            return CheckResult::Pass;
+                        }
+                    }
                 }
             }
         }
@@ -257,11 +287,15 @@ impl PythonLibrary {
     /// Check that a scope calls a specific function in another module.
     /// Looks for "module.function()" calls.
     fn check_calls_function(&self, scope: &Scope, module_name: &str, func_name: &str, _workspace: &str) -> CheckResult {
+        // Use regex for precise matching with word boundaries
+        let pattern = format!(r"\b{}\.\s*{}[(]", regex::escape(module_name), regex::escape(func_name));
+        
         for path in &scope.paths {
             if let Ok(content) = fs::read_to_string(path) {
-                // Match "module.function(" or "module_name.function_name("
-                if content.contains(&format!("{}.{}(", module_name, func_name)) {
-                    return CheckResult::Pass;
+                if let Ok(re) = regex::Regex::new(&pattern) {
+                    if re.is_match(&content) {
+                        return CheckResult::Pass;
+                    }
                 }
             }
         }
