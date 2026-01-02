@@ -368,9 +368,14 @@ fn print_element_checks(element: &hielements_core::Element, indent: usize) {
         println!("{}  scope {} = ...", prefix, scope.name.name.blue());
     }
 
-    for cp in &element.connection_points {
-        let type_info = format!(": {}", cp.type_annotation.type_name.name);
-        println!("{}  connection_point {}{} = ...", prefix, cp.name.name.magenta(), type_info.yellow());
+    for r in &element.refs {
+        let type_info = format!(": {}", r.type_annotation.type_name.name);
+        println!("{}  ref {}{} = ...", prefix, r.name.name.magenta(), type_info.yellow());
+    }
+
+    for u in &element.uses {
+        let target = u.target.iter().map(|i| i.name.as_str()).collect::<Vec<_>>().join(".");
+        println!("{}  {} uses {}", prefix, u.source.name.blue(), target.cyan());
     }
 
     for _check in &element.checks {
