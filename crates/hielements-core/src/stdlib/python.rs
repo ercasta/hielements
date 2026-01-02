@@ -145,12 +145,22 @@ impl PythonLibrary {
         let scope = Scope::new(ScopeKind::File(format!("class:{}", class_name)));
         let mut found_paths = Vec::new();
         
+        // Use regex for more precise matching with word boundaries
+        let pattern = format!(r"\bclass\s+{}[:(]", regex::escape(class_name));
+        let re = regex::Regex::new(&pattern).ok();
+        
         for entry in find_python_files(workspace) {
             if let Ok(content) = fs::read_to_string(&entry) {
-                // Match "class ClassName" or "class ClassName("
-                if content.contains(&format!("class {}:", class_name))
-                    || content.contains(&format!("class {}(", class_name)) {
-                    found_paths.push(entry.to_string_lossy().to_string());
+                if let Some(ref regex) = re {
+                    if regex.is_match(&content) {
+                        found_paths.push(entry.to_string_lossy().to_string());
+                    }
+                } else {
+                    // Fallback to exact pattern matching
+                    if content.contains(&format!("class {}:", class_name))
+                        || content.contains(&format!("class {}(", class_name)) {
+                        found_paths.push(entry.to_string_lossy().to_string());
+                    }
                 }
             }
         }
@@ -229,14 +239,23 @@ impl PythonLibrary {
 
     /// Check that a specific function returns a given type.
     fn check_function_returns_type(&self, scope: &Scope, func_name: &str, type_name: &str, _workspace: &str) -> CheckResult {
+        // Use regex for precise function matching
+        let func_pattern = format!(r"\b(async\s+)?def\s+{}[(]", regex::escape(func_name));
+        let func_re = regex::Regex::new(&func_pattern).ok();
+        
         for path in &scope.paths {
             if let Ok(content) = fs::read_to_string(path) {
                 let lines: Vec<&str> = content.lines().collect();
                 for (i, line) in lines.iter().enumerate() {
-                    // Check if this line defines the function
-                    if line.contains(&format!("def {}(", func_name)) 
-                        || line.contains(&format!("async def {}(", func_name)) {
-                        
+                    // Check if this line defines the function using regex
+                    let is_function_def = if let Some(ref re) = func_re {
+                        re.is_match(line)
+                    } else {
+                        line.contains(&format!("def {}(", func_name)) 
+                            || line.contains(&format!("async def {}(", func_name))
+                    };
+                    
+                    if is_function_def {
                         // Check if return type is on this line or next lines (for multi-line signatures)
                         let mut check_lines: Vec<&str> = vec![line];
                         for j in (i + 1)..std::cmp::min(i + 5, lines.len()) {
