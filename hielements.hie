@@ -1,6 +1,8 @@
-## Hielements Self-Description
+## Hielements Self-Description (V3 Syntax)
 ## This file describes the structure of the Hielements project itself,
 ## demonstrating the language's ability to model hierarchical software systems.
+##
+## Updated to use V3 syntax: curly brackets, ref, and uses keywords
 ##
 ## The specification is split into multiple files for easier navigation:
 ## - specs/core.hie        - Core library (lexer, parser, AST, interpreter)
@@ -15,7 +17,7 @@ import files
 import rust
 
 ## The Hielements project - a language for describing software structure
-element hielements:
+element hielements {
     scope root = files.folder_selector('.')
     
     check files.exists(root, 'Cargo.toml')
@@ -23,32 +25,36 @@ element hielements:
     check files.exists(root, 'LICENSE')
     
     ## Core library providing lexing, parsing, interpretation
-    element core:
+    element core {
         scope src = files.folder_selector('crates/hielements-core/src')
         scope crate = rust.crate_selector('hielements-core')
         
         check files.exists(src, 'lib.rs')
         
         ## Lexer - tokenizes .hie source files using logos
-        element lexer:
+        element lexer {
             scope module = rust.module_selector('lexer')
             
-            ## Connection points: what the lexer produces
-            connection_point token_output: Token = rust.struct_selector('Token')
-            connection_point token_kinds: TokenKind = rust.enum_selector('TokenKind')
+            ## Refs: what the lexer produces
+            ref token_output: Token = rust.struct_selector('Token')
+            ref token_kinds: TokenKind = rust.enum_selector('TokenKind')
             
             check rust.struct_exists('Lexer')
             check rust.enum_exists('TokenKind')
             check rust.has_tests(module)
             check rust.has_docs(module)
+        }
         
         ## Parser - produces AST from token stream
-        element parser:
+        element parser {
             scope module = rust.module_selector('parser')
             scope lexer_module = rust.module_selector('lexer')
             
-            ## Connection points: what parser consumes and produces
-            connection_point ast_output: Program = rust.struct_selector('Program')
+            ## Parser uses lexer for tokens
+            lexer_module uses lexer
+            
+            ## Refs: what parser produces
+            ref ast_output: Program = rust.struct_selector('Program')
             
             check rust.struct_exists('Parser')
             check rust.function_exists('parse')
@@ -56,15 +62,16 @@ element hielements:
             
             ## Behavioral: Parser depends on lexer for tokens
             check rust.depends_on(module, lexer_module)
+        }
         
         ## AST - typed representation of parsed programs
-        element ast:
+        element ast {
             scope module = rust.module_selector('ast')
             
-            ## Connection points: AST types used by other components
-            connection_point program_type: Program = rust.struct_selector('Program')
-            connection_point element_type: Element = rust.struct_selector('Element')
-            connection_point expression_type: Expression = rust.enum_selector('Expression')
+            ## Refs: AST types used by other components
+            ref program_type: Program = rust.struct_selector('Program')
+            ref element_type: Element = rust.struct_selector('Element')
+            ref expression_type: Expression = rust.enum_selector('Expression')
             
             check rust.struct_exists('Program')
             check rust.struct_exists('Element')
@@ -81,20 +88,28 @@ element hielements:
             check rust.enum_exists('ComponentSpec')
             check rust.struct_exists('ConnectionPattern')
             
+            ## V3 ref and uses declaration structures
+            check rust.struct_exists('RefDeclaration')
+            check rust.struct_exists('UsesDeclaration')
+            
             ## Language declaration structures
             check rust.struct_exists('LanguageDeclaration')
             check rust.struct_exists('ConnectionCheckDeclaration')
             check rust.struct_exists('ConnectionCheckParameter')
+        }
         
         ## Interpreter - semantic validation and check execution
-        element interpreter:
+        element interpreter {
             scope module = rust.module_selector('interpreter')
             scope parser_module = rust.module_selector('parser')
             scope stdlib_module = rust.module_selector('stdlib')
             scope lexer_module = rust.module_selector('lexer')
             
-            ## Connection points: interpreter interfaces
-            connection_point check_output: CheckResult = rust.enum_selector('CheckResult')
+            ## Interpreter uses parser (for AST types)
+            module uses parser
+            
+            ## Refs: interpreter interfaces
+            ref check_output: CheckResult = rust.enum_selector('CheckResult')
             
             check rust.struct_exists('Interpreter')
             check rust.function_exists('validate')
@@ -109,28 +124,30 @@ element hielements:
             ## Behavioral: Interpreter should NOT directly depend on lexer
             ## (it goes through parser's AST abstraction)
             check rust.no_dependency(module, lexer_module)
+        }
         
         ## Diagnostics - error reporting infrastructure
-        element diagnostics:
+        element diagnostics {
             scope module = rust.module_selector('diagnostics')
             
-            ## Connection point: error types used throughout
-            connection_point diagnostic_type: Diagnostic = rust.struct_selector('Diagnostic')
+            ## Ref: error types used throughout
+            ref diagnostic_type: Diagnostic = rust.struct_selector('Diagnostic')
             
             check rust.struct_exists('Diagnostic')
             check rust.struct_exists('Diagnostics')
             check rust.enum_exists('DiagnosticSeverity')
+        }
         
         ## Standard Library
-        element stdlib:
+        element stdlib {
             scope module = rust.module_selector('stdlib')
             scope stdlib_src = files.folder_selector('crates/hielements-core/src/stdlib')
             scope parser_module = rust.module_selector('parser')
             scope interpreter_module = rust.module_selector('interpreter')
             
-            ## Connection point: extension interface for adding new libraries
-            connection_point library_trait: Library = rust.trait_selector('Library')
-            connection_point value_type: Value = rust.enum_selector('Value')
+            ## Refs: extension interface for adding new libraries
+            ref library_trait: Library = rust.trait_selector('Library')
+            ref value_type: Value = rust.enum_selector('Value')
             
             check files.exists(stdlib_src, 'mod.rs')
             check files.exists(stdlib_src, 'files.rs')
@@ -146,32 +163,35 @@ element hielements:
             check rust.no_dependency(module, interpreter_module)
             
             ## Files library - file system operations
-            element files_library:
+            element files_library {
                 scope files_module = files.file_selector('crates/hielements-core/src/stdlib/files.rs')
                 
                 check rust.struct_exists('FilesLibrary')
                 check rust.implements('FilesLibrary', 'Library')
                 check rust.has_tests(files_module)
+            }
             
             ## Rust library - Rust code analysis
-            element rust_library:
+            element rust_library {
                 scope rust_module = files.file_selector('crates/hielements-core/src/stdlib/rust.rs')
                 
                 check rust.struct_exists('RustLibrary')
                 check rust.implements('RustLibrary', 'Library')
                 check rust.has_tests(rust_module)
+            }
             
             ## Python library - Python code analysis
-            element python_library:
+            element python_library {
                 scope python_module = files.file_selector('crates/hielements-core/src/stdlib/python.rs')
                 
                 check files.exists(stdlib_src, 'python.rs')
                 check rust.struct_exists('PythonLibrary')
                 check rust.implements('PythonLibrary', 'Library')
                 check rust.has_tests(python_module)
+            }
             
             ## External library support - allows user-defined plugins
-            element external:
+            element external {
                 scope external_module = files.file_selector('crates/hielements-core/src/stdlib/external.rs')
                 
                 check files.exists(stdlib_src, 'external.rs')
@@ -181,9 +201,10 @@ element hielements:
                 check rust.function_exists('load_external_libraries')
                 check rust.enum_exists('LibraryType')
                 check rust.has_tests(external_module)
+            }
             
             ## WASM library support - sandboxed plugins (infrastructure in place)
-            element wasm:
+            element wasm {
                 scope wasm_module = files.file_selector('crates/hielements-core/src/stdlib/wasm.rs')
                 
                 check files.exists(stdlib_src, 'wasm.rs')
@@ -193,17 +214,20 @@ element hielements:
                 check rust.function_exists('load_wasm_libraries')
                 check rust.function_exists('load_workspace_wasm_libraries')
                 check rust.has_tests(wasm_module)
+            }
+        }
         
         ## Span tracking for source locations
-        element span:
+        element span {
             scope module = rust.module_selector('span')
             
-            ## Connection point: location types used for error reporting
-            connection_point span_type: Span = rust.struct_selector('Span')
-            connection_point position_type: Position = rust.struct_selector('Position')
+            ## Refs: location types used for error reporting
+            ref span_type: Span = rust.struct_selector('Span')
+            ref position_type: Position = rust.struct_selector('Position')
             
             check rust.struct_exists('Position')
             check rust.struct_exists('Span')
+        }
         
         ## ===== Core Pipeline Connections =====
         ## These checks verify the data flow through the compilation pipeline:
@@ -219,12 +243,16 @@ element hielements:
         
         ## Verify interpreter uses parser/AST types (Program, etc)
         check rust.depends_on(interpreter_mod, ast_mod)
+    }
     
     ## CLI - command-line interface
-    element cli:
+    element cli {
         scope cli_src = files.folder_selector('crates/hielements-cli/src')
         scope main_module = rust.module_selector('main')
         scope core_crate = rust.crate_selector('hielements-core')
+        
+        ## CLI uses core library
+        main_module uses core
         
         check files.exists(cli_src, 'main.rs')
         check rust.function_exists('main')
@@ -236,30 +264,35 @@ element hielements:
         
         ## Behavioral: Core should NOT depend on CLI (proper layering)
         check rust.no_dependency(core_crate, cli_src)
+    }
     
     ## VS Code Extension - editor integration
-    element vscode_extension:
+    element vscode_extension {
         scope ext_src = files.folder_selector('vscode-extension')
         
         check files.exists(ext_src, 'package.json')
         
         ## Language configuration
-        element language_config:
+        element language_config {
             scope config = files.file_selector('vscode-extension/language-configuration.json')
             check files.exists(ext_src, 'language-configuration.json')
+        }
         
         ## Syntax highlighting
-        element syntax:
+        element syntax {
             scope syntaxes = files.folder_selector('vscode-extension/syntaxes')
             check files.exists(syntaxes, 'hielements.tmLanguage.json')
+        }
         
         ## Extension code
-        element extension:
+        element extension {
             scope main = files.file_selector('vscode-extension/src/extension.ts')
             check files.exists(ext_src, 'src/extension.ts')
+        }
+    }
     
     ## Documentation
-    element documentation:
+    element documentation {
         scope docs = files.folder_selector('doc')
         
         check files.exists(docs, 'language_reference.md')
@@ -268,9 +301,10 @@ element hielements:
         check files.exists(docs, 'external_libraries.md')
         check files.exists(docs, 'wasm_plugins.md')
         check files.exists(docs, 'related_work.md')
+    }
     
     ## Examples
-    element examples:
+    element examples {
         scope examples = files.folder_selector('examples')
         
         check files.exists(examples, 'minimal.hie')
@@ -284,11 +318,13 @@ element hielements:
         check files.exists(examples, 'language_example.hie')
         check files.exists(examples, 'python_example.hie')
         check files.exists(examples, 'v2_syntax_example.hie')
+        check files.exists(examples, 'v3_syntax_example.hie')
         check files.exists(examples, 'hielements.toml')
         check files.exists(examples, 'hielements_hybrid.toml')
+    }
     
     ## CI/CD and automation
-    element cicd:
+    element cicd {
         scope github_dir = files.folder_selector('.github')
         scope workflows = files.folder_selector('.github/workflows')
         
@@ -298,3 +334,5 @@ element hielements:
         
         ## Dependabot configuration
         check files.exists(github_dir, 'dependabot.yml')
+    }
+}

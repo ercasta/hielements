@@ -1,15 +1,16 @@
-# Hielements Language Reference (V2)
+# Hielements Language Reference (V3)
 
-This document provides a complete reference for the Hielements V2 language syntax and semantics. Hielements is a declarative language for describing and enforcing software architecture.
+This document provides a complete reference for the Hielements V3 language syntax and semantics. Hielements is a declarative language for describing and enforcing software architecture.
 
-**Version**: 2.0 (This version is incompatible with V1 - see [Migration Guide](#appendix-d-migration-guide-from-v1))
+**Version**: 3.0 (This version adds curly bracket syntax, `ref` keyword, and `uses` declarations)
 
 ## Design Philosophy
 
-Hielements V2 introduces a clearer separation between *descriptive* and *prescriptive* parts of the language:
+Hielements V3 introduces several improvements over V2:
 
-- **Prescriptive** (templates): Defines the structure, rules, and constraints using `requires`/`forbids`/`allows` keywords and checks
-- **Descriptive** (elements): Implements templates and binds to actual code using scopes
+- **Curly brackets `{}`**: Alternative to indentation-based blocks for clearer scope delimiters
+- **`ref` keyword**: Renamed from `connection_point` to avoid confusion with `uses` declarations
+- **`uses` keyword**: Explicit dependency declarations between elements/scopes
 
 It is possible to use only the descriptive part without the prescriptive one; in this case, no enforcement/checks are performed.
 
@@ -78,9 +79,11 @@ The following are reserved keywords:
 | `element` | Declares an element |
 | `template` | Declares an element template |
 | `implements` | Declares that an element implements template(s) |
-| `binds` | Binds a scope/connection_point to a template declaration (V2) |
+| `binds` | Binds a scope/ref to a template declaration |
 | `scope` | Declares a scope selector |
-| `connection_point` | Declares a connection point |
+| `ref` | Declares a reference point (V3, replaces `connection_point`) |
+| `connection_point` | Declares a connection point (deprecated, use `ref`) |
+| `uses` | Declares a dependency on another element/scope (V3) |
 | `check` | Declares a rule/check |
 | `import` | Imports a library or module |
 | `as` | Alias for imports |
@@ -139,9 +142,10 @@ false
 | `.` | Member access |
 | `,` | Argument separator |
 | `:` | Block start, type annotation |
+| `{` `}` | Block delimiters (V3 alternative to indentation) |
 | `(` `)` | Function call, grouping |
 | `[` `]` | List literals |
-| `<` `>` | Language specification in scopes (V2) |
+| `<` `>` | Language specification in scopes |
 
 ---
 
@@ -182,21 +186,36 @@ Elements are the fundamental building blocks of Hielements. An element represent
 
 ### 3.1 Syntax
 
+V3 supports two styles for block delimiters: curly brackets `{}` or colon and indentation:
+
 ```
+# Curly bracket syntax (V3)
+element_declaration ::= 'element' identifier '{' element_body '}'
+
+# Indentation syntax (V2/V3)
 element_declaration ::= 'element' identifier ':' element_body
 
 element_body ::= (scope_declaration 
-                | connection_point_declaration 
+                | ref_declaration 
+                | uses_declaration
                 | check_declaration 
                 | nested_element)*
 ```
 
 ### 3.2 Basic Element
 
+Curly bracket syntax (V3):
+```hielements
+element orders_service {
+    scope src = files.folder_selector('src/orders')
+    check files.contains(src, 'main.py')
+}
+```
+
+Indentation syntax (V2/V3):
 ```hielements
 element orders_service:
     scope src = files.folder_selector('src/orders')
-    
     check files.contains(src, 'main.py')
 ```
 
@@ -344,50 +363,53 @@ element api_layer:
 
 ---
 
-## 5. Connection Points
+## 5. Refs (formerly Connection Points)
 
-Connection points expose interfaces, APIs, or dependencies that other elements can reference. They make inter-element relationships explicit and verifiable.
+Refs (reference points) expose interfaces, APIs, or dependencies that other elements can reference. They make inter-element relationships explicit and verifiable.
+
+**Note**: In V3, `ref` is the preferred keyword. `connection_point` is deprecated but still supported for backward compatibility.
 
 ### 5.1 Syntax
 
 ```
-connection_point_declaration ::= 'connection_point' identifier ':' type_name '=' expression
+ref_declaration ::= 'ref' identifier ':' type_name '=' expression
 ```
 
-Type annotations are **mandatory** for all connection points.
+Type annotations are **mandatory** for all refs.
 
-### 5.2 Basic Connection Points
+### 5.2 Basic Refs
 
 ```hielements
-element api_server:
+element api_server {
     scope module = python.module_selector('api')
     
-    # All connection points must have type annotations
-    connection_point rest_api: HttpHandler = python.public_functions(module)
+    # All refs must have type annotations
+    ref rest_api: HttpHandler = python.public_functions(module)
     
     # Expose the main entry point
-    connection_point main: Function = python.function_selector(module, 'main')
+    ref main: Function = python.function_selector(module, 'main')
+}
 ```
 
-### 5.3 Connection Point Type Annotations
+### 5.3 Ref Type Annotations
 
-Connection points **must** have explicit type annotations to ensure type safety across libraries and languages:
+Refs **must** have explicit type annotations to ensure type safety across libraries and languages:
 
 ```hielements
-element api_server:
+element api_server {
     scope module = python.module_selector('api')
     scope dockerfile = docker.file_selector('Dockerfile')
     
     # Basic type annotations (mandatory)
-    connection_point port: integer = docker.exposed_port(dockerfile)
-    connection_point api_url: string = python.get_api_url(module)
-    connection_point ssl_enabled: boolean = config.get_flag('ssl')
-    connection_point timeout: float = config.get_timeout()
+    ref port: integer = docker.exposed_port(dockerfile)
+    ref api_url: string = python.get_api_url(module)
+    ref ssl_enabled: boolean = config.get_flag('ssl')
+    ref timeout: float = config.get_timeout()
     
     # Custom type annotations
-    connection_point rest_api: HttpHandler = python.public_functions(module)
-    connection_point db_conn: DatabaseConnection = python.class_selector(module, 'Database')
-```
+    ref rest_api: HttpHandler = python.public_functions(module)
+    ref db_conn: DatabaseConnection = python.class_selector(module, 'Database')
+}
 
 #### Basic Types
 
@@ -453,6 +475,59 @@ Different libraries expose different types of connection points:
 - They provide **documentation** of element interfaces
 - **Type annotations** are mandatory and provide type safety
 - **Type checking** occurs at specification validation time (when implemented)
+
+---
+
+## 5a. Uses Declarations (V3)
+
+Uses declarations explicitly declare dependencies between elements or scopes. This makes architectural dependencies visible and verifiable.
+
+### 5a.1 Syntax
+
+```
+uses_declaration ::= identifier 'uses' qualified_identifier
+```
+
+Where `qualified_identifier` is a path like `lexer` or `core.lexer`.
+
+### 5a.2 Basic Uses Declarations
+
+```hielements
+element core {
+    element lexer {
+        scope module = rust.module_selector('lexer')
+    }
+    
+    element parser {
+        scope module = rust.module_selector('parser')
+        scope lexer_module = rust.module_selector('lexer')
+        
+        # Declare that lexer_module depends on lexer element
+        lexer_module uses lexer
+    }
+}
+```
+
+### 5a.3 Qualified Target Paths
+
+Uses declarations can reference elements using qualified paths:
+
+```hielements
+element parser {
+    scope module = rust.module_selector('parser')
+    
+    # Reference an element in parent scope using qualified name
+    module uses core.lexer
+}
+```
+
+### 5a.4 Uses Semantics
+
+- Uses declarations are **explicit** - they document architectural dependencies
+- The source identifier must be a **scope** defined in the same element
+- The target can be an **element** or **scope** reference
+- Name resolution first looks at the **current element**, then **parent scope**
+- Uses declarations enable **dependency validation** and **architecture enforcement**
 
 ---
 
