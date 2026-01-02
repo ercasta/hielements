@@ -81,8 +81,8 @@ The following are reserved keywords:
 | `implements` | Declares that an element implements template(s) |
 | `binds` | Binds a scope/ref to a template declaration |
 | `scope` | Declares a scope selector |
-| `ref` | Declares a reference point (V3, replaces `connection_point`) |
-| `connection_point` | Declares a connection point (deprecated, use `ref`) |
+| `ref` | Declares a reference point (V3, preferred over `connection_point`) |
+| `connection_point` | Declares a connection point (supported for backward compatibility, prefer `ref`) |
 | `uses` | Declares a dependency on another element/scope (V3) |
 | `check` | Declares a rule/check |
 | `import` | Imports a library or module |

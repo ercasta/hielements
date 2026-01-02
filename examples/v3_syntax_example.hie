@@ -29,7 +29,7 @@ element core {
         scope module = rust.module_selector('parser')
         scope lexer_module = rust.module_selector('lexer')
         
-        # The parser module uses (depends on) the lexer element
+        # The lexer_module scope uses (depends on) the lexer element
         lexer_module uses lexer
         
         ref ast_output: Program = rust.struct_selector('Program')

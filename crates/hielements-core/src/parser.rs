@@ -800,18 +800,8 @@ impl<'a> Parser<'a> {
     fn parse_uses(&mut self) -> Result<UsesDeclaration, Diagnostic> {
         let start_span = self.current_span();
         
-        // Parse the source identifier (if not already consumed by caller checking for uses)
-        let source = if self.check(TokenKind::Uses) {
-            // Caller has already identified this is a 'uses' keyword at start
-            // This shouldn't happen based on current parsing logic, but handle it
-            return Err(Diagnostic::error(
-                "E016",
-                "Uses declaration requires a source identifier before 'uses' keyword",
-            )
-            .with_file(&self.file_path)
-            .with_span(start_span)
-            .build());
-        } else if self.check(TokenKind::Identifier) {
+        // Parse the source identifier
+        let source = if self.check(TokenKind::Identifier) {
             self.parse_identifier()?
         } else {
             let token = self.current();
