@@ -67,7 +67,7 @@ To have a truly hierarchical representation, we need to be able to specify compo
 
     element python_orders_element:
         scope orders = python.python_module_selector('orders')
-        connection_point main_module = python.get_main_module(orders)
+        ref main_module = python.get_main_module(orders)
 
     element python_orders_db_element:
         scope python.python_module_selector('orders_db')

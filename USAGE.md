@@ -80,8 +80,8 @@ element web_service:
     scope config = files.file_selector('config.yaml')
     
     ## Define connection points - what this element exposes
-    connection_point rest_api = python.public_functions(api_module)
-    connection_point db_connection = python.class_selector(database_module, 'Database')
+    ref rest_api = python.public_functions(api_module)
+    ref db_connection = python.class_selector(database_module, 'Database')
     
     ## Define checks - rules that must be satisfied
     check files.exists(config)
@@ -102,7 +102,7 @@ element ecommerce_system:
     ## Order management service
     element orders_service:
         scope module = python.module_selector('services/orders')
-        connection_point api = python.public_functions(module)
+        ref api = python.public_functions(module)
         
         check python.has_tests(module)
         check python.has_docstrings(module)
@@ -110,7 +110,7 @@ element ecommerce_system:
     ## Payment processing service
     element payments_service:
         scope module = python.module_selector('services/payments')
-        connection_point api = python.public_functions(module)
+        ref api = python.public_functions(module)
         
         check python.has_tests(module)
         check python.function_exists(module, 'process_payment')
@@ -138,7 +138,7 @@ import files
 element containerized_service:
     ## Python application
     scope python_src = python.module_selector('app')
-    connection_point main = python.get_main_module(python_src)
+    ref main = python.get_main_module(python_src)
     
     ## Docker configuration
     scope dockerfile = docker.file_selector('Dockerfile')
@@ -172,14 +172,14 @@ Use the `template` keyword to define reusable patterns:
 ```hielements
 import rust
 
-template compiler:
+pattern compiler:
     ## Required: Lexer component
     element lexer:
-        connection_point tokens
+        ref tokens
     
     ## Required: Parser component
     element parser:
-        connection_point ast
+        ref ast
     
     ## Structural check: lexer output compatible with parser input
     check compiler.lexer.tokens.compatible_with(compiler.parser.input)
@@ -210,17 +210,17 @@ element python_compiler implements compiler:
 Elements can implement multiple patterns:
 
 ```hielements
-template microservice:
+pattern microservice:
     element api:
-        connection_point rest_endpoint
+        ref rest_endpoint
     element database:
-        connection_point connection
+        ref connection
 
-template observable:
+pattern observable:
     element metrics:
-        connection_point prometheus_endpoint
+        ref prometheus_endpoint
     element logging:
-        connection_point log_output
+        ref log_output
 
 ## Implement both patterns
 element orders_service implements microservice, observable:
@@ -826,7 +826,7 @@ For microservices or monorepos:
 ## In repository A
 element service_a:
     scope module = python.module_selector('src/')
-    connection_point api = python.public_functions(module)
+    ref api = python.public_functions(module)
 
 ## In repository B
 import service_a from "https://git.example.com/service_a/architecture.hie"
