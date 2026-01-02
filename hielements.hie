@@ -77,7 +77,7 @@ element hielements {
             check rust.struct_exists('Element')
             check rust.enum_exists('Expression')
             
-            ## Template support structures
+            ## Pattern support structures (patterns are declared with `template` keyword)
             check rust.struct_exists('Template')
             check rust.struct_exists('TemplateImplementation')
             check rust.struct_exists('TemplateBinding')
@@ -301,6 +301,10 @@ element hielements {
         check files.exists(docs, 'external_libraries.md')
         check files.exists(docs, 'wasm_plugins.md')
         check files.exists(docs, 'related_work.md')
+        
+        ## Pattern catalog - test suite for language prescriptive features
+        ## Coverage of this catalog drives language evolution
+        check files.exists(docs, 'patterns_catalog.md')
     }
     
     ## Examples

@@ -6,7 +6,7 @@
 
 Hielements helps you define, document, and enforce the logical structure of your software systems. Unlike traditional architecture documentation that becomes stale, Hielements specifications are formally checked against your actual code—ensuring your architecture stays aligned with reality.
 
-> 📝 **Note**: This documentation describes Hielements V2, which introduces a clearer separation between **prescriptive** (templates with rules) and **descriptive** (actual implementations) parts of the language. V2 is incompatible with V1.
+> 📝 **Note**: This documentation describes Hielements V2, which introduces a clearer separation between **prescriptive** (patterns with rules) and **descriptive** (actual implementations) parts of the language. V2 is incompatible with V1.
 
 ---
 
@@ -21,7 +21,7 @@ Modern software systems are complex. As codebases grow, their actual structure d
 - 🔗 **Making relationships explicit** between components
 - 🏗️ **Supporting hierarchical composition** for complex systems
 - 🌲 **Providing hierarchical checks** that compose through element hierarchies
-- 🎨 **Enabling reusable templates** for consistent architectural patterns
+- 🎨 **Enabling reusable patterns** for consistent architectural constraints
 - 🌐 **Working across languages** (Python, Docker, Terraform, and more)
 - 🤝 **Enabling human-AI collaboration** through structured specifications
 
@@ -32,18 +32,18 @@ Modern software systems are complex. As codebases grow, their actual structure d
 Hielements V2 separates two key concerns:
 
 **🏗️ Prescriptive** — Define the rules and constraints
-- Element **templates** establish architectural patterns
+- **Patterns** (declared with `template`) establish architectural blueprints
 - **Checks** enforce rules and requirements
 - Keywords like `requires`, `forbids`, and `allows` control constraints
-- Templates declare what *should* be true
+- Patterns declare what *should* be true
 
 **📝 Descriptive** — Document what actually exists
 - **Elements** describe concrete implementations
 - **Scopes** bind to actual code and artifacts
-- The `implements` keyword connects elements to templates
-- The `binds` keyword maps implementations to template declarations
+- The `implements` keyword connects elements to patterns
+- The `binds` keyword maps implementations to pattern declarations
 
-You can use Hielements **descriptively only** (documenting structure without enforcement) or **prescriptively** (with templates and checks for enforcement). Mix and match based on your needs.
+You can use Hielements **descriptively only** (documenting structure without enforcement) or **prescriptively** (with patterns and checks for enforcement). Mix and match based on your needs.
 
 ---
 
@@ -71,23 +71,23 @@ element orders_service:
 
 Run `hielements check` and Hielements will verify your architecture against the actual code. If someone changes the Dockerfile or renames the module, the checks will fail—keeping your architecture in sync.
 
-### Reusable Templates
+### Reusable Patterns
 
 Define architectural patterns once and reuse them across your system:
 
 ```hielements
-# Define a template for microservices (prescriptive)
+# Define a pattern for microservices (prescriptive)
 template microservice:
     element api:
-        scope module<python>  # Unbounded scope in template
+        scope module<python>  # Unbounded scope in pattern
         connection_point rest_endpoint: RestEndpoint
     element database:
         connection_point connection: DatabaseConnection
     check microservice.api.exposes_rest()
 
-# Implement the template multiple times (descriptive + prescriptive)
+# Implement the pattern multiple times (descriptive + prescriptive)
 element orders_service implements microservice:
-    # Bind template scopes to actual code using V2 syntax
+    # Bind pattern scopes to actual code using V2 syntax
     scope api_mod<python> binds microservice.api.module = python.module_selector('orders.api')
     connection_point endpoint: RestEndpoint binds microservice.api.rest_endpoint = python.public_functions(api_mod)
     connection_point db: DatabaseConnection binds microservice.database.connection = postgres.database_selector('orders_db')
@@ -98,13 +98,13 @@ element payments_service implements microservice:
     connection_point db: DatabaseConnection binds microservice.database.connection = postgres.database_selector('payments_db')
 ```
 
-Templates ensure consistency across similar components and make architectural patterns explicit.
+Patterns ensure consistency across similar components and make architectural constraints explicit.
 
 ---
 
 ## Key Features
 
-### 🧩 Reusable Element Templates
+### 🧩 Reusable Patterns
 
 Define architectural patterns once and reuse them across your codebase:
 
@@ -119,7 +119,7 @@ template compiler:
     check compiler.lexer.tokens.compatible_with(compiler.parser.input)
 
 element python_compiler implements compiler:
-    # Bind template scopes using V2 binds keyword
+    # Bind pattern scopes using V2 binds keyword
     scope lexer_mod<rust> binds compiler.lexer.module = rust.module_selector('pycompiler::lexer')
     connection_point lexer_tokens: TokenStream binds compiler.lexer.tokens = rust.function_selector(lexer_mod, 'tokenize')
     
@@ -127,7 +127,9 @@ element python_compiler implements compiler:
     connection_point parser_ast: AbstractSyntaxTree binds compiler.parser.ast = rust.function_selector(parser_mod, 'parse')
 ```
 
-Templates ensure consistency across similar components, making architectural patterns explicit and enforceable.
+Patterns ensure consistency across similar components, making architectural constraints explicit and enforceable.
+
+> 📚 **See the [Pattern Catalog](doc/patterns_catalog.md)** for an extensive collection of common software engineering patterns with their Hielements implementations.
 
 ### 🔒 Type-Safe Connection Points
 
@@ -285,15 +287,15 @@ Elements represent logical components with:
 - **Connection Points**: APIs, interfaces, or dependencies the element exposes
 - **Children**: Sub-elements for hierarchical composition
 
-### 2. Define Templates (Prescriptive - Optional)
+### 2. Define Patterns (Prescriptive - Optional)
 
-Templates establish architectural patterns with:
+Patterns establish architectural blueprints with:
 - **Unbounded scopes**: Declared without implementation (`scope module<rust>`)
 - **Rules**: Constraints that implementations must satisfy
 - **Requirements**: Using `requires`, `forbids`, and `allows` keywords
 - **Checks**: Verifiable properties
 
-### 3. Bind Implementations to Templates
+### 3. Bind Implementations to Patterns
 
 Use the `implements` and `binds` keywords to connect:
 ```hielements
@@ -388,7 +390,7 @@ hielements check architecture.hie
 
 📖 **[Usage Guide](USAGE.md)** - Comprehensive guide covering:
 - Writing Hielements specifications
-- Using element templates for reusable patterns
+- Using patterns for reusable architectural blueprints
 - Creating custom libraries
 - Best practices and CI/CD integration
 
@@ -406,6 +408,7 @@ Install the Hielements extension for VSCode:
 
 - 📘 **[Usage Guide](USAGE.md)** - Complete guide to using Hielements
 - 📖 [Language Reference](doc/language_reference.md) - Complete syntax and semantics
+- 📚 **[Pattern Catalog](doc/patterns_catalog.md)** - Extensive collection of software engineering patterns
 - 🔌 [External Libraries Guide](doc/external_libraries.md) - Creating custom libraries
 - 🏗️ [Technical Architecture](doc/technical_architecture.md) - Implementation details
 - 🔍 [Related Work](doc/related_work.md) - Comparison with similar tools
@@ -422,7 +425,7 @@ Install the Hielements extension for VSCode:
 - [x] Language design and specification
 - [x] Core interpreter implementation (Rust)
 - [x] Standard libraries (Python, Docker, files)
-- [x] Element templates for reusable patterns
+- [x] Patterns (formerly "element templates") for reusable architectural constraints
 - [ ] VSCode extension
 - [ ] Language Server Protocol
 - [ ] CI/CD integration templates
@@ -454,7 +457,7 @@ Check out our [Contributing Guide](CONTRIBUTING.md) (coming soon).
 
 **Hielements V2 makes this possible** through:
 - **Descriptive mode**: Document your architecture without enforcement
-- **Prescriptive mode**: Use templates and checks to enforce architectural rules
+- **Prescriptive mode**: Use patterns and checks to enforce architectural rules
 - **Hybrid approach**: Mix both modes as needed for different parts of your system
 
 ---
@@ -487,7 +490,7 @@ Yes! Hielements works with both greenfield and brownfield projects.
 Linters check code quality and style within a single file or module. Hielements checks architectural rules across your entire system, including relationships between components.
 
 ### What's the difference between prescriptive and descriptive modes?
-**Descriptive mode** lets you document your architecture without enforcement—useful for understanding existing systems or when you need flexibility. **Prescriptive mode** uses templates, `requires`/`forbids`/`allows` keywords, and checks to enforce architectural rules. You can mix both modes: describe some parts of your system while prescribing rules for others.
+**Descriptive mode** lets you document your architecture without enforcement—useful for understanding existing systems or when you need flexibility. **Prescriptive mode** uses patterns (declared with `template`), `requires`/`forbids`/`allows` keywords, and checks to enforce architectural rules. You can mix both modes: describe some parts of your system while prescribing rules for others.
 
 ---
 

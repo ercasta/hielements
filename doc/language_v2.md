@@ -5,12 +5,12 @@ Hielements V2 is a second generation of the language. This second generation is 
 The goal of hielements v2 is having a clearer separation of responsibilities between *descriptive* and *prescriptive* parts of the language.
 
 Specifically:
-- The *prescriptive* part is made of *element templates*, the requires / forbids / allows keywords, and checks
-- The *descriptive* part is made of elements that *implement* templates and scopes that bind to actual code.
+- The *prescriptive* part is made of *patterns* (declared with the `template` keyword), the requires / forbids / allows keywords, and checks
+- The *descriptive* part is made of elements that *implement* patterns and scopes that bind to actual code.
 
 It is possible to use the descriptive part without the prescriptive one; in this case, no enforcement / checks are performed
 
-Element templates declare scopes and rules:
+Patterns declare scopes and rules:
 
 ```
 template observable:
@@ -23,7 +23,7 @@ template observable:
         check files.exists(module, 'Cargo.toml')
  
 ```
-scope in templates is always unbounded.
+scope in patterns is always unbounded.
 
 Elements *binds* these:
 
@@ -34,5 +34,7 @@ element observable_component implements observable:
 ```
 
 The implements and binds keywords, and the language specification via angular brackets are optional, and only used when the prescriptive features of the language are used. 
+
+See the [Pattern Catalog](patterns_catalog.md) for an extensive collection of common software engineering patterns expressed in Hielements.
 
 
