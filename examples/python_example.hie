@@ -1,0 +1,72 @@
+# Example: Python Language Library Usage
+# Demonstrates the Python library checks for imports, return types, and calls
+
+import files
+import python
+
+## Example 1: Basic module structure validation
+element payment_service:
+    scope payment_module = python.module_selector('payments.service')
+    
+    # Import checks - verify required dependencies
+    check python.imports(payment_module, 'typing')
+    check python.imports(payment_module, 'logging')
+    
+    # Ensure no deprecated modules are used
+    check python.no_import(payment_module, 'deprecated_lib')
+
+## Example 2: Return type validation
+element api_endpoints:
+    scope api = python.module_selector('api.endpoints')
+    
+    # Verify API returns proper response types
+    check python.returns_type(api, 'Response')
+    check python.returns_type(api, 'JsonResponse')
+    
+    # Verify specific endpoints return correct types
+    check python.function_returns_type(api, 'create_payment', 'PaymentResponse')
+    check python.function_returns_type(api, 'list_payments', 'List')
+
+## Example 3: Function call verification
+element order_processor:
+    scope processor = python.module_selector('orders.processor')
+    
+    # Verify the processor calls required validation functions
+    check python.calls(processor, 'validate_order')
+    check python.calls(processor, 'calculate_total')
+    
+    # Verify logging is used
+    check python.calls(processor, 'logger')
+    check python.calls_function(processor, 'logger', 'info')
+    check python.calls_function(processor, 'logger', 'error')
+
+## Example 4: Cross-module dependencies
+element application:
+    scope models = python.module_selector('models')
+    scope services = python.module_selector('services')
+    
+    # Verify services layer uses models
+    check python.imports(services, 'models')
+    check python.calls_scope(services, models)
+
+## Example 5: Type safety validation
+element data_layer:
+    scope database = python.module_selector('database.connection')
+    
+    # Ensure database functions have proper return types
+    check python.function_returns_type(database, 'connect', 'Connection')
+    check python.function_returns_type(database, 'query', 'Result')
+    check python.function_returns_type(database, 'execute', 'int')
+
+## Example 6: Testing architecture
+element test_suite:
+    scope unit_tests = python.module_selector('tests.unit')
+    scope integration_tests = python.module_selector('tests.integration')
+    
+    # Verify test modules import testing framework
+    check python.imports(unit_tests, 'pytest')
+    check python.imports(integration_tests, 'pytest')
+    
+    # Verify tests call the code under test
+    scope app_code = python.module_selector('app')
+    check python.calls_scope(unit_tests, app_code)
