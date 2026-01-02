@@ -5,23 +5,26 @@
   },
   "brackets": [
     ["(", ")"],
-    ["[", "]"]
+    ["[", "]"],
+    ["{", "}"]
   ],
   "autoClosingPairs": [
     { "open": "(", "close": ")" },
     { "open": "[", "close": "]" },
+    { "open": "{", "close": "}" },
     { "open": "'", "close": "'", "notIn": ["string", "comment"] },
     { "open": "\"", "close": "\"", "notIn": ["string", "comment"] }
   ],
   "surroundingPairs": [
     ["(", ")"],
     ["[", "]"],
+    ["{", "}"],
     ["'", "'"],
     ["\"", "\""]
   ],
   "indentationRules": {
-    "increaseIndentPattern": "^\\s*(element|scope|connection_point|check).*:\\s*(#.*)?$",
-    "decreaseIndentPattern": "^\\s*$"
+    "increaseIndentPattern": "^\\s*(element|pattern|template|scope|connection_point|ref|check).*[:{]\\s*(#.*)?$",
+    "decreaseIndentPattern": "^\\s*}\\s*$"
   },
   "folding": {
     "markers": {

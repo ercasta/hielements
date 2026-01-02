@@ -17,6 +17,9 @@ pub enum TokenKind {
     #[token("template")]
     Template,
 
+    #[token("pattern")]
+    Pattern,
+
     #[token("implements")]
     Implements,
 
