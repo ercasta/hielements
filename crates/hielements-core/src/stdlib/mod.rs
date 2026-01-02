@@ -2,6 +2,7 @@
 
 pub mod external;
 pub mod files;
+pub mod python;
 pub mod rust;
 pub mod wasm;
 
@@ -176,6 +177,7 @@ impl LibraryRegistry {
         };
         // Register built-in libraries
         registry.register(Box::new(files::FilesLibrary::new()));
+        registry.register(Box::new(python::PythonLibrary::new()));
         registry.register(Box::new(rust::RustLibrary::new()));
         registry
     }
