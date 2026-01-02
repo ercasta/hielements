@@ -301,9 +301,9 @@ element my_service:
 
 The language annotation is specified in angular brackets immediately after the scope name (`<language_name>`).
 
-### 4.4 Unbounded Scopes in Templates
+### 4.4 Unbounded Scopes in Patterns
 
-In templates, scopes are **unbounded** (declared without a selector expression). They serve as placeholders to be bound by implementing elements:
+In patterns (declared with `template`), scopes are **unbounded** (declared without a selector expression). They serve as placeholders to be bound by implementing elements:
 
 ```hielements
 template observable:
@@ -315,18 +315,18 @@ template observable:
 
 ### 4.5 Binding Scopes with `binds` (V2)
 
-When an element implements a template, it uses the `binds` keyword to connect its scopes to the template's unbounded scopes:
+When an element implements a pattern, it uses the `binds` keyword to connect its scopes to the pattern's unbounded scopes:
 
 ```hielements
 element observable_component implements observable:
-    # Bind this scope to the template's unbounded scope
+    # Bind this scope to the pattern's unbounded scope
     scope main_module<rust> binds observable.metrics.module = rust.module_selector('payments::api')
     
-    # Bind a connection point to the template's connection point
+    # Bind a connection point to the pattern's connection point
     connection_point main_handler: MetricsHandler binds observable.metrics.prometheus = rust.function_selector(main_module, 'handler')
 ```
 
-The `binds` clause specifies which template scope/connection_point this declaration satisfies.
+The `binds` clause specifies which pattern scope/connection_point this declaration satisfies.
 
 ### 4.6 Multiple Scopes
 
@@ -1623,13 +1623,13 @@ element orders_service:
     check files.exists(dockerfile, 'Dockerfile')
 ```
 
-### 15.2 Template with Unbounded Scopes (V2)
+### 15.2 Pattern with Unbounded Scopes (V2)
 
 ```hielements
 import files
 import rust
 
-## Observable Template
+## Observable Pattern
 ## Defines a component that exposes metrics
 template observable:
     element metrics:
@@ -1641,9 +1641,9 @@ template observable:
         
         check files.exists(module, 'Cargo.toml')
 
-## Metrics Service implementing the observable template
+## Metrics Service implementing the observable pattern
 element metrics_service implements observable:
-    # Bind the scope to the template's unbounded scope
+    # Bind the scope to the pattern's unbounded scope
     scope metrics_mod<rust> binds observable.metrics.module = rust.module_selector('metrics::api')
     
     # Bind the connection point
@@ -1656,7 +1656,7 @@ element metrics_service implements observable:
 import files
 import rust
 
-## Microservice Template
+## Microservice Pattern
 template microservice:
     element api:
         scope module<rust>
@@ -2001,13 +2001,13 @@ element my_service:
 
 **Migration**: Replace `: language` with `<language>` after the scope name.
 
-### D.3 Template Unbounded Scopes
+### D.3 Pattern Unbounded Scopes
 
 **V1 (Deprecated):**
 ```hielements
 template compiler:
     element lexer:
-        scope module = rust.module_selector('lexer')  # Bound in template
+        scope module = rust.module_selector('lexer')  # Bound in pattern
         connection_point tokens: TokenStream = rust.function_selector(module, 'tokenize')
 ```
 
@@ -2019,7 +2019,7 @@ template compiler:
         connection_point tokens: TokenStream
 ```
 
-**Migration**: Remove the `= expression` part from template scopes. They become placeholders.
+**Migration**: Remove the `= expression` part from pattern scopes. They become placeholders.
 
 ### D.4 Element Bindings with `binds`
 
@@ -2038,15 +2038,15 @@ element my_compiler implements compiler:
 ```
 
 **Migration**:
-1. Change `template.element.scope = expr` to `scope name<lang> binds template.element.scope = expr`
-2. Change `template.element.connection_point = expr` to `connection_point name: Type binds template.element.connection_point = expr`
+1. Change `pattern.element.scope = expr` to `scope name<lang> binds pattern.element.scope = expr`
+2. Change `pattern.element.connection_point = expr` to `connection_point name: Type binds pattern.element.connection_point = expr`
 
 ### D.5 Descriptive-Only Mode
 
-V2 supports using the language without templates or bindings. If you're not using prescriptive features, you can write V2 code that looks similar to V1:
+V2 supports using the language without patterns or bindings. If you're not using prescriptive features, you can write V2 code that looks similar to V1:
 
 ```hielements
-# V2 descriptive-only (no templates, no binds)
+# V2 descriptive-only (no patterns, no binds)
 element my_service:
     scope src<rust> = rust.module_selector('my_service')
     connection_point api: HttpHandler = rust.public_functions(src)
@@ -2100,10 +2100,10 @@ element orders implements microservice:
 ### D.7 Migration Checklist
 
 - [ ] Update all language annotations from `: lang` to `<lang>`
-- [ ] Remove `= expression` from template scopes (make them unbounded)
-- [ ] Remove `= expression` from template connection points (make them unbounded)
-- [ ] Add `binds template.path` clause to element scopes that bind to templates
-- [ ] Add `binds template.path` clause to element connection points that bind to templates
+- [ ] Remove `= expression` from pattern scopes (make them unbounded)
+- [ ] Remove `= expression` from pattern connection points (make them unbounded)
+- [ ] Add `binds pattern.path` clause to element scopes that bind to patterns
+- [ ] Add `binds pattern.path` clause to element connection points that bind to patterns
 - [ ] Update any references to use the new local scope names
 - [ ] Test that all checks pass with the new syntax
 
@@ -2112,7 +2112,7 @@ element orders implements microservice:
 **Hielements V2 is NOT backward compatible with V1.** The V1 syntax is deprecated and no longer supported. All existing V1 code must be migrated to V2 syntax.
 
 The key philosophy changes:
-- **Templates are prescriptive** - they define structure without implementation
+- **Patterns are prescriptive** - they define structure without implementation
 - **Elements are descriptive** - they bind to actual code
 - **`binds` makes connections explicit** - clearer separation of concerns
 - **Angular brackets for language** - more consistent with type syntax conventions

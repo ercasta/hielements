@@ -52,16 +52,16 @@ element core {
 }
 
 ###
-Template with V3 syntax
-Shows that templates also work with curly brackets
+Pattern with V3 syntax
+Shows that patterns also work with curly brackets
 ###
 template observable {
     allows language rust
     
     element metrics {
-        # Unbounded scope in template
+        # Unbounded scope in pattern
         scope module<rust>
-        # Unbounded ref in template
+        # Unbounded ref in pattern
         ref prometheus: MetricsHandler
         
         check rust.function_exists(module, 'metrics_handler')
@@ -69,7 +69,7 @@ template observable {
 }
 
 ###
-Element implementing template with V3 syntax
+Element implementing pattern with V3 syntax
 ###
 element payments_service implements observable {
     scope root = files.folder_selector('src/payments')

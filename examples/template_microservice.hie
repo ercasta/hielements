@@ -1,10 +1,10 @@
-# Example: Microservice Template
-# Demonstrates multiple template implementation
+# Example: Microservice Pattern
+# Demonstrates multiple pattern implementation
 
 import files
 import rust
 
-## Microservice Template
+## Microservice Pattern
 ## Defines the standard structure of a microservice with API, database, and container.
 template microservice:
     element api:
@@ -21,7 +21,7 @@ template microservice:
     
     check microservice.container.exposes_port(8080)
 
-## Observable Template
+## Observable Pattern
 ## Adds observability features to a service
 template observable:
     element metrics:
@@ -34,7 +34,7 @@ template observable:
     
     check observable.metrics.prometheus_endpoint.is_available()
 
-## Resilient Template  
+## Resilient Pattern  
 ## Adds resilience patterns to a service
 template resilient:
     element circuit_breaker:
@@ -46,7 +46,7 @@ template resilient:
         connection_point retry_config: RetryPolicy = rust.struct_selector(module, 'RetryPolicy')
 
 ## Orders Service
-## A production-ready microservice implementing multiple templates
+## A production-ready microservice implementing multiple patterns
 element orders_service implements microservice, observable, resilient:
     microservice.api.scope = rust.module_selector('orders::api')
     microservice.api.rest_endpoint = rust.function_selector(microservice.api.scope, 'create_routes')

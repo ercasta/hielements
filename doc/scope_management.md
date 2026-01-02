@@ -110,11 +110,11 @@ element system:
         check rust.depends_on(module, service_a.api)  # Cross-sibling reference
 ```
 
-## Template Scope Binding
+## Pattern Scope Binding
 
-### Template Placeholders
+### Pattern Placeholders
 
-Templates define scope placeholders that implementations must bind:
+Patterns (declared with `template`) define scope placeholders that implementations must bind:
 
 ```hielements
 template microservice:
@@ -135,10 +135,10 @@ element my_service implements microservice:
 
 ### Binding Resolution
 
-Template bindings use **absolute paths** starting with the template name to:
-1. Avoid name clashes when implementing multiple templates
-2. Clearly identify which template property is being bound
-3. Support nested element references within templates
+Pattern bindings use **absolute paths** starting with the pattern name to:
+1. Avoid name clashes when implementing multiple patterns
+2. Clearly identify which pattern property is being bound
+3. Support nested element references within patterns
 
 ## Connection Point Scoping
 
@@ -176,7 +176,7 @@ During check execution:
 | Context | Can Access |
 |---------|------------|
 | Element | Own scopes, parent scopes (via qualified path), child scopes (via child.scope) |
-| Template | Own placeholder scopes, bound scopes in implementations |
+| Pattern | Own placeholder scopes, bound scopes in implementations |
 | Check | All scopes in scope at the check location |
 
 ## Error Messages
