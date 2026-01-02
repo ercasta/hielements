@@ -161,6 +161,15 @@ element hielements:
                 check rust.implements('RustLibrary', 'Library')
                 check rust.has_tests(rust_module)
             
+            ## Python library - Python code analysis
+            element python_library:
+                scope python_module = files.file_selector('crates/hielements-core/src/stdlib/python.rs')
+                
+                check files.exists(stdlib_src, 'python.rs')
+                check rust.struct_exists('PythonLibrary')
+                check rust.implements('PythonLibrary', 'Library')
+                check rust.has_tests(python_module)
+            
             ## External library support - allows user-defined plugins
             element external:
                 scope external_module = files.file_selector('crates/hielements-core/src/stdlib/external.rs')
@@ -273,6 +282,7 @@ element hielements:
         check files.exists(examples, 'template_microservice.hie')
         check files.exists(examples, 'hierarchical.hie')
         check files.exists(examples, 'language_example.hie')
+        check files.exists(examples, 'python_example.hie')
         check files.exists(examples, 'v2_syntax_example.hie')
         check files.exists(examples, 'hielements.toml')
         check files.exists(examples, 'hielements_hybrid.toml')
