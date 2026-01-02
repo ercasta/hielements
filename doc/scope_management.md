@@ -103,7 +103,7 @@ Sibling elements can also reference each other's scopes:
 element system:
     element service_a:
         scope module = rust.module_selector('service_a')
-        connection_point api: Handler = rust.function_selector(module, 'handler')
+        ref api: Handler = rust.function_selector(module, 'handler')
     
     element service_b:
         scope module = rust.module_selector('service_b')
@@ -117,10 +117,10 @@ element system:
 Patterns (declared with `template`) define scope placeholders that implementations must bind:
 
 ```hielements
-template microservice:
+pattern microservice:
     element api:
         scope module  # Placeholder - no expression
-        connection_point endpoint: Handler
+        ref endpoint: Handler
 ```
 
 ### Binding Syntax
@@ -149,10 +149,10 @@ element api_service:
     scope module = rust.module_selector('api')
     
     # Connection points can reference scopes
-    connection_point handler: HttpHandler = rust.function_selector(module, 'handle_request')
+    ref handler: HttpHandler = rust.function_selector(module, 'handle_request')
     
     # Or be standalone typed declarations
-    connection_point port: integer = docker.exposed_port(dockerfile)
+    ref port: integer = docker.exposed_port(dockerfile)
 ```
 
 ## Validation-Time vs Runtime Resolution

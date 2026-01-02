@@ -77,7 +77,8 @@ The following are reserved keywords:
 | Keyword | Description |
 |---------|-------------|
 | `element` | Declares an element |
-| `template` | Declares a pattern (reusable architectural blueprint) |
+| `pattern` | Declares a pattern (reusable architectural blueprint, preferred in V3) |
+| `template` | Declares a pattern (supported for backward compatibility, prefer `pattern`) |
 | `implements` | Declares that an element implements pattern(s) |
 | `binds` | Binds a scope/ref to a pattern declaration |
 | `scope` | Declares a scope selector |
@@ -229,8 +230,8 @@ element payment_gateway:
     scope dockerfile = docker.file_selector('payments.dockerfile')
     
     # Connection points expose interfaces to other elements
-    connection_point api = python.public_functions(python_module)
-    connection_point port = docker.exposed_port(dockerfile)
+    ref api = python.public_functions(python_module)
+    ref port = docker.exposed_port(dockerfile)
     
     # Checks enforce rules
     check docker.exposes_port(dockerfile, 8080)
@@ -306,11 +307,11 @@ The language annotation is specified in angular brackets immediately after the s
 In patterns (declared with `template`), scopes are **unbounded** (declared without a selector expression). They serve as placeholders to be bound by implementing elements:
 
 ```hielements
-template observable:
+pattern observable:
     element metrics:
         # Unbounded scope - no '=' expression
         scope module<rust>
-        connection_point prometheus: MetricsHandler
+        ref prometheus: MetricsHandler
 ```
 
 ### 4.5 Binding Scopes with `binds` (V2)
@@ -323,10 +324,10 @@ element observable_component implements observable:
     scope main_module<rust> binds observable.metrics.module = rust.module_selector('payments::api')
     
     # Bind a connection point to the pattern's connection point
-    connection_point main_handler: MetricsHandler binds observable.metrics.prometheus = rust.function_selector(main_module, 'handler')
+    ref main_handler: MetricsHandler binds observable.metrics.prometheus = rust.function_selector(main_module, 'handler')
 ```
 
-The `binds` clause specifies which pattern scope/connection_point this declaration satisfies.
+The `binds` clause specifies which pattern scope/ref this declaration satisfies.
 
 ### 4.6 Multiple Scopes
 
@@ -429,12 +430,12 @@ Custom types are user-defined type names that can represent:
 
 ```hielements
 # Custom type example
-template compiler:
+pattern compiler:
     element lexer:
-        connection_point tokens: TokenStream = rust.struct_selector('Token')
+        ref tokens: TokenStream = rust.struct_selector('Token')
     
     element parser:
-        connection_point ast: AbstractSyntaxTree = rust.struct_selector('Program')
+        ref ast: AbstractSyntaxTree = rust.struct_selector('Program')
 ```
 
 ### 5.4 Using Connection Points
@@ -445,7 +446,7 @@ Connection points are used in checks to verify relationships:
 element orders_service:
     element api:
         scope module = python.module_selector('orders.api')
-        connection_point handlers: HttpHandler = python.public_functions(module)
+        ref handlers: HttpHandler = python.public_functions(module)
     
     element docker:
         scope dockerfile = docker.file_selector('orders.dockerfile')
@@ -639,14 +640,14 @@ element ecommerce_platform:
     
     element orders_service:
         scope module = python.module_selector('services.orders')
-        connection_point api = python.public_functions(module)
+        ref api = python.public_functions(module)
         
         element orders_db:
             scope migrations = sql.migration_selector('db/orders')
     
     element payments_service:
         scope module = python.module_selector('services.payments')
-        connection_point api = python.public_functions(module)
+        ref api = python.public_functions(module)
     
     # Cross-service check: orders can call payments
     check python.can_import(orders_service.module, payments_service.module)
@@ -659,7 +660,7 @@ Children elements are referenced using dot notation:
 ```hielements
 element system:
     element service_a:
-        connection_point api = python.public_functions(module)
+        ref api = python.public_functions(module)
     
     element service_b:
         scope module = python.module_selector('service_b')
@@ -698,13 +699,13 @@ In V2, patterns define **unbounded** scopes that serve as placeholders, while im
 Patterns are declared using the `template` keyword and define a structure with **unbounded scopes**:
 
 ```hielements
-template observable:
+pattern observable:
     element metrics implements measurable:
         allows language rust
         
         # Unbounded scope - angular brackets specify language
         scope module<rust>
-        connection_point prometheus: MetricsHandler
+        ref prometheus: MetricsHandler
         
         check files.exists(module, 'Cargo.toml')
 ```
@@ -724,7 +725,7 @@ element observable_component implements observable:
     scope main_module<rust> binds observable.metrics.module = rust.module_selector('payments::api')
     
     # Bind connection point
-    connection_point main_handler: MetricsHandler binds observable.metrics.prometheus = rust.function_selector(main_module, 'handler')
+    ref main_handler: MetricsHandler binds observable.metrics.prometheus = rust.function_selector(main_module, 'handler')
 ```
 
 The `binds` keyword creates an explicit connection between the element's scope and the pattern's placeholder.
@@ -745,15 +746,15 @@ element simple_component:
 Pattern properties are referenced using absolute paths prefixed with the pattern name (e.g., `observable.metrics`). This prevents name clashes when implementing multiple patterns:
 
 ```hielements
-template microservice:
+pattern microservice:
     element api:
         scope module<rust>
-        connection_point rest_endpoint: HttpHandler
+        ref rest_endpoint: HttpHandler
 
-template observable:
+pattern observable:
     element api:
         scope module<rust>
-        connection_point metrics_endpoint: MetricsHandler
+        ref metrics_endpoint: MetricsHandler
 
 # No name clash - each 'api' is explicitly qualified
 element my_service implements microservice, observable:
@@ -769,11 +770,11 @@ element my_service implements microservice, observable:
 An element can implement multiple patterns:
 
 ```hielements
-template resilient:
+pattern resilient:
     element circuit_breaker:
         scope module<rust>
 
-template secured:
+pattern secured:
     element authentication:
         scope module<rust>
 
@@ -793,21 +794,21 @@ element production_service implements microservice, resilient, secured:
 When implementing a pattern, all unbounded scopes must be bound:
 
 ```hielements
-template web_service:
+pattern web_service:
     element frontend:
         scope src<typescript>
-        connection_point static_files: StaticAssets
+        ref static_files: StaticAssets
     
     element backend:
         scope src<python>
-        connection_point api: HttpHandler
+        ref api: HttpHandler
 
 # Valid - all required bindings provided
 element complete_service implements web_service:
     scope frontend_src<typescript> binds web_service.frontend.src = typescript.module_selector('frontend')
     scope backend_src<python> binds web_service.backend.src = python.module_selector('backend')
-    connection_point static: StaticAssets binds web_service.frontend.static_files = files.glob_selector('frontend/dist/*')
-    connection_point api: HttpHandler binds web_service.backend.api = python.public_functions(backend_src)
+    ref static: StaticAssets binds web_service.frontend.static_files = files.glob_selector('frontend/dist/*')
+    ref api: HttpHandler binds web_service.backend.api = python.public_functions(backend_src)
 
 # Invalid - missing bindings (would produce validation error)
 element incomplete_service implements web_service:
@@ -820,7 +821,7 @@ element incomplete_service implements web_service:
 Checks defined in patterns are automatically included when the pattern is implemented. The checks use absolute references and are evaluated with the concrete bindings:
 
 ```hielements
-template microservice:
+pattern microservice:
     element api:
         scope module<python>
     element database:
@@ -874,7 +875,7 @@ Patterns can declare connection points at the pattern level (not just within chi
 **Example:**
 
 ```hielements
-template microservice:
+pattern microservice:
     element api:
         scope module<rust>
     
@@ -882,7 +883,7 @@ template microservice:
         scope dockerfile
     
     ## Pattern-level unbounded connection point
-    connection_point port: integer
+    ref port: integer
     
     ## Pattern checks can reference the pattern-level connection point
     check files.exists(container.dockerfile, 'Dockerfile')
@@ -894,14 +895,14 @@ element orders_service implements microservice:
     scope dockerfile binds microservice.container.dockerfile = files.file_selector('orders.dockerfile')
     
     ## Bind the pattern-level port
-    connection_point service_port: integer binds microservice.port = rust.const_selector('ORDERS_PORT')
+    ref service_port: integer binds microservice.port = rust.const_selector('ORDERS_PORT')
 
 element payments_service implements microservice:
     scope api_mod<rust> binds microservice.api.module = rust.module_selector('payments::api')
     scope dockerfile binds microservice.container.dockerfile = files.file_selector('payments.dockerfile')
     
     ## Different service, different port
-    connection_point service_port: integer binds microservice.port = rust.const_selector('PAYMENTS_PORT')
+    ref service_port: integer binds microservice.port = rust.const_selector('PAYMENTS_PORT')
 ```
 
 **Benefits:**
@@ -919,18 +920,18 @@ Hierarchical checks allow parent elements to prescribe requirements that must be
 The unified syntax uses `requires`, `allows`, and `forbids` keywords with an optional `descendant` modifier:
 
 ```hielements
-template dockerized:
+pattern dockerized:
     ## At least one descendant must have a docker scope (V2 syntax with unbounded scope)
     requires descendant scope dockerfile
     
     ## At least one descendant must satisfy this check
     requires descendant check docker.has_healthcheck(dockerfile)
 
-template observable:
+pattern observable:
     ## At least one descendant must have a metrics element with implements
     requires descendant element metrics_service implements metrics_provider
 
-template production_ready:
+pattern production_ready:
     ## At least one descendant must implement the dockerized template
     requires descendant implements dockerized
     
@@ -967,7 +968,7 @@ element ecommerce_platform implements production_ready:
     ## Monitoring - implements observable (satisfies second requirement)
     element monitoring implements observable:
         scope metrics_mod<rust> binds observable.metrics.module = rust.module_selector('monitoring::metrics')
-        connection_point prometheus: MetricsHandler binds observable.metrics.prometheus = rust.function_selector(metrics_mod, 'handler')
+        ref prometheus: MetricsHandler binds observable.metrics.prometheus = rust.function_selector(metrics_mod, 'handler')
 ```
 
 #### Hierarchical Requirement Kinds
@@ -978,14 +979,14 @@ element ecommerce_platform implements production_ready:
 | Check | `requires descendant check expr` | A descendant must satisfy this check |
 | Element | `requires descendant element name [implements pattern]` | A descendant must have an element with this structure |
 | Pattern Implementation | `requires descendant implements pattern_name` | A descendant must implement the specified pattern |
-| Connection Point | `requires descendant connection_point name: Type` | A descendant must have a connection point |
+| Connection Point | `requires descendant ref name: Type` | A descendant must have a connection point |
 
 #### Immediate vs Descendant Requirements
 
 The `descendant` modifier determines whether the requirement applies to any descendant in the hierarchy or only to immediate children:
 
 ```hielements
-template microservice:
+pattern microservice:
     ## Immediate child requirement (no descendant modifier)
     requires element api implements api_handler
     
@@ -1004,7 +1005,7 @@ Connection boundaries allow specifying constraints on architectural dependencies
 Use `allows connection to` in patterns to whitelist specific connection targets:
 
 ```hielements
-template frontend_zone:
+pattern frontend_zone:
     ## Code in this zone may only import from api_gateway
     allows connection to api_gateway.public_api
 
@@ -1022,7 +1023,7 @@ element my_frontend implements frontend_zone:
 Use `forbids connection to` in patterns to blacklist specific connection targets:
 
 ```hielements
-template secure_zone:
+pattern secure_zone:
     ## Code in this zone cannot import from external modules
     forbids connection to external.*
     forbids connection to public_network.*
@@ -1037,7 +1038,7 @@ element internal_service implements secure_zone:
 Use `requires connection to` in patterns to mandate that code MUST have a dependency:
 
 ```hielements
-template service_mesh_zone:
+pattern service_mesh_zone:
     ## All services in this mesh must import from logging module
     requires connection to logging.*
 
@@ -1065,7 +1066,7 @@ allows connection to api.public.*      ## Matches api.public.users, api.public.o
 Multiple boundaries can be combined - allows create a whitelist, forbids create a blacklist, requires create mandatory dependencies:
 
 ```hielements
-template secure_service:
+pattern secure_service:
     allows connection to api.endpoint
     allows connection to logging.output
     forbids connection to database.*
@@ -1100,11 +1101,11 @@ When A is allowed to connect to B, and B is allowed to connect to C:
 Patterns can constrain which programming languages elements may use through `requires`, `allows`, and `forbids` with the `language` keyword:
 
 ```hielements
-template python_only:
+pattern python_only:
     requires language python
     forbids language rust
 
-template multilingual:
+pattern multilingual:
     allows language python
     allows language rust
     allows language java
@@ -1389,7 +1390,7 @@ element api_module:
     scope module = python.module_selector('myapp.api')
     scope handlers = python.package_selector('myapp.api.handlers')
     
-    connection_point public_api = python.public_functions(module)
+    ref public_api = python.public_functions(module)
     
     check python.function_exists(module, 'create_app')
     check python.no_circular_imports(module)
@@ -1434,7 +1435,7 @@ element containerized_service:
     scope dockerfile = docker.file_selector('Dockerfile')
     scope compose = docker.compose_selector('docker-compose.yml')
     
-    connection_point ports = docker.exposed_ports(dockerfile)
+    ref ports = docker.exposed_ports(dockerfile)
     
     check docker.exposes_port(dockerfile, 8080)
     check docker.base_image(dockerfile, 'python:3.11-slim')
@@ -1485,7 +1486,7 @@ The following is the complete EBNF grammar for Hielements V2:
 
 ```ebnf
 (* Program structure *)
-program            ::= import_statement* language_declaration* (template_declaration | element_declaration)+
+program            ::= import_statement* language_declaration* (pattern_declaration | element_declaration)+
 
 (* Imports *)
 import_statement   ::= 'import' import_path ('as' identifier)?
@@ -1501,55 +1502,59 @@ parameter_list       ::= parameter (',' parameter)*
 parameter            ::= identifier ':' 'scope' '[' ']'
 
 (* Patterns - with unbounded scopes *)
-(* Note: The 'template' keyword is used to declare patterns *)
-template_declaration ::= doc_comment? 'template' identifier ':' NEWLINE INDENT template_body DEDENT
-template_body        ::= template_item+
-template_item        ::= scope_declaration_template
-                       | connection_point_declaration_template
-                       | check_declaration
-                       | element_declaration
-                       | component_requirement
+(* Note: The 'pattern' keyword is preferred, 'template' is supported for backward compatibility *)
+pattern_declaration ::= doc_comment? ('pattern' | 'template') identifier ':' NEWLINE INDENT pattern_body DEDENT
+                      | doc_comment? ('pattern' | 'template') identifier '{' pattern_body '}'
+pattern_body        ::= pattern_item+
+pattern_item        ::= scope_declaration_pattern
+                      | ref_declaration_pattern
+                      | check_declaration
+                      | element_declaration
+                      | component_requirement
 
 (* Scope in patterns - can be unbounded (no '=' expression) *)
-scope_declaration_template ::= 'scope' identifier language_annotation? NEWLINE
-                             | 'scope' identifier language_annotation? '=' expression NEWLINE
+scope_declaration_pattern ::= 'scope' identifier language_annotation? NEWLINE
+                            | 'scope' identifier language_annotation? '=' expression NEWLINE
 
-(* Connection point in patterns - can be unbounded (no '=' expression) *)
-connection_point_declaration_template ::= 'connection_point' identifier ':' type_name NEWLINE
-                                        | 'connection_point' identifier ':' type_name '=' expression NEWLINE
+(* Ref (connection point) in patterns - can be unbounded (no '=' expression) *)
+ref_declaration_pattern ::= ('ref' | 'connection_point') identifier ':' type_name NEWLINE
+                          | ('ref' | 'connection_point') identifier ':' type_name '=' expression NEWLINE
 
 (* Elements *)
 (* Note: Elements do NOT support component_requirement - requires/allows/forbids are only in patterns *)
-element_declaration ::= doc_comment? 'element' identifier template_implementation? ':' NEWLINE INDENT element_body DEDENT
-template_implementation ::= 'implements' identifier (',' identifier)*
+element_declaration ::= doc_comment? 'element' identifier pattern_implementation? ':' NEWLINE INDENT element_body DEDENT
+                      | doc_comment? 'element' identifier pattern_implementation? '{' element_body '}'
+pattern_implementation ::= 'implements' identifier (',' identifier)*
 element_body        ::= element_item+
 element_item        ::= scope_declaration
-                      | connection_point_declaration
+                      | ref_declaration
                       | check_declaration
+                      | uses_declaration
                       | element_declaration
 
 (* Component Requirements - unified syntax - ONLY allowed in patterns *)
 component_requirement ::= ('requires' | 'allows' | 'forbids') ['descendant'] component_spec
-component_spec        ::= scope_declaration_template
+component_spec        ::= scope_declaration_pattern
                         | check_declaration
                         | element_spec
                         | connection_spec
-                        | connection_point_spec
+                        | ref_spec
                         | language_spec
 
 element_spec          ::= 'element' identifier [':' type_name] ['implements' identifier] [':' NEWLINE INDENT element_body DEDENT]
 connection_spec       ::= 'connection' ['to'] connection_pattern NEWLINE
-connection_point_spec ::= 'connection_point' identifier ':' type_name ['=' expression] NEWLINE
+ref_spec             ::= ('ref' | 'connection_point') identifier ':' type_name ['=' expression] NEWLINE
 connection_pattern    ::= identifier ('.' identifier)* ('.' '*')?
 language_spec         ::= 'language' identifier NEWLINE
 
-(* Declarations - V2 syntax with angular brackets and binds *)
+(* Declarations - V2/V3 syntax with angular brackets, binds, ref, and uses *)
 language_annotation  ::= '<' identifier '>'
 binds_clause         ::= 'binds' qualified_identifier
 
 scope_declaration           ::= 'scope' identifier language_annotation? binds_clause? '=' expression NEWLINE
-connection_point_declaration ::= 'connection_point' identifier ':' type_name binds_clause? '=' expression NEWLINE
+ref_declaration            ::= ('ref' | 'connection_point') identifier ':' type_name binds_clause? '=' expression NEWLINE
 check_declaration           ::= 'check' function_call NEWLINE
+uses_declaration            ::= identifier 'uses' qualified_identifier NEWLINE
 
 (* Qualified identifiers for binds references *)
 qualified_identifier ::= identifier ('.' identifier)+
@@ -1612,8 +1617,8 @@ element orders_service:
     scope dockerfile = files.file_selector('orders.dockerfile')
     
     # Connection points with type annotations
-    connection_point api: HttpHandler = rust.public_functions(rust_module)
-    connection_point main: Function = rust.function_selector(rust_module, 'main')
+    ref api: HttpHandler = rust.public_functions(rust_module)
+    ref main: Function = rust.function_selector(rust_module, 'main')
     
     # Architectural rules
     check rust.function_exists(rust_module, 'create_order')
@@ -1631,13 +1636,13 @@ import rust
 
 ## Observable Pattern
 ## Defines a component that exposes metrics
-template observable:
+pattern observable:
     element metrics:
         allows language rust
         
         # Unbounded scope - will be bound by implementing element
         scope module<rust>
-        connection_point prometheus: MetricsHandler
+        ref prometheus: MetricsHandler
         
         check files.exists(module, 'Cargo.toml')
 
@@ -1647,7 +1652,7 @@ element metrics_service implements observable:
     scope metrics_mod<rust> binds observable.metrics.module = rust.module_selector('metrics::api')
     
     # Bind the connection point
-    connection_point handler: MetricsHandler binds observable.metrics.prometheus = rust.function_selector(metrics_mod, 'handler')
+    ref handler: MetricsHandler binds observable.metrics.prometheus = rust.function_selector(metrics_mod, 'handler')
 ```
 
 ### 15.3 Microservices Architecture (V2)
@@ -1657,10 +1662,10 @@ import files
 import rust
 
 ## Microservice Pattern
-template microservice:
+pattern microservice:
     element api:
         scope module<rust>
-        connection_point endpoint: HttpHandler
+        ref endpoint: HttpHandler
     
     element container:
         scope dockerfile
@@ -1675,19 +1680,19 @@ element ecommerce_platform:
     element orders_service implements microservice:
         scope api_mod<rust> binds microservice.api.module = rust.module_selector('services::orders')
         scope dockerfile binds microservice.container.dockerfile = files.file_selector('services/orders/Dockerfile')
-        connection_point api: HttpHandler binds microservice.api.endpoint = rust.public_functions(api_mod)
+        ref api: HttpHandler binds microservice.api.endpoint = rust.public_functions(api_mod)
     
     ## Inventory Service
     element inventory_service implements microservice:
         scope api_mod<rust> binds microservice.api.module = rust.module_selector('services::inventory')
         scope dockerfile binds microservice.container.dockerfile = files.file_selector('services/inventory/Dockerfile')
-        connection_point api: HttpHandler binds microservice.api.endpoint = rust.public_functions(api_mod)
+        ref api: HttpHandler binds microservice.api.endpoint = rust.public_functions(api_mod)
     
     ## Payments Service
     element payments_service implements microservice:
         scope api_mod<rust> binds microservice.api.module = rust.module_selector('services::payments')
         scope dockerfile binds microservice.container.dockerfile = files.file_selector('services/payments/Dockerfile')
-        connection_point api: HttpHandler binds microservice.api.endpoint = rust.public_functions(api_mod)
+        ref api: HttpHandler binds microservice.api.endpoint = rust.public_functions(api_mod)
     
     # Cross-service rules
     check rust.can_import(orders_service.api_mod, inventory_service.api)
@@ -1709,8 +1714,8 @@ element hexagonal_app:
     element domain:
         scope module<rust> = rust.package_selector('myapp::domain')
         
-        connection_point entities: Entities = rust.struct_selector(module, '*Entity')
-        connection_point services: Services = rust.struct_selector(module, '*Service')
+        ref entities: Entities = rust.struct_selector(module, '*Entity')
+        ref services: Services = rust.struct_selector(module, '*Service')
         
         # Domain must not import adapters
         check rust.no_dependency(module, adapters.module)
@@ -1720,7 +1725,7 @@ element hexagonal_app:
     element application:
         scope module<rust> = rust.package_selector('myapp::application')
         
-        connection_point use_cases: UseCases = rust.public_functions(module)
+        ref use_cases: UseCases = rust.public_functions(module)
         
         # Application can only depend on domain
         check rust.imports_only(module, [domain.module])
@@ -1732,11 +1737,11 @@ element hexagonal_app:
         
         element database_adapter:
             scope module<rust> = rust.module_selector('myapp::adapters::database')
-            connection_point repositories: Repositories = rust.struct_selector(module, '*Repository')
+            ref repositories: Repositories = rust.struct_selector(module, '*Repository')
         
         element api_adapter:
             scope module<rust> = rust.module_selector('myapp::adapters::api')
-            connection_point routes: Routes = rust.function_selector(module, 'setup_routes')
+            ref routes: Routes = rust.function_selector(module, 'setup_routes')
         
         # Adapters depend on application and domain
         check rust.imports(module, application.module)
@@ -1813,16 +1818,16 @@ import rust
 
 ## Compiler Pattern with unbounded scopes
 ## Defines the structure of a compiler with lexer and parser components.
-template compiler:
+pattern compiler:
     ## Lexer - tokenizes source code
     element lexer:
         scope module<rust>
-        connection_point tokens: TokenStream
+        ref tokens: TokenStream
     
     ## Parser - produces abstract syntax tree
     element parser:
         scope module<rust>
-        connection_point ast: AbstractSyntaxTree
+        ref ast: AbstractSyntaxTree
     
     ## Verify lexer output is compatible with parser input
     check compiler.lexer.tokens.compatible_with(compiler.parser.input)
@@ -1832,11 +1837,11 @@ template compiler:
 element rust_compiler implements compiler:
     # Bind lexer with V2 binds syntax
     scope lexer_mod<rust> binds compiler.lexer.module = rust.module_selector('rustcompiler::lexer')
-    connection_point tokens: TokenStream binds compiler.lexer.tokens = rust.function_selector(lexer_mod, 'tokenize')
+    ref tokens: TokenStream binds compiler.lexer.tokens = rust.function_selector(lexer_mod, 'tokenize')
     
     # Bind parser
     scope parser_mod<rust> binds compiler.parser.module = rust.module_selector('rustcompiler::parser')
-    connection_point ast: AbstractSyntaxTree binds compiler.parser.ast = rust.function_selector(parser_mod, 'parse')
+    ref ast: AbstractSyntaxTree binds compiler.parser.ast = rust.function_selector(parser_mod, 'parse')
     
     # Add compiler-specific elements
     element optimizer:
@@ -1844,33 +1849,33 @@ element rust_compiler implements compiler:
         check rust.function_exists(module, 'optimize_ast')
 
 ## Microservice Pattern with unbounded scopes
-template microservice:
+pattern microservice:
     element api:
         scope module<rust>
-        connection_point rest_endpoint: HttpHandler
+        ref rest_endpoint: HttpHandler
     
     element database:
         scope module<rust>
-        connection_point connection: DbConnection
+        ref connection: DbConnection
     
     element container:
         scope dockerfile
-        connection_point ports: integer
+        ref ports: integer
     
     check microservice.container.exposes_port(8080)
     check microservice.api.connects_to(microservice.database)
 
 ## Observable Pattern
-template observable:
+pattern observable:
     element metrics:
         scope module<rust>
-        connection_point prometheus_endpoint: MetricsHandler
+        ref prometheus_endpoint: MetricsHandler
 
 ## Resilient Pattern
-template resilient:
+pattern resilient:
     element circuit_breaker:
         scope module<rust>
-        connection_point breaker_config: BreakerConfig
+        ref breaker_config: BreakerConfig
 
 ## Production Service with Multiple Patterns (V2 syntax)
 element production_service implements microservice, observable, resilient:
@@ -1879,17 +1884,17 @@ element production_service implements microservice, observable, resilient:
     scope db_mod<rust> binds microservice.database.module = rust.module_selector('service::db')
     scope dockerfile binds microservice.container.dockerfile = files.file_selector('service.dockerfile')
     
-    connection_point api: HttpHandler binds microservice.api.rest_endpoint = rust.public_functions(api_mod)
-    connection_point db: DbConnection binds microservice.database.connection = rust.struct_selector(db_mod, 'DbConnection')
-    connection_point ports: integer binds microservice.container.ports = rust.const_selector(api_mod, 'PORT')
+    ref api: HttpHandler binds microservice.api.rest_endpoint = rust.public_functions(api_mod)
+    ref db: DbConnection binds microservice.database.connection = rust.struct_selector(db_mod, 'DbConnection')
+    ref ports: integer binds microservice.container.ports = rust.const_selector(api_mod, 'PORT')
     
     # Observable bindings
     scope metrics_mod<rust> binds observable.metrics.module = rust.module_selector('service::metrics')
-    connection_point prometheus: MetricsHandler binds observable.metrics.prometheus_endpoint = rust.function_selector(metrics_mod, 'metrics_handler')
+    ref prometheus: MetricsHandler binds observable.metrics.prometheus_endpoint = rust.function_selector(metrics_mod, 'metrics_handler')
     
     # Resilient bindings
     scope resilience_mod<rust> binds resilient.circuit_breaker.module = rust.module_selector('service::resilience')
-    connection_point breaker: BreakerConfig binds resilient.circuit_breaker.breaker_config = rust.struct_selector(resilience_mod, 'CircuitBreakerConfig')
+    ref breaker: BreakerConfig binds resilient.circuit_breaker.breaker_config = rust.struct_selector(resilience_mod, 'CircuitBreakerConfig')
 ```
 
 ---
@@ -1981,7 +1986,7 @@ This section helps migrate existing Hielements V1 code to V2 syntax.
 | Language annotation | `scope name : lang = expr` | `scope name<lang> = expr` |
 | Template scopes | `scope name = expr` | `scope name<lang>` (unbounded) |
 | Binding scopes | `template.element.scope = expr` | `scope name<lang> binds template.element.scope = expr` |
-| Connection points | `connection_point name: Type = expr` | `connection_point name: Type binds path = expr` (for bindings) |
+| Connection points | `ref name: Type = expr` | `ref name: Type binds path = expr` (for bindings) |
 
 ### D.2 Language Annotation Changes
 
@@ -2005,18 +2010,18 @@ element my_service:
 
 **V1 (Deprecated):**
 ```hielements
-template compiler:
+pattern compiler:
     element lexer:
         scope module = rust.module_selector('lexer')  # Bound in pattern
-        connection_point tokens: TokenStream = rust.function_selector(module, 'tokenize')
+        ref tokens: TokenStream = rust.function_selector(module, 'tokenize')
 ```
 
 **V2 (Current):**
 ```hielements
-template compiler:
+pattern compiler:
     element lexer:
         scope module<rust>  # Unbounded - no '=' expression
-        connection_point tokens: TokenStream
+        ref tokens: TokenStream
 ```
 
 **Migration**: Remove the `= expression` part from pattern scopes. They become placeholders.
@@ -2034,12 +2039,12 @@ element my_compiler implements compiler:
 ```hielements
 element my_compiler implements compiler:
     scope lexer_mod<rust> binds compiler.lexer.module = rust.module_selector('mycompiler::lexer')
-    connection_point tokens: TokenStream binds compiler.lexer.tokens = rust.function_selector(lexer_mod, 'tokenize')
+    ref tokens: TokenStream binds compiler.lexer.tokens = rust.function_selector(lexer_mod, 'tokenize')
 ```
 
 **Migration**:
 1. Change `pattern.element.scope = expr` to `scope name<lang> binds pattern.element.scope = expr`
-2. Change `pattern.element.connection_point = expr` to `connection_point name: Type binds pattern.element.connection_point = expr`
+2. Change `pattern.element.ref = expr` to `ref name: Type binds pattern.element.ref = expr`
 
 ### D.5 Descriptive-Only Mode
 
@@ -2049,7 +2054,7 @@ V2 supports using the language without patterns or bindings. If you're not using
 # V2 descriptive-only (no patterns, no binds)
 element my_service:
     scope src<rust> = rust.module_selector('my_service')
-    connection_point api: HttpHandler = rust.public_functions(src)
+    ref api: HttpHandler = rust.public_functions(src)
     check rust.function_exists(src, 'main')
 ```
 
@@ -2060,10 +2065,10 @@ element my_service:
 import python
 import docker
 
-template microservice:
+pattern microservice:
     element api:
         scope module = python.module_selector('api')
-        connection_point endpoint = python.public_functions(module)
+        ref endpoint = python.public_functions(module)
     
     element container:
         scope dockerfile = docker.file_selector('Dockerfile')
@@ -2081,10 +2086,10 @@ element orders implements microservice:
 import files
 import rust
 
-template microservice:
+pattern microservice:
     element api:
         scope module<rust>  # Unbounded
-        connection_point endpoint: HttpHandler
+        ref endpoint: HttpHandler
     
     element container:
         scope dockerfile
@@ -2093,7 +2098,7 @@ template microservice:
 
 element orders implements microservice:
     scope api_mod<rust> binds microservice.api.module = rust.module_selector('orders::api')
-    connection_point endpoint: HttpHandler binds microservice.api.endpoint = rust.public_functions(api_mod)
+    ref endpoint: HttpHandler binds microservice.api.endpoint = rust.public_functions(api_mod)
     scope dockerfile binds microservice.container.dockerfile = files.file_selector('orders.dockerfile')
 ```
 
