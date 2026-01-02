@@ -8,7 +8,7 @@ This guide walks you through using Hielements to describe, document, and enforce
 
 1. [Getting Started](#getting-started)
 2. [Writing Your First Hielements Spec](#writing-your-first-hielements-spec)
-3. [Using Element Templates](#using-element-templates)
+3. [Using Patterns](#using-patterns)
 4. [Creating Custom Libraries](#creating-custom-libraries)
 5. [Best Practices](#best-practices)
 6. [Integration with CI/CD](#integration-with-cicd)
@@ -155,15 +155,17 @@ element containerized_service:
 
 ---
 
-## Using Element Templates
+## Using Patterns
 
-Element templates are reusable architectural patterns that can be instantiated with concrete implementations. Templates help enforce consistent structure across similar components.
+Patterns are reusable architectural blueprints that can be instantiated with concrete implementations. Patterns (declared with the `template` keyword) help enforce consistent structure across similar components.
 
-### What Are Templates?
+> 📚 **See the [Pattern Catalog](doc/patterns_catalog.md)** for an extensive collection of common software engineering patterns with their Hielements implementations.
 
-Templates define the **structure** and **requirements** that elements must satisfy. Think of them as architectural blueprints or interfaces that elements implement.
+### What Are Patterns?
 
-### Defining a Template
+Patterns define the **structure** and **requirements** that elements must satisfy. Think of them as architectural blueprints or interfaces that elements implement.
+
+### Defining a Pattern
 
 Use the `template` keyword to define reusable patterns:
 
@@ -183,7 +185,7 @@ template compiler:
     check compiler.lexer.tokens.compatible_with(compiler.parser.input)
 ```
 
-### Implementing a Template
+### Implementing a Pattern
 
 Use the `implements` keyword to create concrete implementations:
 
@@ -203,9 +205,9 @@ element python_compiler implements compiler:
         check rust.function_exists(module, 'optimize_ast')
 ```
 
-### Multiple Template Implementation
+### Multiple Pattern Implementation
 
-Elements can implement multiple templates:
+Elements can implement multiple patterns:
 
 ```hielements
 template microservice:
@@ -220,7 +222,7 @@ template observable:
     element logging:
         connection_point log_output
 
-## Implement both templates
+## Implement both patterns
 element orders_service implements microservice, observable:
     ## Microservice bindings
     microservice.api.scope = python.module_selector('orders.api')
@@ -230,28 +232,28 @@ element orders_service implements microservice, observable:
     observable.metrics.scope = python.module_selector('orders.metrics')
     observable.logging.scope = python.module_selector('orders.logging')
     
-    ## Cross-template checks
+    ## Cross-pattern checks
     check microservice.api.exposes_rest()
     check observable.metrics.prometheus_endpoint.is_available()
 ```
 
-### Benefits of Templates
+### Benefits of Patterns
 
 1. **Consistency**: Ensure similar components follow the same structure
 2. **Reusability**: Define architectural patterns once, use everywhere
-3. **Evolution**: Update the template to update all implementations
-4. **Documentation**: Templates serve as architectural documentation
+3. **Evolution**: Update the pattern to update all implementations
+4. **Documentation**: Patterns serve as architectural documentation
 5. **Validation**: Automatically verify implementations conform to patterns
 
-### When to Use Templates
+### When to Use Patterns
 
-Use templates when:
+Use patterns when:
 - You have multiple components with similar structure (e.g., multiple microservices)
-- You want to enforce architectural patterns (e.g., hexagonal architecture)
+- You want to enforce architectural constraints (e.g., hexagonal architecture)
 - You need consistent structure across teams or projects
 - You're building a framework or platform with expected patterns
 
-Don't use templates when:
+Don't use patterns when:
 - Components are truly unique with no shared structure
 - The pattern is used only once
 - The abstraction would be more complex than the concrete code
@@ -798,14 +800,14 @@ Hielements implements the Language Server Protocol (LSP), enabling integration w
 
 ## Advanced Topics
 
-### Using Element Templates at Scale
+### Using Patterns at Scale
 
 For large organizations, consider:
 
-1. **Template Libraries**: Create organization-wide template libraries
-2. **Template Governance**: Establish processes for creating and updating templates
-3. **Template Documentation**: Document each template's purpose and usage
-4. **Template Versioning**: Version templates independently of implementations
+1. **Pattern Libraries**: Create organization-wide pattern libraries
+2. **Pattern Governance**: Establish processes for creating and updating patterns
+3. **Pattern Documentation**: Document each pattern's purpose and usage
+4. **Pattern Versioning**: Version patterns independently of implementations
 
 ### Custom Library Development
 
@@ -839,6 +841,7 @@ element service_b:
 ## Getting Help
 
 - 📖 [Language Reference](doc/language_reference.md) - Complete syntax reference
+- 📚 [Pattern Catalog](doc/patterns_catalog.md) - Software engineering patterns
 - 🔌 [External Libraries Guide](doc/external_libraries.md) - Creating custom libraries
 - 🏗️ [Technical Architecture](doc/technical_architecture.md) - Implementation details
 - 💬 [Discussions](https://github.com/ercasta/hielements/discussions) - Ask questions
@@ -850,10 +853,11 @@ element service_b:
 
 1. **Explore Examples**: Check out the [`examples/`](examples/) directory
 2. **Read the Language Reference**: Dive deep into [language_reference.md](doc/language_reference.md)
-3. **Create Your First Spec**: Start with a simple element describing part of your system
-4. **Add Checks**: Gradually add checks to enforce your architecture
-5. **Use Templates**: Abstract common patterns into reusable templates
-6. **Integrate CI/CD**: Add architecture checks to your pipeline
-7. **Extend with Libraries**: Create custom libraries for your needs
+3. **Browse the Pattern Catalog**: See common patterns in [patterns_catalog.md](doc/patterns_catalog.md)
+4. **Create Your First Spec**: Start with a simple element describing part of your system
+5. **Add Checks**: Gradually add checks to enforce your architecture
+6. **Use Patterns**: Abstract common constraints into reusable patterns
+7. **Integrate CI/CD**: Add architecture checks to your pipeline
+8. **Extend with Libraries**: Create custom libraries for your needs
 
 Happy architecting with Hielements! 🏗️

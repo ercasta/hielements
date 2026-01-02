@@ -25,7 +25,7 @@ It is possible to use only the descriptive part without the prescriptive one; in
 5. [Connection Points](#5-connection-points)
 6. [Rules (Checks)](#6-rules-checks)
 7. [Children Elements](#7-children-elements)
-8. [Element Templates](#8-element-templates)
+8. [Patterns](#8-patterns)
 9. [Language Declarations](#9-language-declarations)
 10. [Imports and Modules](#10-imports-and-modules)
 11. [Expressions](#11-expressions)
@@ -77,9 +77,9 @@ The following are reserved keywords:
 | Keyword | Description |
 |---------|-------------|
 | `element` | Declares an element |
-| `template` | Declares an element template |
-| `implements` | Declares that an element implements template(s) |
-| `binds` | Binds a scope/ref to a template declaration |
+| `template` | Declares a pattern (reusable architectural blueprint) |
+| `implements` | Declares that an element implements pattern(s) |
+| `binds` | Binds a scope/ref to a pattern declaration |
 | `scope` | Declares a scope selector |
 | `ref` | Declares a reference point (V3, preferred over `connection_point`) |
 | `connection_point` | Declares a connection point (supported for backward compatibility, prefer `ref`) |
@@ -90,9 +90,9 @@ The following are reserved keywords:
 | `from` | Selective import |
 | `true` | Boolean literal |
 | `false` | Boolean literal |
-| `requires` | Declares a required component (templates only) |
-| `allows` | Declares an allowed component (templates only) |
-| `forbids` | Declares a forbidden component (templates only) |
+| `requires` | Declares a required component (patterns only) |
+| `allows` | Declares an allowed component (patterns only) |
+| `forbids` | Declares a forbidden component (patterns only) |
 | `descendant` | Modifier for hierarchical requirements (applies to descendants) |
 | `connection` | Specifies a connection requirement |
 | `to` | Specifies connection target |
@@ -301,9 +301,9 @@ element my_service:
 
 The language annotation is specified in angular brackets immediately after the scope name (`<language_name>`).
 
-### 4.4 Unbounded Scopes in Templates
+### 4.4 Unbounded Scopes in Patterns
 
-In templates, scopes are **unbounded** (declared without a selector expression). They serve as placeholders to be bound by implementing elements:
+In patterns (declared with `template`), scopes are **unbounded** (declared without a selector expression). They serve as placeholders to be bound by implementing elements:
 
 ```hielements
 template observable:
@@ -315,18 +315,18 @@ template observable:
 
 ### 4.5 Binding Scopes with `binds` (V2)
 
-When an element implements a template, it uses the `binds` keyword to connect its scopes to the template's unbounded scopes:
+When an element implements a pattern, it uses the `binds` keyword to connect its scopes to the pattern's unbounded scopes:
 
 ```hielements
 element observable_component implements observable:
-    # Bind this scope to the template's unbounded scope
+    # Bind this scope to the pattern's unbounded scope
     scope main_module<rust> binds observable.metrics.module = rust.module_selector('payments::api')
     
-    # Bind a connection point to the template's connection point
+    # Bind a connection point to the pattern's connection point
     connection_point main_handler: MetricsHandler binds observable.metrics.prometheus = rust.function_selector(main_module, 'handler')
 ```
 
-The `binds` clause specifies which template scope/connection_point this declaration satisfies.
+The `binds` clause specifies which pattern scope/connection_point this declaration satisfies.
 
 ### 4.6 Multiple Scopes
 
@@ -685,15 +685,17 @@ element microservices:
 
 ---
 
-## 8. Element Templates
+## 8. Patterns
 
-Element templates allow creating reusable element definitions that define the nature of a component. Templates establish structural patterns that elements can implement with concrete scopes and checks.
+Patterns (declared with the `template` keyword) allow creating reusable architectural blueprints that define conformance requirements. Patterns establish structural constraints that elements can implement with concrete scopes and checks.
 
-In V2, templates define **unbounded** scopes that serve as placeholders, while implementing elements use the **`binds`** keyword to provide concrete bindings.
+> **Note**: The `template` keyword is used for declaring patterns. The term "pattern" better reflects the intent: defining architectural patterns that implementations must conform to. See the [Pattern Catalog](patterns_catalog.md) for an extensive collection of common software engineering patterns.
 
-### 8.1 Template Declaration (V2)
+In V2, patterns define **unbounded** scopes that serve as placeholders, while implementing elements use the **`binds`** keyword to provide concrete bindings.
 
-Templates are declared using the `template` keyword and define a structure with **unbounded scopes**:
+### 8.1 Pattern Declaration (V2)
+
+Patterns are declared using the `template` keyword and define a structure with **unbounded scopes**:
 
 ```hielements
 template observable:
@@ -708,31 +710,31 @@ template observable:
 ```
 
 **Key V2 Changes:**
-- Scopes in templates are **unbounded** (no `=` expression)
+- Scopes in patterns are **unbounded** (no `=` expression)
 - Language is specified via **angular brackets** (`<rust>`)
-- Templates can include `allows`/`requires`/`forbids` constraints
+- Patterns can include `allows`/`requires`/`forbids` constraints
 
-### 8.2 Implementing Templates with `binds` (V2)
+### 8.2 Implementing Patterns with `binds` (V2)
 
-Elements implement templates using the `implements` keyword, then use **`binds`** to connect their scopes:
+Elements implement patterns using the `implements` keyword, then use **`binds`** to connect their scopes:
 
 ```hielements
 element observable_component implements observable:
-    # Bind scope to template's unbounded scope
+    # Bind scope to pattern's unbounded scope
     scope main_module<rust> binds observable.metrics.module = rust.module_selector('payments::api')
     
     # Bind connection point
     connection_point main_handler: MetricsHandler binds observable.metrics.prometheus = rust.function_selector(main_module, 'handler')
 ```
 
-The `binds` keyword creates an explicit connection between the element's scope and the template's placeholder.
+The `binds` keyword creates an explicit connection between the element's scope and the pattern's placeholder.
 
 ### 8.3 Descriptive-Only Mode
 
 The `implements` and `binds` keywords are **optional**. When omitted, Hielements operates in "descriptive-only" mode without prescriptive enforcement:
 
 ```hielements
-# Descriptive only - no template implementation
+# Descriptive only - no pattern implementation
 element simple_component:
     scope src<rust> = rust.module_selector('mymodule')
     check rust.function_exists(src, 'main')
@@ -740,7 +742,7 @@ element simple_component:
 
 ### 8.4 Absolute References
 
-Template properties are referenced using absolute paths prefixed with the template name (e.g., `observable.metrics`). This prevents name clashes when implementing multiple templates:
+Pattern properties are referenced using absolute paths prefixed with the pattern name (e.g., `observable.metrics`). This prevents name clashes when implementing multiple patterns:
 
 ```hielements
 template microservice:
@@ -762,9 +764,9 @@ element my_service implements microservice, observable:
     check microservice.api.rest_endpoint.port != observable.api.metrics_endpoint.port
 ```
 
-### 8.5 Multiple Template Implementation
+### 8.5 Multiple Pattern Implementation
 
-An element can implement multiple templates:
+An element can implement multiple patterns:
 
 ```hielements
 template resilient:
@@ -786,9 +788,9 @@ element production_service implements microservice, resilient, secured:
     scope auth<rust> binds secured.authentication.module = rust.module_selector('auth')
 ```
 
-### 8.6 Template Requirements
+### 8.6 Pattern Requirements
 
-When implementing a template, all unbounded scopes must be bound:
+When implementing a pattern, all unbounded scopes must be bound:
 
 ```hielements
 template web_service:
@@ -813,9 +815,9 @@ element incomplete_service implements web_service:
     # ERROR: web_service.backend bindings missing
 ```
 
-### 8.7 Template Checks
+### 8.7 Pattern Checks
 
-Checks defined in templates are automatically included when the template is implemented. The checks use absolute references and are evaluated with the concrete bindings:
+Checks defined in patterns are automatically included when the pattern is implemented. The checks use absolute references and are evaluated with the concrete bindings:
 
 ```hielements
 template microservice:
@@ -826,7 +828,7 @@ template microservice:
     element container:
         scope dockerfile
     
-    # Template checks
+    # Pattern checks
     check microservice.container.exposes_port(8080)
     check microservice.api.connects_to(microservice.database)
 
@@ -835,39 +837,39 @@ element orders_service implements microservice:
     scope db<postgres> binds microservice.database.db = postgres.database_selector('orders_db')
     scope dockerfile binds microservice.container.dockerfile = docker.file_selector('orders.dockerfile')
     
-    # The template checks are automatically evaluated with bound scopes
+    # The pattern checks are automatically evaluated with bound scopes
 ```
 
-### 8.8 Library-Defined Templates
+### 8.8 Library-Defined Patterns
 
-Templates can be defined in external libraries and imported for use:
+Patterns can be defined in external libraries and imported for use:
 
 ```hielements
 import architecture_patterns
 
 element my_service implements architecture_patterns.hexagonal:
-    # Bind the hexagonal architecture template elements
+    # Bind the hexagonal architecture pattern elements
     scope domain<python> binds hexagonal.domain.src = python.package_selector('myapp.domain')
     scope app<python> binds hexagonal.application.src = python.package_selector('myapp.application')
     scope adapters<python> binds hexagonal.adapters.src = python.package_selector('myapp.adapters')
 ```
 
-External libraries can provide templates via the library protocol. See the [External Library Plugin Guide](external_libraries.md) for details.
+External libraries can provide patterns via the library protocol. See the [External Library Plugin Guide](external_libraries.md) for details.
 
-### 8.9 Template Semantics (V2)
+### 8.9 Pattern Semantics (V2)
 
-- Templates define **structure** with **unbounded scopes**
-- Elements implementing templates use **`binds`** to connect scopes
+- Patterns define **structure** with **unbounded scopes**
+- Elements implementing patterns use **`binds`** to connect scopes
 - **Angular brackets** specify language (`<rust>`, `<python>`)
 - `implements` and `binds` are **optional** (for prescriptive features)
-- Template checks are **inherited** by implementing elements
-- Absolute references **prevent name clashes** between multiple templates
-- Templates **cannot be nested** (a template cannot implement another template)
-- Template names must be **unique** within their scope
+- Pattern checks are **inherited** by implementing elements
+- Absolute references **prevent name clashes** between multiple patterns
+- Patterns **cannot be nested** (a pattern cannot implement another pattern)
+- Pattern names must be **unique** within their scope
 
-### 8.10 Template-Level Connection Points
+### 8.10 Pattern-Level Connection Points
 
-Templates can declare connection points at the template level (not just within child elements). These connection points can be used in template checks and must be bound when implementing the template.
+Patterns can declare connection points at the pattern level (not just within child elements). These connection points can be used in pattern checks and must be bound when implementing the pattern.
 
 **Example:**
 
@@ -879,19 +881,19 @@ template microservice:
     element container:
         scope dockerfile
     
-    ## Template-level unbounded connection point
+    ## Pattern-level unbounded connection point
     connection_point port: integer
     
-    ## Template checks can reference the template-level connection point
+    ## Pattern checks can reference the pattern-level connection point
     check files.exists(container.dockerfile, 'Dockerfile')
     check rust.function_exists(api.module, 'start_server')
 
-## When implementing, bind the template-level connection point
+## When implementing, bind the pattern-level connection point
 element orders_service implements microservice:
     scope api_mod<rust> binds microservice.api.module = rust.module_selector('orders::api')
     scope dockerfile binds microservice.container.dockerfile = files.file_selector('orders.dockerfile')
     
-    ## Bind the template-level port
+    ## Bind the pattern-level port
     connection_point service_port: integer binds microservice.port = rust.const_selector('ORDERS_PORT')
 
 element payments_service implements microservice:
@@ -903,10 +905,10 @@ element payments_service implements microservice:
 ```
 
 **Benefits:**
-- **Parameterization**: Templates can be parameterized without hardcoding values
-- **Reusability**: Same template structure with different concrete values
+- **Parameterization**: Patterns can be parameterized without hardcoding values
+- **Reusability**: Same pattern structure with different concrete values
 - **Type Safety**: Connection points have type annotations ensuring correctness
-- **Clarity**: Makes template dependencies and parameters explicit
+- **Clarity**: Makes pattern dependencies and parameters explicit
 
 ### 8.11 Hierarchical Checks
 
@@ -938,7 +940,7 @@ template production_ready:
 
 #### Satisfying Hierarchical Requirements
 
-When an element implements a template with hierarchical requirements, at least one of its descendants must satisfy each requirement:
+When an element implements a pattern with hierarchical requirements, at least one of its descendants must satisfy each requirement:
 
 ```hielements
 element my_app implements dockerized:
@@ -952,7 +954,7 @@ element my_app implements dockerized:
         scope dockerfile binds dockerized.dockerfile = docker.file_selector('Dockerfile')  ## Matches!
         check docker.has_healthcheck(dockerfile)               ## Matches!
 
-## Template implementation requirements
+## Pattern implementation requirements
 element ecommerce_platform implements production_ready:
     ## Frontend - neither dockerized nor observable
     element frontend:
@@ -974,8 +976,8 @@ element ecommerce_platform implements production_ready:
 |------|--------|-------------|
 | Scope | `requires descendant scope name[<lang>]` | A descendant must have a matching scope |
 | Check | `requires descendant check expr` | A descendant must satisfy this check |
-| Element | `requires descendant element name [implements template]` | A descendant must have an element with this structure |
-| Template Implementation | `requires descendant implements template_name` | A descendant must implement the specified template |
+| Element | `requires descendant element name [implements pattern]` | A descendant must have an element with this structure |
+| Pattern Implementation | `requires descendant implements pattern_name` | A descendant must implement the specified pattern |
 | Connection Point | `requires descendant connection_point name: Type` | A descendant must have a connection point |
 
 #### Immediate vs Descendant Requirements
@@ -995,11 +997,11 @@ template microservice:
 
 Connection boundaries allow specifying constraints on architectural dependencies (imports/dependencies) between elements. These boundaries are inherited by all descendants. **Note**: "Connections" refer to logical/architectural dependencies like module imports, not network connections.
 
-**Important**: Connection boundaries (`allows connection`, `forbids connection`, `requires connection`) are **only allowed in templates**, not in regular elements. Elements can inherit these constraints by implementing templates that define them.
+**Important**: Connection boundaries (`allows connection`, `forbids connection`, `requires connection`) are **only allowed in patterns**, not in regular elements. Elements can inherit these constraints by implementing patterns that define them.
 
 #### Allowing Connections
 
-Use `allows connection to` in templates to whitelist specific connection targets:
+Use `allows connection to` in patterns to whitelist specific connection targets:
 
 ```hielements
 template frontend_zone:
@@ -1017,7 +1019,7 @@ element my_frontend implements frontend_zone:
 
 #### Forbidding Connections
 
-Use `forbids connection to` in templates to blacklist specific connection targets:
+Use `forbids connection to` in patterns to blacklist specific connection targets:
 
 ```hielements
 template secure_zone:
@@ -1032,7 +1034,7 @@ element internal_service implements secure_zone:
 
 #### Requiring Connections
 
-Use `requires connection to` in templates to mandate that code MUST have a dependency:
+Use `requires connection to` in patterns to mandate that code MUST have a dependency:
 
 ```hielements
 template service_mesh_zone:
@@ -1050,7 +1052,7 @@ element service_mesh implements service_mesh_zone:
 Connection patterns support wildcards with `.*` to match any sub-path:
 
 ```hielements
-## In templates:
+## In patterns:
 forbids connection to database.*       ## Matches database.connection, database.pool, etc.
 forbids connection to external.*       ## Matches anything under external
 allows connection to api.public.*      ## Matches api.public.users, api.public.orders, etc.
@@ -1087,7 +1089,7 @@ When A is allowed to connect to B, and B is allowed to connect to C:
 - `allows connection` boundaries create a **whitelist** - only listed targets are permitted
 - `forbids connection` boundaries create a **blacklist** - listed targets are prohibited
 - `requires connection` boundaries create a **mandate** - dependencies MUST exist
-- **Connection boundaries are only allowed in templates** - elements inherit them via `implements`
+- **Connection boundaries are only allowed in patterns** - elements inherit them via `implements`
 - Boundaries are **inherited** by all descendants within the parent/child hierarchy
 - Multiple boundaries are **combined** (allows AND forbids AND requires apply)
 - Wildcards (`.*`) match **any path suffix** (library-specific interpretation)
@@ -1095,7 +1097,7 @@ When A is allowed to connect to B, and B is allowed to connect to C:
 
 ### 8.12 Language Constraints
 
-Templates can constrain which programming languages elements may use through `requires`, `allows`, and `forbids` with the `language` keyword:
+Patterns can constrain which programming languages elements may use through `requires`, `allows`, and `forbids` with the `language` keyword:
 
 ```hielements
 template python_only:
@@ -1108,7 +1110,7 @@ template multilingual:
     allows language java
 ```
 
-When an element implements a template with language constraints:
+When an element implements a pattern with language constraints:
 - `requires language X` - The element must have at least one scope with language X
 - `allows language X` - Only languages X are permitted (whitelist)
 - `forbids language X` - Language X is prohibited (blacklist)
@@ -1498,7 +1500,8 @@ connection_check     ::= 'connection_check' identifier '(' parameter_list ')' ':
 parameter_list       ::= parameter (',' parameter)*
 parameter            ::= identifier ':' 'scope' '[' ']'
 
-(* Templates - with unbounded scopes *)
+(* Patterns - with unbounded scopes *)
+(* Note: The 'template' keyword is used to declare patterns *)
 template_declaration ::= doc_comment? 'template' identifier ':' NEWLINE INDENT template_body DEDENT
 template_body        ::= template_item+
 template_item        ::= scope_declaration_template
@@ -1507,16 +1510,16 @@ template_item        ::= scope_declaration_template
                        | element_declaration
                        | component_requirement
 
-(* Scope in templates - can be unbounded (no '=' expression) *)
+(* Scope in patterns - can be unbounded (no '=' expression) *)
 scope_declaration_template ::= 'scope' identifier language_annotation? NEWLINE
                              | 'scope' identifier language_annotation? '=' expression NEWLINE
 
-(* Connection point in templates - can be unbounded (no '=' expression) *)
+(* Connection point in patterns - can be unbounded (no '=' expression) *)
 connection_point_declaration_template ::= 'connection_point' identifier ':' type_name NEWLINE
                                         | 'connection_point' identifier ':' type_name '=' expression NEWLINE
 
 (* Elements *)
-(* Note: Elements do NOT support component_requirement - requires/allows/forbids are only in templates *)
+(* Note: Elements do NOT support component_requirement - requires/allows/forbids are only in patterns *)
 element_declaration ::= doc_comment? 'element' identifier template_implementation? ':' NEWLINE INDENT element_body DEDENT
 template_implementation ::= 'implements' identifier (',' identifier)*
 element_body        ::= element_item+
@@ -1525,7 +1528,7 @@ element_item        ::= scope_declaration
                       | check_declaration
                       | element_declaration
 
-(* Component Requirements - unified syntax - ONLY allowed in templates *)
+(* Component Requirements - unified syntax - ONLY allowed in patterns *)
 component_requirement ::= ('requires' | 'allows' | 'forbids') ['descendant'] component_spec
 component_spec        ::= scope_declaration_template
                         | check_declaration
@@ -1620,13 +1623,13 @@ element orders_service:
     check files.exists(dockerfile, 'Dockerfile')
 ```
 
-### 15.2 Template with Unbounded Scopes (V2)
+### 15.2 Pattern with Unbounded Scopes (V2)
 
 ```hielements
 import files
 import rust
 
-## Observable Template
+## Observable Pattern
 ## Defines a component that exposes metrics
 template observable:
     element metrics:
@@ -1638,9 +1641,9 @@ template observable:
         
         check files.exists(module, 'Cargo.toml')
 
-## Metrics Service implementing the observable template
+## Metrics Service implementing the observable pattern
 element metrics_service implements observable:
-    # Bind the scope to the template's unbounded scope
+    # Bind the scope to the pattern's unbounded scope
     scope metrics_mod<rust> binds observable.metrics.module = rust.module_selector('metrics::api')
     
     # Bind the connection point
@@ -1653,7 +1656,7 @@ element metrics_service implements observable:
 import files
 import rust
 
-## Microservice Template
+## Microservice Pattern
 template microservice:
     element api:
         scope module<rust>
@@ -1802,13 +1805,13 @@ element testing_standards:
         check rust.function_exists(tests, 'test_create_order')
 ```
 
-### 15.7 Element Templates (V2)
+### 15.7 Patterns (V2)
 
 ```hielements
 import files
 import rust
 
-## Compiler Template with unbounded scopes
+## Compiler Pattern with unbounded scopes
 ## Defines the structure of a compiler with lexer and parser components.
 template compiler:
     ## Lexer - tokenizes source code
@@ -1825,7 +1828,7 @@ template compiler:
     check compiler.lexer.tokens.compatible_with(compiler.parser.input)
 
 ## Rust Compiler Implementation
-## Implements the compiler template for Rust code.
+## Implements the compiler pattern for Rust code.
 element rust_compiler implements compiler:
     # Bind lexer with V2 binds syntax
     scope lexer_mod<rust> binds compiler.lexer.module = rust.module_selector('rustcompiler::lexer')
@@ -1840,7 +1843,7 @@ element rust_compiler implements compiler:
         scope module<rust> = rust.module_selector('rustcompiler::optimizer')
         check rust.function_exists(module, 'optimize_ast')
 
-## Microservice Template with unbounded scopes
+## Microservice Pattern with unbounded scopes
 template microservice:
     element api:
         scope module<rust>
@@ -1857,19 +1860,19 @@ template microservice:
     check microservice.container.exposes_port(8080)
     check microservice.api.connects_to(microservice.database)
 
-## Observable Template
+## Observable Pattern
 template observable:
     element metrics:
         scope module<rust>
         connection_point prometheus_endpoint: MetricsHandler
 
-## Resilient Template
+## Resilient Pattern
 template resilient:
     element circuit_breaker:
         scope module<rust>
         connection_point breaker_config: BreakerConfig
 
-## Production Service with Multiple Templates (V2 syntax)
+## Production Service with Multiple Patterns (V2 syntax)
 element production_service implements microservice, observable, resilient:
     # Microservice bindings with V2 binds syntax
     scope api_mod<rust> binds microservice.api.module = rust.module_selector('service::api')
@@ -1998,13 +2001,13 @@ element my_service:
 
 **Migration**: Replace `: language` with `<language>` after the scope name.
 
-### D.3 Template Unbounded Scopes
+### D.3 Pattern Unbounded Scopes
 
 **V1 (Deprecated):**
 ```hielements
 template compiler:
     element lexer:
-        scope module = rust.module_selector('lexer')  # Bound in template
+        scope module = rust.module_selector('lexer')  # Bound in pattern
         connection_point tokens: TokenStream = rust.function_selector(module, 'tokenize')
 ```
 
@@ -2016,7 +2019,7 @@ template compiler:
         connection_point tokens: TokenStream
 ```
 
-**Migration**: Remove the `= expression` part from template scopes. They become placeholders.
+**Migration**: Remove the `= expression` part from pattern scopes. They become placeholders.
 
 ### D.4 Element Bindings with `binds`
 
@@ -2035,15 +2038,15 @@ element my_compiler implements compiler:
 ```
 
 **Migration**:
-1. Change `template.element.scope = expr` to `scope name<lang> binds template.element.scope = expr`
-2. Change `template.element.connection_point = expr` to `connection_point name: Type binds template.element.connection_point = expr`
+1. Change `pattern.element.scope = expr` to `scope name<lang> binds pattern.element.scope = expr`
+2. Change `pattern.element.connection_point = expr` to `connection_point name: Type binds pattern.element.connection_point = expr`
 
 ### D.5 Descriptive-Only Mode
 
-V2 supports using the language without templates or bindings. If you're not using prescriptive features, you can write V2 code that looks similar to V1:
+V2 supports using the language without patterns or bindings. If you're not using prescriptive features, you can write V2 code that looks similar to V1:
 
 ```hielements
-# V2 descriptive-only (no templates, no binds)
+# V2 descriptive-only (no patterns, no binds)
 element my_service:
     scope src<rust> = rust.module_selector('my_service')
     connection_point api: HttpHandler = rust.public_functions(src)
@@ -2097,10 +2100,10 @@ element orders implements microservice:
 ### D.7 Migration Checklist
 
 - [ ] Update all language annotations from `: lang` to `<lang>`
-- [ ] Remove `= expression` from template scopes (make them unbounded)
-- [ ] Remove `= expression` from template connection points (make them unbounded)
-- [ ] Add `binds template.path` clause to element scopes that bind to templates
-- [ ] Add `binds template.path` clause to element connection points that bind to templates
+- [ ] Remove `= expression` from pattern scopes (make them unbounded)
+- [ ] Remove `= expression` from pattern connection points (make them unbounded)
+- [ ] Add `binds pattern.path` clause to element scopes that bind to patterns
+- [ ] Add `binds pattern.path` clause to element connection points that bind to patterns
 - [ ] Update any references to use the new local scope names
 - [ ] Test that all checks pass with the new syntax
 
@@ -2109,7 +2112,7 @@ element orders implements microservice:
 **Hielements V2 is NOT backward compatible with V1.** The V1 syntax is deprecated and no longer supported. All existing V1 code must be migrated to V2 syntax.
 
 The key philosophy changes:
-- **Templates are prescriptive** - they define structure without implementation
+- **Patterns are prescriptive** - they define structure without implementation
 - **Elements are descriptive** - they bind to actual code
 - **`binds` makes connections explicit** - clearer separation of concerns
 - **Angular brackets for language** - more consistent with type syntax conventions

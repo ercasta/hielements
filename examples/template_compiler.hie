@@ -1,12 +1,12 @@
-# Example: Compiler Template
-# Demonstrates element templates with a compiler structure
+# Example: Compiler Pattern
+# Demonstrates patterns with a compiler structure
 
 import files
 import rust
 
-## Compiler Template
+## Compiler Pattern
 ## Defines the standard structure of a compiler with lexer and parser components.
-## This template can be reused for different compiler implementations.
+## This pattern can be reused for different compiler implementations.
 template compiler:
     ## Lexer component
     ## Responsible for tokenizing source code
@@ -24,7 +24,7 @@ template compiler:
     check compiler.lexer.tokens.compatible_with(compiler.parser.input)
 
 ## Python Compiler
-## A concrete implementation of the compiler template for Python code.
+## A concrete implementation of the compiler pattern for Python code.
 element python_compiler implements compiler:
     # Bind lexer element to concrete Rust module
     compiler.lexer.scope = rust.module_selector('pycompiler::lexer')
@@ -44,7 +44,7 @@ element python_compiler implements compiler:
         check rust.function_exists(module, 'generate_bytecode')
 
 ## JavaScript Compiler
-## Another implementation of the compiler template for JavaScript.
+## Another implementation of the compiler pattern for JavaScript.
 element js_compiler implements compiler:
     # Bind lexer element
     compiler.lexer.scope = rust.module_selector('jscompiler::lexer')
