@@ -32,7 +32,7 @@ Modern software systems are complex. As codebases grow, their actual structure d
 Hielements V2 separates two key concerns:
 
 **🏗️ Prescriptive** — Define the rules and constraints
-- **Patterns** (declared with `template`) establish architectural blueprints
+- **Patterns** (declared with `pattern`) establish architectural blueprints
 - **Checks** enforce rules and requirements
 - Keywords like `requires`, `forbids`, and `allows` control constraints
 - Patterns declare what *should* be true
@@ -62,7 +62,7 @@ element orders_service:
     scope dockerfile<docker> = docker.file_selector('orders_service.dockerfile')
     
     # Define connection points with types
-    connection_point main: PythonModule = python.get_main_module(python_module)
+    ref main: PythonModule = python.get_main_module(python_module)
     
     # Enforce rules
     check docker.exposes_port(dockerfile, 8080)
@@ -77,25 +77,30 @@ Define architectural patterns once and reuse them across your system:
 
 ```hielements
 # Define a pattern for microservices (prescriptive)
-template microservice:
-    element api:
+pattern microservice {
+    element api {
         scope module<python>  # Unbounded scope in pattern
-        connection_point rest_endpoint: RestEndpoint
-    element database:
-        connection_point connection: DatabaseConnection
+        ref rest_endpoint: RestEndpoint
+    }
+    element database {
+        ref connection: DatabaseConnection
+    }
     check microservice.api.exposes_rest()
+}
 
 # Implement the pattern multiple times (descriptive + prescriptive)
-element orders_service implements microservice:
+element orders_service implements microservice {
     # Bind pattern scopes to actual code using V2 syntax
     scope api_mod<python> binds microservice.api.module = python.module_selector('orders.api')
-    connection_point endpoint: RestEndpoint binds microservice.api.rest_endpoint = python.public_functions(api_mod)
-    connection_point db: DatabaseConnection binds microservice.database.connection = postgres.database_selector('orders_db')
+    ref endpoint: RestEndpoint binds microservice.api.rest_endpoint = python.public_functions(api_mod)
+    ref db: DatabaseConnection binds microservice.database.connection = postgres.database_selector('orders_db')
+}
 
-element payments_service implements microservice:
+element payments_service implements microservice {
     scope api_mod<python> binds microservice.api.module = python.module_selector('payments.api')
-    connection_point endpoint: RestEndpoint binds microservice.api.rest_endpoint = python.public_functions(api_mod)
-    connection_point db: DatabaseConnection binds microservice.database.connection = postgres.database_selector('payments_db')
+    ref endpoint: RestEndpoint binds microservice.api.rest_endpoint = python.public_functions(api_mod)
+    ref db: DatabaseConnection binds microservice.database.connection = postgres.database_selector('payments_db')
+}
 ```
 
 Patterns ensure consistency across similar components and make architectural constraints explicit.
@@ -109,22 +114,26 @@ Patterns ensure consistency across similar components and make architectural con
 Define architectural patterns once and reuse them across your codebase:
 
 ```hielements
-template compiler:
-    element lexer:
+pattern compiler {
+    element lexer {
         scope module<rust>  # Unbounded scope (V2)
-        connection_point tokens: TokenStream
-    element parser:
+        ref tokens: TokenStream
+    }
+    element parser {
         scope module<rust>  # Unbounded scope (V2)
-        connection_point ast: AbstractSyntaxTree
+        ref ast: AbstractSyntaxTree
+    }
     check compiler.lexer.tokens.compatible_with(compiler.parser.input)
+}
 
-element python_compiler implements compiler:
+element python_compiler implements compiler {
     # Bind pattern scopes using V2 binds keyword
     scope lexer_mod<rust> binds compiler.lexer.module = rust.module_selector('pycompiler::lexer')
-    connection_point lexer_tokens: TokenStream binds compiler.lexer.tokens = rust.function_selector(lexer_mod, 'tokenize')
+    ref lexer_tokens: TokenStream binds compiler.lexer.tokens = rust.function_selector(lexer_mod, 'tokenize')
     
     scope parser_mod<rust> binds compiler.parser.module = rust.module_selector('pycompiler::parser')
-    connection_point parser_ast: AbstractSyntaxTree binds compiler.parser.ast = rust.function_selector(parser_mod, 'parse')
+    ref parser_ast: AbstractSyntaxTree binds compiler.parser.ast = rust.function_selector(parser_mod, 'parse')
+}
 ```
 
 Patterns ensure consistency across similar components, making architectural constraints explicit and enforceable.
@@ -138,13 +147,13 @@ Explicit type annotations are **required** for all connection points, enabling c
 ```hielements
 element api_service:
     # Basic types (mandatory)
-    connection_point port: integer = docker.exposed_port(dockerfile)
-    connection_point api_url: string = config.get_url()
-    connection_point ssl_enabled: boolean = config.get_flag('ssl')
+    ref port: integer = docker.exposed_port(dockerfile)
+    ref api_url: string = config.get_url()
+    ref ssl_enabled: boolean = config.get_flag('ssl')
     
     # Custom types for domain-specific interfaces
-    connection_point handler: HttpHandler = python.public_functions(module)
-    connection_point db_conn: DatabaseConnection = python.class_selector(module, 'Database')
+    ref handler: HttpHandler = python.public_functions(module)
+    ref db_conn: DatabaseConnection = python.class_selector(module, 'Database')
 ```
 
 Mandatory types provide safety and serve as inline documentation of interfaces.
@@ -154,34 +163,41 @@ Mandatory types provide safety and serve as inline documentation of interfaces.
 Define requirements that must be satisfied somewhere in your element hierarchy, enabling flexible yet enforceable architectural constraints:
 
 ```hielements
-template dockerized:
+pattern dockerized {
     ## At least one descendant must have a docker configuration
     requires descendant scope dockerfile<docker>
     requires descendant check docker.has_healthcheck(dockerfile)
+}
 
-element my_app implements dockerized:
-    element frontend:
+element my_app implements dockerized {
+    element frontend {
         scope src<files> = files.folder_selector('frontend')
         # Not dockerized - that's OK
+    }
     
-    element backend:
+    element backend {
         scope dockerfile<docker> binds dockerized.dockerfile = docker.file_selector('Dockerfile.backend')
         check docker.has_healthcheck(dockerfile)
         # This satisfies the hierarchical requirement!
+    }
+}
 ```
 
 Hierarchical checks also support **connection boundaries** to control architectural dependencies:
 
 ```hielements
-template frontend_zone:
+pattern frontend_zone {
     ## Code in this zone may only import from API gateway
     allows connection to api_gateway.public_api
     forbids connection to database.*
+}
 
-element my_frontend implements frontend_zone:
-    element web_app:
+element my_frontend implements frontend_zone {
+    element web_app {
         scope src<javascript> = files.folder_selector('frontend/web')
         # Inherits connection boundaries - cannot access database
+    }
+}
 ```
 
 Benefits:
@@ -220,8 +236,8 @@ Make inter-component relationships visible and verifiable:
 
 ```hielements
 element api_server:
-    connection_point rest_api = python.public_functions(api_module)
-    connection_point database = postgres.connection(config)
+    ref rest_api = python.public_functions(api_module)
+    ref database = postgres.connection(config)
 ```
 
 ### ✅ Enforceable Rules
@@ -490,7 +506,7 @@ Yes! Hielements works with both greenfield and brownfield projects.
 Linters check code quality and style within a single file or module. Hielements checks architectural rules across your entire system, including relationships between components.
 
 ### What's the difference between prescriptive and descriptive modes?
-**Descriptive mode** lets you document your architecture without enforcement—useful for understanding existing systems or when you need flexibility. **Prescriptive mode** uses patterns (declared with `template`), `requires`/`forbids`/`allows` keywords, and checks to enforce architectural rules. You can mix both modes: describe some parts of your system while prescribing rules for others.
+**Descriptive mode** lets you document your architecture without enforcement—useful for understanding existing systems or when you need flexibility. **Prescriptive mode** uses patterns (declared with `pattern`), `requires`/`forbids`/`allows` keywords, and checks to enforce architectural rules. You can mix both modes: describe some parts of your system while prescribing rules for others.
 
 ---
 

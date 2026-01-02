@@ -7,18 +7,18 @@ import rust
 ## Compiler Pattern
 ## Defines the standard structure of a compiler with lexer and parser components.
 ## This pattern can be reused for different compiler implementations.
-template compiler:
+pattern compiler:
     ## Lexer component
     ## Responsible for tokenizing source code
     element lexer:
         scope module = rust.module_selector('lexer')
-        connection_point tokens: TokenStream = rust.function_selector(module, 'tokenize')
+        ref tokens: TokenStream = rust.function_selector(module, 'tokenize')
     
     ## Parser component
     ## Responsible for producing an abstract syntax tree
     element parser:
         scope module = rust.module_selector('parser')
-        connection_point ast: AbstractSyntaxTree = rust.function_selector(module, 'parse')
+        ref ast: AbstractSyntaxTree = rust.function_selector(module, 'parse')
     
     ## Ensure lexer output is compatible with parser input
     check compiler.lexer.tokens.compatible_with(compiler.parser.input)

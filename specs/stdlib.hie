@@ -11,9 +11,9 @@ element stdlib:
     scope parser_module = rust.module_selector('parser')
     scope interpreter_module = rust.module_selector('interpreter')
     
-    ## Connection point: extension interface for adding new libraries
-    connection_point library_trait: Library = rust.trait_selector('Library')
-    connection_point value_type: Value = rust.enum_selector('Value')
+    ## Refs: extension interface for adding new libraries
+    ref library_trait: Library = rust.trait_selector('Library')
+    ref value_type: Value = rust.enum_selector('Value')
     
     check files.exists(stdlib_src, 'mod.rs')
     check files.exists(stdlib_src, 'files.rs')
