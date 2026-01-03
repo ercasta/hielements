@@ -22,6 +22,7 @@ Modern software systems are complex. As codebases grow, their actual structure d
 - 🏗️ **Supporting hierarchical composition** for complex systems
 - 🌲 **Providing hierarchical checks** that compose through element hierarchies
 - 🎨 **Enabling reusable patterns** for consistent architectural constraints
+- 📚 **Providing an executable pattern library** with auto-generated documentation
 - 🌐 **Working across languages** (Python, Docker, Terraform, and more)
 - 🤝 **Enabling human-AI collaboration** through structured specifications
 
@@ -139,6 +140,16 @@ element python_compiler implements compiler {
 Patterns ensure consistency across similar components, making architectural constraints explicit and enforceable.
 
 > 📚 **See the [Pattern Catalog](doc/patterns_catalog.md)** for an extensive collection of common software engineering patterns with their Hielements implementations.
+
+#### 🆕 Executable Pattern Library
+
+Hielements includes a comprehensive **pattern library** (`patterns/` directory) with reusable architectural blueprints:
+- All patterns are stored as executable `.hie` files, not just documentation
+- Patterns can be imported and implemented in your projects
+- **Automatic catalog generation** keeps documentation in sync with patterns
+- Covers structural, behavioral, infrastructure, and cross-cutting concerns
+
+This approach ensures patterns are living artifacts that can be validated, tested, and evolved alongside your code.
 
 ### 🔒 Type-Safe Connection Points
 
@@ -431,7 +442,9 @@ Install the Hielements extension for VSCode:
 - 🔍 [Related Work](doc/related_work.md) - Comparison with similar tools
 - 📝 [Summary](doc/summary.md) - High-level overview
 
-### Generating Library Documentation
+### Generating Documentation
+
+#### Library Documentation
 
 Use the `hielements doc` command to generate documentation for all available libraries (including custom ones):
 
@@ -445,6 +458,25 @@ hielements doc --format json --output doc/library_catalog.json
 # Filter to specific libraries
 hielements doc --library files,rust
 ```
+
+#### Pattern Catalog
+
+Hielements includes an extensive **pattern library** with reusable architectural patterns stored as executable `.hie` files. The pattern catalog is **automatically generated** from these pattern definitions:
+
+```bash
+# Generate the pattern catalog
+python3 scripts/generate_pattern_catalog.py
+```
+
+The pattern library (`patterns/` directory) contains:
+- **Structural patterns**: Layered architecture, hexagonal, microservices, clean architecture
+- **Behavioral patterns**: Event-driven, pipeline, CQRS, saga
+- **Infrastructure patterns**: Containerized services, sidecar, API gateway
+- **Cross-cutting patterns**: Observability, resilience, security
+- **Testing patterns**: Test pyramid, contract testing
+- **Compiler patterns**: Compiler pipeline, visitor
+
+These patterns are not just documentation—they're executable Hielements specifications that you can import and implement in your own projects. The automatic catalog generation ensures patterns stay synchronized with their implementations.
 
 ---
 

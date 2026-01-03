@@ -1,0 +1,58 @@
+## Layered Architecture (N-Tier) Pattern
+## 
+## Description:
+## Organizes code into horizontal layers where each layer has a specific responsibility
+## and can only depend on layers below it.
+##
+## Use Cases:
+## - Traditional enterprise applications
+## - Web applications with clear separation of concerns
+
+import files
+import rust
+
+## Layered Architecture Pattern
+## Enforces strict layer dependencies: presentation → business → data
+pattern layered_architecture {
+    ## Presentation Layer - UI and API endpoints
+    element presentation {
+        scope module<rust>
+        ref api_endpoints: HttpHandler
+    }
+    
+    ## Business Layer - Business logic and domain services
+    element business {
+        scope module<rust>
+        ref domain_services: DomainService
+    }
+    
+    ## Data Layer - Data access and persistence
+    element data {
+        scope module<rust>
+        ref repositories: Repository
+    }
+    
+    ## Layer dependency rules
+    ## Presentation can only depend on business layer
+    forbids connection to data.*
+    
+    ## Business layer cannot depend on presentation
+    ## (enforced via check)
+    check rust.no_dependency(business.module, presentation.module)
+    
+    ## Data layer is a leaf - no dependencies on upper layers
+    check rust.no_dependency(data.module, business.module)
+    check rust.no_dependency(data.module, presentation.module)
+}
+
+## Example Implementation
+element my_web_app implements layered_architecture {
+    scope presentation_mod<rust> binds layered_architecture.presentation.module = rust.module_selector('app::api')
+    ref endpoints: HttpHandler binds layered_architecture.presentation.api_endpoints = rust.public_functions(presentation_mod)
+    
+    scope business_mod<rust> binds layered_architecture.business.module = rust.module_selector('app::services')
+    ref services: DomainService binds layered_architecture.business.domain_services = rust.public_functions(business_mod)
+    
+    scope data_mod<rust> binds layered_architecture.data.module = rust.module_selector('app::repositories')
+    ref repos: Repository binds layered_architecture.data.repositories = rust.struct_selector(data_mod, '*Repository')
+}

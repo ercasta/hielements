@@ -302,7 +302,8 @@ element hielements {
         check files.exists(docs, 'wasm_plugins.md')
         check files.exists(docs, 'related_work.md')
         
-        ## Pattern catalog - test suite for language prescriptive features
+        ## Pattern catalog - auto-generated from pattern library
+        ## Test suite for language prescriptive features
         ## Coverage of this catalog drives language evolution
         check files.exists(docs, 'patterns_catalog.md')
         
@@ -311,6 +312,45 @@ element hielements {
         check files.exists(docs, 'library_catalog.md')
         ## Agent-readable JSON format
         check files.exists(docs, 'library_catalog.json')
+    }
+    
+    ## Pattern Library
+    ## Executable pattern definitions organized by category
+    element patterns {
+        scope patterns = files.folder_selector('patterns')
+        
+        ## Check pattern categories exist
+        check files.exists(patterns, 'structural')
+        check files.exists(patterns, 'behavioral')
+        check files.exists(patterns, 'cross-cutting')
+        check files.exists(patterns, 'compiler')
+        check files.exists(patterns, 'README.md')
+        
+        ## Structural patterns
+        element structural {
+            scope dir = files.folder_selector('patterns/structural')
+            check files.exists(dir, 'layered_architecture.hie')
+            check files.exists(dir, 'hexagonal.hie')
+            check files.exists(dir, 'microservice.hie')
+        }
+        
+        ## Behavioral patterns
+        element behavioral {
+            scope dir = files.folder_selector('patterns/behavioral')
+            check files.exists(dir, 'event_driven.hie')
+        }
+        
+        ## Cross-cutting patterns
+        element cross_cutting {
+            scope dir = files.folder_selector('patterns/cross-cutting')
+            check files.exists(dir, 'observability.hie')
+        }
+        
+        ## Compiler patterns
+        element compiler {
+            scope dir = files.folder_selector('patterns/compiler')
+            check files.exists(dir, 'compiler_pipeline.hie')
+        }
     }
     
     ## Examples
@@ -331,6 +371,14 @@ element hielements {
         check files.exists(examples, 'v3_syntax_example.hie')
         check files.exists(examples, 'hielements.toml')
         check files.exists(examples, 'hielements_hybrid.toml')
+    }
+    
+    ## Scripts and automation tools
+    element scripts {
+        scope scripts = files.folder_selector('scripts')
+        
+        ## Pattern catalog generation
+        check files.exists(scripts, 'generate_pattern_catalog.py')
     }
     
     ## CI/CD and automation

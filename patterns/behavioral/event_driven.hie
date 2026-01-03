@@ -1,0 +1,67 @@
+## Event-Driven Architecture Pattern
+##
+## Description:
+## System components communicate through events, enabling loose coupling
+## and async processing.
+##
+## Use Cases:
+## - Real-time systems
+## - Systems requiring high scalability and loose coupling
+
+import files
+import rust
+
+## Event-Driven Architecture Pattern
+pattern event_driven {
+    ## Event Definitions
+    element events {
+        scope module<rust>
+        ref event_types: EventType
+        
+        ## All events must be serializable
+        check rust.derives(module, 'Serialize')
+        check rust.derives(module, 'Deserialize')
+    }
+    
+    ## Event Bus / Message Broker Integration
+    element event_bus {
+        scope module<rust>
+        ref publish: Publisher
+        ref subscribe: Subscriber
+        
+        check rust.function_exists(module, 'publish')
+        check rust.function_exists(module, 'subscribe')
+    }
+    
+    ## Event Producers
+    element producers {
+        scope module<rust>
+        ref event_emitters: EventEmitter
+        
+        ## Producers must use the event bus
+        producers.module uses event_bus
+    }
+    
+    ## Event Consumers / Handlers
+    element consumers {
+        scope module<rust>
+        ref event_handlers: EventHandler
+        
+        ## Consumers must use the event bus
+        consumers.module uses event_bus
+    }
+    
+    ## Event Store (optional but recommended for event sourcing)
+    element event_store {
+        scope module<rust>
+        ref store: EventStore
+        ref replay: ReplayFunction
+        
+        check rust.function_exists(module, 'store_event')
+        check rust.function_exists(module, 'replay_events')
+    }
+    
+    ## Decoupling rule - producers don't know about consumers
+    check rust.no_dependency(producers.module, consumers.module)
+    check rust.no_dependency(consumers.module, producers.module)
+}
