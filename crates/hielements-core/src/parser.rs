@@ -70,7 +70,7 @@ impl<'a> Parser<'a> {
             // Skip doc comments before templates/elements
             let doc_comment = self.parse_doc_comment();
 
-            if self.check(TokenKind::Template) {
+            if self.check(TokenKind::Template) || self.check(TokenKind::Pattern) {
                 match self.parse_template(doc_comment) {
                     Ok(template) => templates.push(template),
                     Err(diag) => {
@@ -546,10 +546,20 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse a template declaration.
-    /// Supports both curly bracket syntax `template name { ... }` and indentation syntax `template name:\n    ...`
+    /// Supports both curly bracket syntax `pattern name { ... }` and indentation syntax `pattern name:\n    ...`
+    /// Also accepts `template` for backward compatibility.
     fn parse_template(&mut self, doc_comment: Option<String>) -> Result<Template, Diagnostic> {
         let start_span = self.current_span();
-        self.expect(TokenKind::Template)?;
+        // Accept both 'pattern' (preferred) and 'template' (backward compatibility)
+        if !self.check(TokenKind::Pattern) && !self.check(TokenKind::Template) {
+            return Err(Diagnostic::error(
+                "E001",
+                format!("Expected 'pattern' or 'template' keyword, found {:?}", self.current().kind)
+            ).with_file(&self.file_path)
+             .with_span(start_span)
+             .build());
+        }
+        self.advance(); // consume 'pattern' or 'template'
         let name = self.parse_identifier()?;
         
         // Support both curly bracket syntax `{ ... }` and colon/indent syntax `: ...`
@@ -1258,7 +1268,7 @@ impl<'a> Parser<'a> {
             match token.kind {
                 TokenKind::Scope | TokenKind::Element | TokenKind::Check | 
                 TokenKind::ConnectionPoint | TokenKind::Ref | TokenKind::Uses |
-                TokenKind::Template | TokenKind::Implements |
+                TokenKind::Template | TokenKind::Pattern | TokenKind::Implements |
                 TokenKind::Binds | TokenKind::To |
                 // Unified keywords can also be used as identifiers in some contexts
                 TokenKind::Requires | TokenKind::Allows | TokenKind::Forbids |

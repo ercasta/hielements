@@ -12,7 +12,7 @@ import rust
 
 ## Dockerized Template
 ## Requires that at least one descendant element has a docker configuration.
-template dockerized:
+pattern dockerized:
     ## At least one descendant must have a docker scope
     requires descendant scope dockerfile = docker.file_selector('Dockerfile')
     
@@ -21,37 +21,37 @@ template dockerized:
 
 ## Observable Template
 ## Requires that at least one descendant exposes metrics for monitoring.
-template observable:
+pattern observable:
     ## At least one descendant must have metrics endpoint (with named element and implements)
     requires descendant element metrics_service implements metrics_base
 
 ## Metrics Base Template
 ## Base template for metrics components.
-template metrics_base:
+pattern metrics_base:
     requires element handler
 
 ## Secure Zone Template
 ## Defines connection boundaries that apply to all descendants.
-template secure_zone:
+pattern secure_zone:
     forbids connection to external.*
     forbids connection to public_network.*
 
 ## Frontend Zone Template
 ## Frontend components can only connect to API gateway.
-template frontend_zone:
+pattern frontend_zone:
     allows connection to api_gateway.public_api
     forbids connection to database.*
     forbids connection to internal_services.*
 
 ## Backend Zone Template
 ## Backend components cannot access external systems.
-template backend_zone:
+pattern backend_zone:
     forbids connection to external.*
 
 ## Service Mesh Zone Template
 ## Demonstrates requires connection - all services in this zone
 ## MUST have a dependency on the logging module
-template service_mesh_zone:
+pattern service_mesh_zone:
     ## All services in this mesh must import from logging module
     requires connection to logging.*
     
@@ -63,7 +63,7 @@ template service_mesh_zone:
 
 ## Production Ready Template
 ## Demonstrates requires descendant implements shorthand
-template production_ready:
+pattern production_ready:
     requires descendant implements dockerized
     requires descendant implements observable
 
@@ -93,7 +93,7 @@ element my_app implements dockerized, observable:
     ## Metrics service - this satisfies the observable requirement
     element metrics:
         scope module = rust.module_selector('metrics')
-        connection_point prometheus: MetricsHandler = rust.function_selector(module, 'handler')
+        ref prometheus: MetricsHandler = rust.function_selector(module, 'handler')
         
         check rust.function_exists(module, 'collect_metrics')
 
@@ -112,21 +112,21 @@ element ecommerce_platform:
     ## API Gateway - the single entry point
     element api_gateway:
         scope src = files.folder_selector('gateway/src')
-        connection_point public_api: HttpHandler = rust.function_selector(src, 'routes')
+        ref public_api: HttpHandler = rust.function_selector(src, 'routes')
     
     ## Secure backend zone - no external connections allowed via template
     element backend implements backend_zone:
         element order_service:
             scope src = files.folder_selector('services/orders')
-            connection_point orders_api: HttpHandler = rust.function_selector(src, 'orders')
+            ref orders_api: HttpHandler = rust.function_selector(src, 'orders')
         
         element payment_service implements secure_zone:
             scope src = files.folder_selector('services/payments')
-            connection_point payments_api: HttpHandler = rust.function_selector(src, 'payments')
+            ref payments_api: HttpHandler = rust.function_selector(src, 'payments')
         
         element database:
             scope config = files.file_selector('db/config.yaml')
-            connection_point db_connection: DbConnection = rust.struct_selector(config, 'Connection')
+            ref db_connection: DbConnection = rust.struct_selector(config, 'Connection')
 
 ## Payment Processor
 ## An example of a deeply secure component with multiple requirements.

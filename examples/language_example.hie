@@ -18,26 +18,28 @@ language rust:
     connection_check depends_on(source: scope[], target: scope[]):
         rust.dependency_exists(source, target)
 
-## Template requiring Python language
-template python_service:
+## Pattern requiring Python language
+pattern python_service {
     requires language python
     forbids language rust
+}
 
-## Template allowing multiple languages
-template multilingual_app:
+## Pattern allowing multiple languages
+pattern multilingual_app {
     allows language python
     allows language rust
+}
 
-## A Python-only service implementing the python_service template
-element api_service implements python_service:
+## A Python-only service implementing the python_service pattern
+element api_service implements python_service {
     # V2 syntax: angular brackets for language annotation
     scope src<python> = files.folder_selector('src/api')
     scope tests<python> = files.folder_selector('tests/api')
 
     check files.exists(src, '__init__.py')
 
-## A multi-language system implementing the multilingual_app template
-element full_stack_app implements multilingual_app:
+## A multi-language system implementing the multilingual_app pattern
+element full_stack_app implements multilingual_app {
     element frontend:
         scope src<python> = files.folder_selector('frontend')
 

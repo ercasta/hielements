@@ -68,7 +68,7 @@
           }
         },
         {
-          "match": "\\b(connection_point)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*=",
+          "match": "\\b(connection_point|ref)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*=",
           "captures": {
             "1": { "name": "keyword.declaration.connection-point.hielements" },
             "2": { "name": "variable.other.connection-point.hielements" }
@@ -126,7 +126,7 @@
         },
         {
           "name": "keyword.declaration.hielements",
-          "match": "\\b(element|scope|connection_point|check)\\b"
+          "match": "\\b(element|template|pattern|scope|connection_point|ref|check|implements|binds|uses|requires|allows|forbids|descendant|connection|to|language|connection_check)\\b"
         },
         {
           "name": "constant.language.boolean.hielements",

@@ -1,64 +1,71 @@
 # Example: Hielements V2 Syntax
 # Demonstrates the new V2 language features:
 # - Angular brackets for language specification: scope module<rust>
-# - Unbounded scopes in templates (no = expression)
-# - binds keyword for connecting scopes to templates
+# - Unbounded scopes in patterns (no = expression)
+# - binds keyword for connecting scopes to patterns
 
 import files
 import rust
 
 ###
-Observable Template (V2 Syntax)
+Observable Pattern (V2 Syntax)
 Defines a component that must expose metrics.
 Uses unbounded scopes that will be bound by implementing elements.
 ###
-template observable:
+pattern observable {
     allows language rust
     
     ## Metrics component - unbounded scope
-    element metrics:
+    element metrics {
         # Unbounded scope - no '=' expression
         scope module<rust>
         # Unbounded connection point
-        connection_point prometheus: MetricsHandler
+        ref prometheus: MetricsHandler
         
         check rust.function_exists(module, 'metrics_handler')
+    }
+}
 
-## Resilient Template
+## Resilient Pattern
 ## Adds resilience patterns (circuit breaker, retry)
-template resilient:
-    element circuit_breaker:
+pattern resilient {
+    element circuit_breaker {
         scope module<rust>
-        connection_point breaker_config: BreakerConfig
+        ref breaker_config: BreakerConfig
+    }
+}
 
 ###
 Payments Service
 A concrete implementation demonstrating V2 binds syntax.
 ###
-element payments_service implements observable, resilient:
+element payments_service implements observable, resilient {
     scope root = files.folder_selector('src/payments')
     
-    # Bind scope to observable template's metrics.module using V2 syntax
+    # Bind scope to observable pattern's metrics.module using V2 syntax
     scope metrics_mod<rust> binds observable.metrics.module = rust.module_selector('payments::metrics')
     
     # Bind connection point
-    connection_point handler: MetricsHandler binds observable.metrics.prometheus = rust.function_selector(metrics_mod, 'handler')
+    ref handler: MetricsHandler binds observable.metrics.prometheus = rust.function_selector(metrics_mod, 'handler')
     
-    # Bind resilient template's circuit_breaker
+    # Bind resilient pattern's circuit_breaker
     scope breaker_mod<rust> binds resilient.circuit_breaker.module = rust.module_selector('payments::breaker')
-    connection_point breaker: BreakerConfig binds resilient.circuit_breaker.breaker_config = rust.struct_selector(breaker_mod, 'BreakerConfig')
+    ref breaker: BreakerConfig binds resilient.circuit_breaker.breaker_config = rust.struct_selector(breaker_mod, 'BreakerConfig')
     
     ## API module
-    element api:
+    element api {
         scope module<rust> = rust.module_selector('payments::api')
         
         check rust.function_exists(module, 'process_payment')
         check rust.has_tests(module)
+    }
+}
 
-## Simple element without templates (descriptive only mode)
+## Simple element without patterns (descriptive only mode)
 ## In V2, implements and binds are optional
-element simple_service:
+element simple_service {
     scope src<rust> = rust.module_selector('simple_service')
-    connection_point api: HttpHandler = rust.public_functions(src)
+    ref api: HttpHandler = rust.public_functions(src)
     
     check rust.function_exists(src, 'handle_request')
+}

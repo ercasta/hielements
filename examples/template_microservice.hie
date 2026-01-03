@@ -6,44 +6,44 @@ import rust
 
 ## Microservice Pattern
 ## Defines the standard structure of a microservice with API, database, and container.
-template microservice:
+pattern microservice:
     element api:
         scope module = rust.module_selector('api')
-        connection_point rest_endpoint: HttpHandler = rust.function_selector(module, 'routes')
+        ref rest_endpoint: HttpHandler = rust.function_selector(module, 'routes')
     
     element database:
         scope module = rust.module_selector('db')
-        connection_point connection: DbConnection = rust.struct_selector(module, 'DbConnection')
+        ref connection: DbConnection = rust.struct_selector(module, 'DbConnection')
     
     element container:
         scope dockerfile = files.file_selector('Dockerfile')
-        connection_point ports: integer = rust.const_selector('PORT')
+        ref ports: integer = rust.const_selector('PORT')
     
     check microservice.container.exposes_port(8080)
 
 ## Observable Pattern
 ## Adds observability features to a service
-template observable:
+pattern observable:
     element metrics:
         scope module = rust.module_selector('metrics')
-        connection_point prometheus_endpoint: MetricsHandler = rust.function_selector(module, 'metrics_handler')
+        ref prometheus_endpoint: MetricsHandler = rust.function_selector(module, 'metrics_handler')
     
     element logging:
         scope module = rust.module_selector('logging')
-        connection_point log_output: LogConfig = rust.function_selector(module, 'setup_logging')
+        ref log_output: LogConfig = rust.function_selector(module, 'setup_logging')
     
     check observable.metrics.prometheus_endpoint.is_available()
 
 ## Resilient Pattern  
 ## Adds resilience patterns to a service
-template resilient:
+pattern resilient:
     element circuit_breaker:
         scope module = rust.module_selector('resilience')
-        connection_point breaker_config: BreakerConfig = rust.struct_selector(module, 'BreakerConfig')
+        ref breaker_config: BreakerConfig = rust.struct_selector(module, 'BreakerConfig')
     
     element retry_policy:
         scope module = rust.module_selector('retry')
-        connection_point retry_config: RetryPolicy = rust.struct_selector(module, 'RetryPolicy')
+        ref retry_config: RetryPolicy = rust.struct_selector(module, 'RetryPolicy')
 
 ## Orders Service
 ## A production-ready microservice implementing multiple patterns

@@ -8,7 +8,7 @@ import rust
 
 ## Dockerized Template
 ## Requires a docker configuration with health checks
-template dockerized:
+pattern dockerized:
     element container:
         scope dockerfile = files.file_selector('Dockerfile')
     
@@ -16,31 +16,31 @@ template dockerized:
 
 ## Observable Template
 ## Requires metrics and logging capabilities
-template observable:
+pattern observable:
     element metrics:
         scope module = rust.module_selector('metrics')
-        connection_point prometheus: MetricsHandler = rust.function_selector(module, 'handler')
+        ref prometheus: MetricsHandler = rust.function_selector(module, 'handler')
     
     element logging:
         scope module = rust.module_selector('logging')
 
 ## Microservice Template with Parameterized Port
 ## Demonstrates template-level connection points
-template microservice:
+pattern microservice:
     element api:
         scope module = rust.module_selector('api')
-        connection_point rest_endpoint: HttpHandler = rust.function_selector(module, 'routes')
+        ref rest_endpoint: HttpHandler = rust.function_selector(module, 'routes')
     
     element database:
         scope module = rust.module_selector('db')
-        connection_point connection: DbConnection = rust.struct_selector(module, 'Connection')
+        ref connection: DbConnection = rust.struct_selector(module, 'Connection')
     
     element container:
         scope dockerfile = files.file_selector('Dockerfile')
     
     ## Template-level connection point for the service port
     ## This can be bound to different values for each implementation
-    connection_point service_port: integer = rust.const_selector('PORT')
+    ref service_port: integer = rust.const_selector('PORT')
     
     ## Template checks using the template-level connection point
     ## These checks will use the bound port value for each implementation
@@ -49,7 +49,7 @@ template microservice:
 
 ## Production Ready Template
 ## Requires descendants to implement both dockerized and observable templates
-template production_ready:
+pattern production_ready:
     ## This template requires that at least one descendant implements dockerized
     requires descendant implements dockerized
     

@@ -12,15 +12,15 @@ element api_service:
     scope config_file = files.file_selector('config.yaml')
     
     ## Basic type annotations
-    connection_point port: integer = rust.const_selector('PORT')
-    connection_point host: string = rust.const_selector('HOST')
-    connection_point debug_mode: boolean = rust.const_selector('DEBUG')
-    connection_point timeout: float = rust.const_selector('TIMEOUT')
+    ref port: integer = rust.const_selector('PORT')
+    ref host: string = rust.const_selector('HOST')
+    ref debug_mode: boolean = rust.const_selector('DEBUG')
+    ref timeout: float = rust.const_selector('TIMEOUT')
     
     ## Custom type annotations
-    connection_point handler: HttpHandler = rust.function_selector(api_module, 'handle_request')
-    connection_point middleware: Middleware = rust.function_selector(api_module, 'apply_middleware')
-    connection_point routes: Routes = rust.function_selector(api_module, 'get_routes')
+    ref handler: HttpHandler = rust.function_selector(api_module, 'handle_request')
+    ref middleware: Middleware = rust.function_selector(api_module, 'apply_middleware')
+    ref routes: Routes = rust.function_selector(api_module, 'get_routes')
     
     check rust.function_exists(api_module, 'handle_request')
     check rust.function_exists(api_module, 'apply_middleware')
@@ -31,31 +31,31 @@ element api_service:
 element database_service:
     scope db_module = rust.module_selector('database')
     
-    connection_point connection: DbConnection = rust.struct_selector(db_module, 'Connection')
-    connection_point pool_size: integer = rust.const_selector('POOL_SIZE')
-    connection_point retry_attempts: integer = rust.const_selector('MAX_RETRIES')
-    connection_point connection_timeout: float = rust.const_selector('CONN_TIMEOUT')
+    ref connection: DbConnection = rust.struct_selector(db_module, 'Connection')
+    ref pool_size: integer = rust.const_selector('POOL_SIZE')
+    ref retry_attempts: integer = rust.const_selector('MAX_RETRIES')
+    ref connection_timeout: float = rust.const_selector('CONN_TIMEOUT')
     
     check rust.struct_exists(db_module, 'Connection')
 
 ## Compiler Example
 ## Shows typed connection points in a compiler pipeline
-template compiler_pipeline:
+pattern compiler_pipeline:
     element source_reader:
         scope module = rust.module_selector('reader')
-        connection_point source_code: string = rust.function_selector(module, 'read_source')
+        ref source_code: string = rust.function_selector(module, 'read_source')
     
     element lexer:
         scope module = rust.module_selector('lexer')
-        connection_point tokens: TokenStream = rust.function_selector(module, 'tokenize')
+        ref tokens: TokenStream = rust.function_selector(module, 'tokenize')
     
     element parser:
         scope module = rust.module_selector('parser')
-        connection_point ast: AbstractSyntaxTree = rust.function_selector(module, 'parse')
+        ref ast: AbstractSyntaxTree = rust.function_selector(module, 'parse')
     
     element code_generator:
         scope module = rust.module_selector('codegen')
-        connection_point output: string = rust.function_selector(module, 'generate')
+        ref output: string = rust.function_selector(module, 'generate')
 
 ## Concrete Compiler Implementation
 element python_compiler implements compiler_pipeline:
