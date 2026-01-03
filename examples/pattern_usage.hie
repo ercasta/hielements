@@ -1,0 +1,137 @@
+# Example: Using Patterns from the Pattern Library
+# This example demonstrates how to import and implement patterns from the pattern library
+
+import files
+import rust
+
+## Import patterns from the pattern library
+## (In the future, this could be done via a patterns library)
+## For now, patterns are defined separately and can be referenced
+
+## Example: Implementing the Layered Architecture Pattern
+## Using a 3-tier architecture for a web application
+
+element my_web_application {
+    ## We can conceptually implement the layered_architecture pattern
+    ## Here's what that would look like:
+    
+    ## Presentation Layer
+    element presentation {
+        scope api = files.folder_selector('src/presentation')
+        check files.exists(api, 'routes.rs')
+        check files.exists(api, 'controllers.rs')
+    }
+    
+    ## Business Layer
+    element business {
+        scope services = files.folder_selector('src/business')
+        check files.exists(services, 'user_service.rs')
+        check files.exists(services, 'order_service.rs')
+    }
+    
+    ## Data Layer
+    element data {
+        scope repositories = files.folder_selector('src/data')
+        check files.exists(repositories, 'user_repository.rs')
+        check files.exists(repositories, 'order_repository.rs')
+    }
+}
+
+## Layer dependency checks would ensure:
+## - Presentation depends only on Business
+## - Business depends only on Data
+## - Data has no upward dependencies
+
+## Example: Implementing the Observability Pattern
+## Adding monitoring to a microservice
+
+element monitored_service {
+    ## Metrics collection
+    element metrics {
+        scope metrics_mod = files.folder_selector('src/metrics')
+        check files.exists(metrics_mod, 'prometheus.rs')
+    }
+    
+    ## Structured logging
+    element logging {
+        scope logging_mod = files.folder_selector('src/logging')
+        check files.exists(logging_mod, 'logger.rs')
+    }
+    
+    ## Distributed tracing
+    element tracing {
+        scope tracing_mod = files.folder_selector('src/tracing')
+        check files.exists(tracing_mod, 'tracer.rs')
+    }
+    
+    ## Health checks
+    element health {
+        scope health_mod = files.folder_selector('src/health')
+        check files.exists(health_mod, 'liveness.rs')
+        check files.exists(health_mod, 'readiness.rs')
+    }
+}
+
+## Example: Composing Multiple Patterns
+## A production-ready microservice implementing multiple architectural patterns
+
+element production_microservice {
+    ## This service would implement:
+    ## - Microservice pattern (API, domain, persistence, container)
+    ## - Observability pattern (metrics, logging, tracing, health)
+    ## - Resilience pattern (circuit breaker, retry, timeout)
+    
+    ## Service structure
+    element service {
+        scope src = files.folder_selector('src')
+        
+        ## API endpoints
+        element api {
+            scope api_mod = files.folder_selector('src/api')
+            check files.exists(api_mod, 'routes.rs')
+        }
+        
+        ## Business logic
+        element domain {
+            scope domain_mod = files.folder_selector('src/domain')
+            check files.exists(domain_mod, 'models.rs')
+        }
+        
+        ## Data access
+        element persistence {
+            scope db_mod = files.folder_selector('src/persistence')
+            check files.exists(db_mod, 'repository.rs')
+        }
+    }
+    
+    ## Observability (as shown above)
+    element observability {
+        element metrics {
+            scope metrics_mod = files.folder_selector('src/metrics')
+            check files.exists(metrics_mod, 'prometheus.rs')
+        }
+        
+        element logging {
+            scope logging_mod = files.folder_selector('src/logging')
+            check files.exists(logging_mod, 'logger.rs')
+        }
+        
+        element tracing {
+            scope tracing_mod = files.folder_selector('src/tracing')
+            check files.exists(tracing_mod, 'tracer.rs')
+        }
+    }
+    
+    ## Container definition
+    element container {
+        scope dockerfile = files.file_selector('Dockerfile')
+        check files.exists('.', 'Dockerfile')
+    }
+    
+    ## Configuration
+    element config {
+        scope config_dir = files.folder_selector('config')
+        check files.exists(config_dir, 'production.yaml')
+        check files.exists(config_dir, 'development.yaml')
+    }
+}
