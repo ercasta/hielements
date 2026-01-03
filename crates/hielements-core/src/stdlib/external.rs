@@ -149,6 +149,44 @@ pub struct LibraryMetadata {
     pub checks: Vec<String>,
 }
 
+/// Extended documentation metadata returned by external process via library.doc
+#[derive(Debug, Clone, Deserialize)]
+pub struct ExternalLibraryDocResponse {
+    pub name: String,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub version: Option<String>,
+    #[serde(default)]
+    pub functions: Vec<ExternalFunctionDoc>,
+    #[serde(default)]
+    pub checks: Vec<ExternalFunctionDoc>,
+}
+
+/// Function documentation from external process
+#[derive(Debug, Clone, Deserialize)]
+pub struct ExternalFunctionDoc {
+    pub name: String,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub parameters: Vec<ExternalParameterDoc>,
+    #[serde(default)]
+    pub return_type: Option<String>,
+    #[serde(default)]
+    pub example: Option<String>,
+}
+
+/// Parameter documentation from external process
+#[derive(Debug, Clone, Deserialize)]
+pub struct ExternalParameterDoc {
+    pub name: String,
+    #[serde(default, rename = "type")]
+    pub param_type: Option<String>,
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
 /// An external library that communicates via JSON-RPC.
 pub struct ExternalLibrary {
     config: ExternalLibraryConfig,
@@ -475,6 +513,76 @@ impl Library for ExternalLibrary {
 
         let result = self.send_request("library.check", params)?;
         Self::json_to_check_result(result)
+    }
+
+    fn documentation(&self) -> crate::doc::LibraryDoc {
+        use crate::doc::{FunctionDoc, LibraryDoc};
+        
+        // Try to get documentation from the external process
+        // Note: We need a mutable borrow for send_request, so we create a new process
+        // for documentation requests. This is a limitation of the current design.
+        let mut lib = ExternalLibrary::new(self.config.clone());
+        
+        match lib.send_request("library.doc", serde_json::json!({})) {
+            Ok(json) => {
+                // Try to parse the response
+                if let Ok(doc_response) = serde_json::from_value::<ExternalLibraryDocResponse>(json) {
+                    let mut lib_doc = LibraryDoc::new(&doc_response.name)
+                        .with_version(doc_response.version.unwrap_or_default());
+                    
+                    if let Some(desc) = doc_response.description {
+                        lib_doc = lib_doc.with_description(desc);
+                    }
+                    
+                    // Add functions
+                    for func in doc_response.functions {
+                        let mut func_doc = FunctionDoc::new(&func.name, func.description.unwrap_or_default());
+                        for param in func.parameters {
+                            func_doc = func_doc.with_param(
+                                &param.name,
+                                param.param_type.unwrap_or_else(|| "any".to_string()),
+                                param.description.unwrap_or_default(),
+                            );
+                        }
+                        if let Some(ret) = func.return_type {
+                            func_doc = func_doc.with_return_type(ret);
+                        }
+                        if let Some(ex) = func.example {
+                            func_doc = func_doc.with_example(ex);
+                        }
+                        lib_doc = lib_doc.with_function(func_doc);
+                    }
+                    
+                    // Add checks
+                    for check in doc_response.checks {
+                        let mut check_doc = FunctionDoc::new(&check.name, check.description.unwrap_or_default());
+                        for param in check.parameters {
+                            check_doc = check_doc.with_param(
+                                &param.name,
+                                param.param_type.unwrap_or_else(|| "any".to_string()),
+                                param.description.unwrap_or_default(),
+                            );
+                        }
+                        if let Some(ret) = check.return_type {
+                            check_doc = check_doc.with_return_type(ret);
+                        }
+                        if let Some(ex) = check.example {
+                            check_doc = check_doc.with_example(ex);
+                        }
+                        lib_doc = lib_doc.with_check(check_doc);
+                    }
+                    
+                    return lib_doc;
+                }
+            }
+            Err(_) => {
+                // External process doesn't support library.doc, return basic info
+            }
+        }
+        
+        // Fallback: return minimal documentation
+        LibraryDoc::new(&self.config.name)
+            .with_description(format!("External library: {}", self.config.executable))
     }
 }
 

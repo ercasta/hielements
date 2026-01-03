@@ -761,6 +761,151 @@ impl Library for RustLibrary {
             _ => Err(LibraryError::new("E399", format!("Unknown check: rust.{}", function)))
         }
     }
+
+    fn documentation(&self) -> crate::doc::LibraryDoc {
+        use crate::doc::{FunctionDoc, LibraryDoc};
+        
+        LibraryDoc::new("rust")
+            .with_description("Rust language analysis library for selecting and checking Rust code constructs.")
+            .with_version("1.0.0")
+            // Selectors
+            .with_function(
+                FunctionDoc::new("crate_selector", "Select a Rust crate by name from the workspace.")
+                    .with_param("crate_name", "string", "Name of the crate to select")
+                    .with_return_type("Scope")
+                    .with_example("scope core = rust.crate_selector('hielements-core')")
+            )
+            .with_function(
+                FunctionDoc::new("module_selector", "Select a Rust module by path (e.g., 'lexer' or 'stdlib::files').")
+                    .with_param("module_path", "string", "Module path using :: separator")
+                    .with_return_type("Scope")
+                    .with_example("scope lexer_mod = rust.module_selector('lexer')")
+            )
+            .with_function(
+                FunctionDoc::new("struct_selector", "Select a Rust struct by name.")
+                    .with_param("struct_name", "string", "Name of the struct to find")
+                    .with_return_type("Scope")
+                    .with_example("ref token: Token = rust.struct_selector('Token')")
+            )
+            .with_function(
+                FunctionDoc::new("enum_selector", "Select a Rust enum by name.")
+                    .with_param("enum_name", "string", "Name of the enum to find")
+                    .with_return_type("Scope")
+                    .with_example("ref kind: TokenKind = rust.enum_selector('TokenKind')")
+            )
+            .with_function(
+                FunctionDoc::new("function_selector", "Select a Rust function by name.")
+                    .with_param("func_name", "string", "Name of the function to find")
+                    .with_return_type("Scope")
+                    .with_example("ref parse_fn: Function = rust.function_selector('parse')")
+            )
+            .with_function(
+                FunctionDoc::new("trait_selector", "Select a Rust trait by name.")
+                    .with_param("trait_name", "string", "Name of the trait to find")
+                    .with_return_type("Scope")
+                    .with_example("ref lib_trait: Trait = rust.trait_selector('Library')")
+            )
+            .with_function(
+                FunctionDoc::new("impl_selector", "Select Rust impl blocks for a type.")
+                    .with_param("type_name", "string", "Name of the type to find impls for")
+                    .with_return_type("Scope")
+                    .with_example("scope impl_blocks = rust.impl_selector('Parser')")
+            )
+            // Checks - existence
+            .with_check(
+                FunctionDoc::new("struct_exists", "Check that a struct with the given name exists.")
+                    .with_param("struct_name", "string", "Name of the struct")
+                    .with_return_type("CheckResult")
+                    .with_example("check rust.struct_exists('Parser')")
+            )
+            .with_check(
+                FunctionDoc::new("enum_exists", "Check that an enum with the given name exists.")
+                    .with_param("enum_name", "string", "Name of the enum")
+                    .with_return_type("CheckResult")
+                    .with_example("check rust.enum_exists('TokenKind')")
+            )
+            .with_check(
+                FunctionDoc::new("function_exists", "Check that a function with the given name exists.")
+                    .with_param("func_name", "string", "Name of the function")
+                    .with_return_type("CheckResult")
+                    .with_example("check rust.function_exists('parse')")
+            )
+            .with_check(
+                FunctionDoc::new("trait_exists", "Check that a trait with the given name exists.")
+                    .with_param("trait_name", "string", "Name of the trait")
+                    .with_return_type("CheckResult")
+                    .with_example("check rust.trait_exists('Library')")
+            )
+            .with_check(
+                FunctionDoc::new("impl_exists", "Check that an impl block for the given type exists.")
+                    .with_param("type_name", "string", "Name of the type")
+                    .with_return_type("CheckResult")
+                    .with_example("check rust.impl_exists('Parser')")
+            )
+            .with_check(
+                FunctionDoc::new("implements", "Check that a type implements a specific trait.")
+                    .with_param("type_name", "string", "Name of the implementing type")
+                    .with_param("trait_name", "string", "Name of the trait")
+                    .with_return_type("CheckResult")
+                    .with_example("check rust.implements('FilesLibrary', 'Library')")
+            )
+            // Checks - code quality
+            .with_check(
+                FunctionDoc::new("uses", "Check that a scope uses a specific module.")
+                    .with_param("scope", "Scope", "The scope to check")
+                    .with_param("module_path", "string", "Module path to look for")
+                    .with_return_type("CheckResult")
+                    .with_example("check rust.uses(parser_mod, 'crate::lexer')")
+            )
+            .with_check(
+                FunctionDoc::new("has_derive", "Check that a scope has a specific derive macro.")
+                    .with_param("scope", "Scope", "The scope to check")
+                    .with_param("derive_name", "string", "Name of the derive (e.g., 'Debug', 'Clone')")
+                    .with_return_type("CheckResult")
+                    .with_example("check rust.has_derive(struct_scope, 'Serialize')")
+            )
+            .with_check(
+                FunctionDoc::new("has_docs", "Check that a scope has documentation comments.")
+                    .with_param("scope", "Scope", "The scope to check")
+                    .with_return_type("CheckResult")
+                    .with_example("check rust.has_docs(module)")
+            )
+            .with_check(
+                FunctionDoc::new("has_tests", "Check that a scope has test functions.")
+                    .with_param("scope", "Scope", "The scope to check")
+                    .with_return_type("CheckResult")
+                    .with_example("check rust.has_tests(module)")
+            )
+            // Checks - dependencies
+            .with_check(
+                FunctionDoc::new("depends_on", "Check that scope_a depends on (uses types from) scope_b.")
+                    .with_param("scope_a", "Scope", "Source scope")
+                    .with_param("scope_b", "Scope", "Target scope that should be a dependency")
+                    .with_return_type("CheckResult")
+                    .with_example("check rust.depends_on(parser_mod, lexer_mod)")
+            )
+            .with_check(
+                FunctionDoc::new("no_dependency", "Check that scope_a does NOT depend on scope_b (architectural boundary).")
+                    .with_param("scope_a", "Scope", "Source scope")
+                    .with_param("scope_b", "Scope", "Target scope that should NOT be a dependency")
+                    .with_return_type("CheckResult")
+                    .with_example("check rust.no_dependency(core_mod, cli_mod)")
+            )
+            .with_check(
+                FunctionDoc::new("pipeline_connects", "Check that output type from one scope connects to input of another.")
+                    .with_param("output_scope", "Scope", "Scope producing output")
+                    .with_param("input_scope", "Scope", "Scope consuming input")
+                    .with_return_type("CheckResult")
+                    .with_example("check rust.pipeline_connects(lexer.tokens, parser.input)")
+            )
+            .with_check(
+                FunctionDoc::new("type_compatible", "Check that two scopes have compatible types.")
+                    .with_param("scope_a", "Scope", "First scope")
+                    .with_param("scope_b", "Scope", "Second scope")
+                    .with_return_type("CheckResult")
+                    .with_example("check rust.type_compatible(producer_type, consumer_type)")
+            )
+    }
 }
 
 #[cfg(test)]

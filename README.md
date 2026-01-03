@@ -426,9 +426,25 @@ Install the Hielements extension for VSCode:
 - 📖 [Language Reference](doc/language_reference.md) - Complete syntax and semantics
 - 📚 **[Pattern Catalog](doc/patterns_catalog.md)** - Extensive collection of software engineering patterns
 - 🔌 [External Libraries Guide](doc/external_libraries.md) - Creating custom libraries
+- 📖 **[Library Catalog](doc/library_catalog.md)** - Auto-generated documentation for all built-in libraries
 - 🏗️ [Technical Architecture](doc/technical_architecture.md) - Implementation details
 - 🔍 [Related Work](doc/related_work.md) - Comparison with similar tools
 - 📝 [Summary](doc/summary.md) - High-level overview
+
+### Generating Library Documentation
+
+Use the `hielements doc` command to generate documentation for all available libraries (including custom ones):
+
+```bash
+# Generate markdown documentation
+hielements doc --format markdown --output doc/library_catalog.md
+
+# Generate JSON catalog for AI agents
+hielements doc --format json --output doc/library_catalog.json
+
+# Filter to specific libraries
+hielements doc --library files,rust
+```
 
 ---
 

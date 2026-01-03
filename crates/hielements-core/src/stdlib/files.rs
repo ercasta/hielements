@@ -234,6 +234,62 @@ impl Library for FilesLibrary {
             _ => Err(LibraryError::new("E199", format!("Unknown check function: files.{}", function)))
         }
     }
+
+    fn documentation(&self) -> crate::doc::LibraryDoc {
+        use crate::doc::{FunctionDoc, LibraryDoc};
+        
+        LibraryDoc::new("files")
+            .with_description("File system operations library for selecting files/folders and checking file existence.")
+            .with_version("1.0.0")
+            // Selectors
+            .with_function(
+                FunctionDoc::new("file_selector", "Select a single file by its path relative to the workspace.")
+                    .with_param("path", "string", "Relative path to the file from workspace root")
+                    .with_return_type("Scope")
+                    .with_example("scope main = files.file_selector('src/main.rs')")
+            )
+            .with_function(
+                FunctionDoc::new("folder_selector", "Select a folder and all files within it recursively.")
+                    .with_param("path", "string", "Relative path to the folder from workspace root")
+                    .with_return_type("Scope")
+                    .with_example("scope src = files.folder_selector('src')")
+            )
+            .with_function(
+                FunctionDoc::new("glob_selector", "Select files matching a glob pattern.")
+                    .with_param("pattern", "string", "Glob pattern (e.g., '**/*.rs', 'src/*.py')")
+                    .with_return_type("Scope")
+                    .with_example("scope rust_files = files.glob_selector('**/*.rs')")
+            )
+            // Checks
+            .with_check(
+                FunctionDoc::new("exists", "Check if a file exists within a scope.")
+                    .with_param("scope", "Scope", "The scope to check within")
+                    .with_param("filename", "string", "The filename to look for")
+                    .with_return_type("CheckResult")
+                    .with_example("check files.exists(src, 'main.rs')")
+            )
+            .with_check(
+                FunctionDoc::new("contains", "Check if a scope contains a file with the given name.")
+                    .with_param("scope", "Scope", "The scope to check")
+                    .with_param("filename", "string", "The filename to look for")
+                    .with_return_type("CheckResult")
+                    .with_example("check files.contains(docs, 'README.md')")
+            )
+            .with_check(
+                FunctionDoc::new("no_files_matching", "Check that no files match a given pattern within a scope.")
+                    .with_param("scope", "Scope", "The scope to check")
+                    .with_param("pattern", "string", "Glob pattern that should not match any files")
+                    .with_return_type("CheckResult")
+                    .with_example("check files.no_files_matching(src, '*.bak')")
+            )
+            .with_check(
+                FunctionDoc::new("max_size", "Check that all files in a scope are under a maximum size.")
+                    .with_param("scope", "Scope", "The scope to check")
+                    .with_param("max_bytes", "integer", "Maximum file size in bytes")
+                    .with_return_type("CheckResult")
+                    .with_example("check files.max_size(assets, 1048576)")
+            )
+    }
 }
 
 #[cfg(test)]
