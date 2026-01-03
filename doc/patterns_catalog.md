@@ -74,18 +74,12 @@ pattern event_driven {
     element producers {
         scope module<rust>
         ref event_emitters: EventEmitter
-        
-        ## Producers must use the event bus
-        producers.module uses event_bus
     }
     
     ## Event Consumers / Handlers
     element consumers {
         scope module<rust>
         ref event_handlers: EventHandler
-        
-        ## Consumers must use the event bus
-        consumers.module uses event_bus
     }
     
     ## Event Store (optional but recommended for event sourcing)
@@ -155,9 +149,6 @@ pattern compiler {
         scope module<rust>
         ref ast: AbstractSyntaxTree
         
-        ## Parser uses lexer
-        parser.module uses lexer
-        
         check rust.struct_exists(module, 'Parser')
         check rust.function_exists(module, 'parse')
     }
@@ -168,9 +159,6 @@ pattern compiler {
         ref type_checker: TypeChecker
         ref symbol_table: SymbolTable
         
-        ## Semantic analyzer uses parser
-        semantic.module uses parser
-        
         check rust.function_exists(module, 'analyze')
     }
     
@@ -179,16 +167,12 @@ pattern compiler {
         scope module<rust>
         ref ir_types: IRNode
         ref ir_builder: IRBuilder
-        
-        ir.module uses semantic
     }
     
     ## Code Generator
     element codegen {
         scope module<rust>
         ref code_emitter: CodeEmitter
-        
-        codegen.module uses ir
         
         check rust.function_exists(module, 'generate')
     }

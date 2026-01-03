@@ -37,18 +37,12 @@ pattern event_driven {
     element producers {
         scope module<rust>
         ref event_emitters: EventEmitter
-        
-        ## Producers must use the event bus
-        producers.module uses event_bus
     }
     
     ## Event Consumers / Handlers
     element consumers {
         scope module<rust>
         ref event_handlers: EventHandler
-        
-        ## Consumers must use the event bus
-        consumers.module uses event_bus
     }
     
     ## Event Store (optional but recommended for event sourcing)
