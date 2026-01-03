@@ -305,6 +305,12 @@ element hielements {
         ## Pattern catalog - test suite for language prescriptive features
         ## Coverage of this catalog drives language evolution
         check files.exists(docs, 'patterns_catalog.md')
+        
+        ## Library documentation catalogs (auto-generated)
+        ## Human-readable markdown format
+        check files.exists(docs, 'library_catalog.md')
+        ## Agent-readable JSON format
+        check files.exists(docs, 'library_catalog.json')
     }
     
     ## Examples

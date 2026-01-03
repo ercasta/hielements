@@ -152,6 +152,10 @@ impl CheckResult {
 /// Libraries provide selectors (via `call`) and checks (via `check`).
 /// Both methods take `&mut self` to support libraries that need to manage state,
 /// such as external process libraries that maintain a subprocess connection.
+/// 
+/// Libraries can also provide documentation via the `documentation` method,
+/// which returns a `LibraryDoc` containing information about available
+/// selectors and checks. This enables automatic documentation generation.
 pub trait Library {
     /// Get the library name.
     fn name(&self) -> &str;
@@ -161,6 +165,15 @@ pub trait Library {
 
     /// Execute a check function.
     fn check(&mut self, function: &str, args: Vec<Value>, workspace: &str) -> LibraryResult<CheckResult>;
+
+    /// Get documentation for this library.
+    /// 
+    /// Returns a `LibraryDoc` containing information about the library's
+    /// description, version, available selectors, and checks.
+    /// Default implementation returns minimal documentation with just the name.
+    fn documentation(&self) -> crate::doc::LibraryDoc {
+        crate::doc::LibraryDoc::new(self.name())
+    }
 }
 
 /// Registry of available libraries.
@@ -226,5 +239,16 @@ impl LibraryRegistry {
     /// Get the names of all registered libraries.
     pub fn names(&self) -> Vec<&str> {
         self.libraries.keys().map(|s| s.as_str()).collect()
+    }
+
+    /// Generate documentation for all registered libraries.
+    /// 
+    /// Returns a `DocumentationCatalog` containing documentation for all libraries.
+    pub fn generate_documentation(&self) -> crate::doc::DocumentationCatalog {
+        let mut catalog = crate::doc::DocumentationCatalog::new();
+        for lib in self.libraries.values() {
+            catalog.add_library(lib.documentation());
+        }
+        catalog
     }
 }

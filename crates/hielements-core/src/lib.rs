@@ -5,6 +5,7 @@
 
 pub mod ast;
 pub mod diagnostics;
+pub mod doc;
 pub mod interpreter;
 pub mod lexer;
 pub mod parser;
@@ -13,6 +14,7 @@ pub mod stdlib;
 
 pub use ast::*;
 pub use diagnostics::{Diagnostic, DiagnosticSeverity, Diagnostics};
+pub use doc::{DocumentationCatalog, FunctionDoc, LibraryDoc, ParameterDoc};
 pub use interpreter::{Interpreter, RunOptions};
 pub use lexer::{Lexer, Token, TokenKind};
 pub use parser::Parser;

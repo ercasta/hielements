@@ -9,7 +9,7 @@ use std::process::ExitCode;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use hielements_core::diagnostics::{DiagnosticSeverity, DiagnosticsOutput};
-use hielements_core::stdlib::CheckResult;
+use hielements_core::stdlib::{CheckResult, LibraryRegistry};
 use hielements_core::{Interpreter, RunOptions};
 
 #[derive(Parser)]
@@ -67,6 +67,25 @@ enum Commands {
         /// Path to the .hie file
         file: String,
     },
+
+    /// Generate documentation for available libraries
+    Doc {
+        /// Workspace directory (defaults to current directory)
+        #[arg(short, long)]
+        workspace: Option<String>,
+
+        /// Output format (markdown, json)
+        #[arg(short, long, default_value = "markdown")]
+        format: String,
+
+        /// Output file (defaults to stdout)
+        #[arg(short, long)]
+        output: Option<String>,
+
+        /// Filter to specific libraries (comma-separated)
+        #[arg(short, long)]
+        library: Option<String>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -78,6 +97,9 @@ fn main() -> ExitCode {
             cmd_run(&file, workspace.as_deref(), &format, dry_run, verbose, filter.as_deref(), limit)
         }
         Commands::Parse { file } => cmd_parse(&file),
+        Commands::Doc { workspace, format, output, library } => {
+            cmd_doc(workspace.as_deref(), &format, output.as_deref(), library.as_deref())
+        }
     }
 }
 
@@ -410,5 +432,63 @@ fn cmd_parse(file: &str) -> ExitCode {
         println!("{}", serde_json::to_string_pretty(&program).unwrap());
     }
 
+    ExitCode::SUCCESS
+}
+
+fn cmd_doc(workspace: Option<&str>, format: &str, output: Option<&str>, library_filter: Option<&str>) -> ExitCode {
+    // Use workspace or current directory
+    let workspace_dir = workspace.unwrap_or(".");
+    
+    // Create library registry with workspace libraries
+    let registry = LibraryRegistry::with_workspace(workspace_dir);
+    
+    // Generate documentation
+    let mut catalog = registry.generate_documentation();
+    
+    // Filter libraries if specified
+    if let Some(filter) = library_filter {
+        let filter_libs: Vec<&str> = filter.split(',').map(|s| s.trim()).collect();
+        catalog.libraries.retain(|lib| filter_libs.contains(&lib.name.as_str()));
+    }
+    
+    // Sort libraries by name for consistent output
+    catalog.libraries.sort_by(|a, b| a.name.cmp(&b.name));
+    
+    // Generate output based on format
+    let output_content = match format {
+        "json" => catalog.to_json(),
+        "markdown" | "md" | _ => catalog.to_markdown(),
+    };
+    
+    // Write output
+    if let Some(output_file) = output {
+        // Validate output path: ensure it's a relative path or within current directory
+        let output_path = Path::new(output_file);
+        
+        // Reject absolute paths for safety
+        if output_path.is_absolute() {
+            eprintln!("{} Absolute paths are not allowed for output files. Use a relative path.", "error:".red().bold());
+            return ExitCode::from(2);
+        }
+        
+        // Reject paths with parent directory references (directory traversal)
+        if output_path.components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+            eprintln!("{} Output path cannot contain parent directory references (..).", "error:".red().bold());
+            return ExitCode::from(2);
+        }
+        
+        match fs::write(output_file, &output_content) {
+            Ok(_) => {
+                println!("{} Documentation written to '{}'", "Success".green().bold(), output_file);
+            }
+            Err(e) => {
+                eprintln!("{} Failed to write to '{}': {}", "error:".red().bold(), output_file, e);
+                return ExitCode::from(2);
+            }
+        }
+    } else {
+        println!("{}", output_content);
+    }
+    
     ExitCode::SUCCESS
 }

@@ -1,0 +1,626 @@
+{
+  "version": "1.0",
+  "libraries": [
+    {
+      "name": "files",
+      "description": "File system operations library for selecting files/folders and checking file existence.",
+      "version": "1.0.0",
+      "functions": [
+        {
+          "name": "file_selector",
+          "description": "Select a single file by its path relative to the workspace.",
+          "parameters": [
+            {
+              "name": "path",
+              "param_type": "string",
+              "description": "Relative path to the file from workspace root"
+            }
+          ],
+          "return_type": "Scope",
+          "example": "scope main = files.file_selector('src/main.rs')"
+        },
+        {
+          "name": "folder_selector",
+          "description": "Select a folder and all files within it recursively.",
+          "parameters": [
+            {
+              "name": "path",
+              "param_type": "string",
+              "description": "Relative path to the folder from workspace root"
+            }
+          ],
+          "return_type": "Scope",
+          "example": "scope src = files.folder_selector('src')"
+        },
+        {
+          "name": "glob_selector",
+          "description": "Select files matching a glob pattern.",
+          "parameters": [
+            {
+              "name": "pattern",
+              "param_type": "string",
+              "description": "Glob pattern (e.g., '**/*.rs', 'src/*.py')"
+            }
+          ],
+          "return_type": "Scope",
+          "example": "scope rust_files = files.glob_selector('**/*.rs')"
+        }
+      ],
+      "checks": [
+        {
+          "name": "exists",
+          "description": "Check if a file exists within a scope.",
+          "parameters": [
+            {
+              "name": "scope",
+              "param_type": "Scope",
+              "description": "The scope to check within"
+            },
+            {
+              "name": "filename",
+              "param_type": "string",
+              "description": "The filename to look for"
+            }
+          ],
+          "return_type": "CheckResult",
+          "example": "check files.exists(src, 'main.rs')"
+        },
+        {
+          "name": "contains",
+          "description": "Check if a scope contains a file with the given name.",
+          "parameters": [
+            {
+              "name": "scope",
+              "param_type": "Scope",
+              "description": "The scope to check"
+            },
+            {
+              "name": "filename",
+              "param_type": "string",
+              "description": "The filename to look for"
+            }
+          ],
+          "return_type": "CheckResult",
+          "example": "check files.contains(docs, 'README.md')"
+        },
+        {
+          "name": "no_files_matching",
+          "description": "Check that no files match a given pattern within a scope.",
+          "parameters": [
+            {
+              "name": "scope",
+              "param_type": "Scope",
+              "description": "The scope to check"
+            },
+            {
+              "name": "pattern",
+              "param_type": "string",
+              "description": "Glob pattern that should not match any files"
+            }
+          ],
+          "return_type": "CheckResult",
+          "example": "check files.no_files_matching(src, '*.bak')"
+        },
+        {
+          "name": "max_size",
+          "description": "Check that all files in a scope are under a maximum size.",
+          "parameters": [
+            {
+              "name": "scope",
+              "param_type": "Scope",
+              "description": "The scope to check"
+            },
+            {
+              "name": "max_bytes",
+              "param_type": "integer",
+              "description": "Maximum file size in bytes"
+            }
+          ],
+          "return_type": "CheckResult",
+          "example": "check files.max_size(assets, 1048576)"
+        }
+      ]
+    },
+    {
+      "name": "python",
+      "description": "Python language analysis library for selecting and checking Python code constructs.",
+      "version": "1.0.0",
+      "functions": [
+        {
+          "name": "module_selector",
+          "description": "Select a Python module by name (e.g., 'orders' or 'orders.api').",
+          "parameters": [
+            {
+              "name": "module_path",
+              "param_type": "string",
+              "description": "Dotted module path"
+            }
+          ],
+          "return_type": "Scope",
+          "example": "scope api = python.module_selector('orders.api')"
+        },
+        {
+          "name": "function_selector",
+          "description": "Select Python functions by name.",
+          "parameters": [
+            {
+              "name": "func_name",
+              "param_type": "string",
+              "description": "Name of the function to find"
+            }
+          ],
+          "return_type": "Scope",
+          "example": "scope handlers = python.function_selector('handle_request')"
+        },
+        {
+          "name": "class_selector",
+          "description": "Select Python classes by name.",
+          "parameters": [
+            {
+              "name": "class_name",
+              "param_type": "string",
+              "description": "Name of the class to find"
+            }
+          ],
+          "return_type": "Scope",
+          "example": "scope models = python.class_selector('UserModel')"
+        }
+      ],
+      "checks": [
+        {
+          "name": "imports",
+          "description": "Check that a scope imports a specific module.",
+          "parameters": [
+            {
+              "name": "scope",
+              "param_type": "Scope",
+              "description": "The scope to check"
+            },
+            {
+              "name": "module_name",
+              "param_type": "string",
+              "description": "Module name to look for"
+            }
+          ],
+          "return_type": "CheckResult",
+          "example": "check python.imports(api_mod, 'typing')"
+        },
+        {
+          "name": "no_import",
+          "description": "Check that a scope does NOT import a specific module.",
+          "parameters": [
+            {
+              "name": "scope",
+              "param_type": "Scope",
+              "description": "The scope to check"
+            },
+            {
+              "name": "module_name",
+              "param_type": "string",
+              "description": "Module name that should not be imported"
+            }
+          ],
+          "return_type": "CheckResult",
+          "example": "check python.no_import(core_mod, 'django')"
+        },
+        {
+          "name": "returns_type",
+          "description": "Check that any function in a scope returns a given type.",
+          "parameters": [
+            {
+              "name": "scope",
+              "param_type": "Scope",
+              "description": "The scope to check"
+            },
+            {
+              "name": "type_name",
+              "param_type": "string",
+              "description": "Return type to look for"
+            }
+          ],
+          "return_type": "CheckResult",
+          "example": "check python.returns_type(api_mod, 'Response')"
+        },
+        {
+          "name": "function_returns_type",
+          "description": "Check that a specific function returns a given type.",
+          "parameters": [
+            {
+              "name": "scope",
+              "param_type": "Scope",
+              "description": "The scope to check"
+            },
+            {
+              "name": "func_name",
+              "param_type": "string",
+              "description": "Function name"
+            },
+            {
+              "name": "type_name",
+              "param_type": "string",
+              "description": "Expected return type"
+            }
+          ],
+          "return_type": "CheckResult",
+          "example": "check python.function_returns_type(api_mod, 'get_user', 'User')"
+        },
+        {
+          "name": "calls",
+          "description": "Check that a scope calls a specific identifier (function or object).",
+          "parameters": [
+            {
+              "name": "scope",
+              "param_type": "Scope",
+              "description": "The scope to check"
+            },
+            {
+              "name": "target",
+              "param_type": "string",
+              "description": "Identifier to look for"
+            }
+          ],
+          "return_type": "CheckResult",
+          "example": "check python.calls(service_mod, 'logger')"
+        },
+        {
+          "name": "calls_function",
+          "description": "Check that a scope calls a specific function in a module.",
+          "parameters": [
+            {
+              "name": "scope",
+              "param_type": "Scope",
+              "description": "The scope to check"
+            },
+            {
+              "name": "module_name",
+              "param_type": "string",
+              "description": "Module name"
+            },
+            {
+              "name": "func_name",
+              "param_type": "string",
+              "description": "Function name"
+            }
+          ],
+          "return_type": "CheckResult",
+          "example": "check python.calls_function(api_mod, 'database', 'connect')"
+        },
+        {
+          "name": "calls_scope",
+          "description": "Check that source scope calls something in target scope.",
+          "parameters": [
+            {
+              "name": "source_scope",
+              "param_type": "Scope",
+              "description": "Source scope that should make calls"
+            },
+            {
+              "name": "target_scope",
+              "param_type": "Scope",
+              "description": "Target scope that should be called"
+            }
+          ],
+          "return_type": "CheckResult",
+          "example": "check python.calls_scope(api_mod, utils_mod)"
+        }
+      ]
+    },
+    {
+      "name": "rust",
+      "description": "Rust language analysis library for selecting and checking Rust code constructs.",
+      "version": "1.0.0",
+      "functions": [
+        {
+          "name": "crate_selector",
+          "description": "Select a Rust crate by name from the workspace.",
+          "parameters": [
+            {
+              "name": "crate_name",
+              "param_type": "string",
+              "description": "Name of the crate to select"
+            }
+          ],
+          "return_type": "Scope",
+          "example": "scope core = rust.crate_selector('hielements-core')"
+        },
+        {
+          "name": "module_selector",
+          "description": "Select a Rust module by path (e.g., 'lexer' or 'stdlib::files').",
+          "parameters": [
+            {
+              "name": "module_path",
+              "param_type": "string",
+              "description": "Module path using :: separator"
+            }
+          ],
+          "return_type": "Scope",
+          "example": "scope lexer_mod = rust.module_selector('lexer')"
+        },
+        {
+          "name": "struct_selector",
+          "description": "Select a Rust struct by name.",
+          "parameters": [
+            {
+              "name": "struct_name",
+              "param_type": "string",
+              "description": "Name of the struct to find"
+            }
+          ],
+          "return_type": "Scope",
+          "example": "ref token: Token = rust.struct_selector('Token')"
+        },
+        {
+          "name": "enum_selector",
+          "description": "Select a Rust enum by name.",
+          "parameters": [
+            {
+              "name": "enum_name",
+              "param_type": "string",
+              "description": "Name of the enum to find"
+            }
+          ],
+          "return_type": "Scope",
+          "example": "ref kind: TokenKind = rust.enum_selector('TokenKind')"
+        },
+        {
+          "name": "function_selector",
+          "description": "Select a Rust function by name.",
+          "parameters": [
+            {
+              "name": "func_name",
+              "param_type": "string",
+              "description": "Name of the function to find"
+            }
+          ],
+          "return_type": "Scope",
+          "example": "ref parse_fn: Function = rust.function_selector('parse')"
+        },
+        {
+          "name": "trait_selector",
+          "description": "Select a Rust trait by name.",
+          "parameters": [
+            {
+              "name": "trait_name",
+              "param_type": "string",
+              "description": "Name of the trait to find"
+            }
+          ],
+          "return_type": "Scope",
+          "example": "ref lib_trait: Trait = rust.trait_selector('Library')"
+        },
+        {
+          "name": "impl_selector",
+          "description": "Select Rust impl blocks for a type.",
+          "parameters": [
+            {
+              "name": "type_name",
+              "param_type": "string",
+              "description": "Name of the type to find impls for"
+            }
+          ],
+          "return_type": "Scope",
+          "example": "scope impl_blocks = rust.impl_selector('Parser')"
+        }
+      ],
+      "checks": [
+        {
+          "name": "struct_exists",
+          "description": "Check that a struct with the given name exists.",
+          "parameters": [
+            {
+              "name": "struct_name",
+              "param_type": "string",
+              "description": "Name of the struct"
+            }
+          ],
+          "return_type": "CheckResult",
+          "example": "check rust.struct_exists('Parser')"
+        },
+        {
+          "name": "enum_exists",
+          "description": "Check that an enum with the given name exists.",
+          "parameters": [
+            {
+              "name": "enum_name",
+              "param_type": "string",
+              "description": "Name of the enum"
+            }
+          ],
+          "return_type": "CheckResult",
+          "example": "check rust.enum_exists('TokenKind')"
+        },
+        {
+          "name": "function_exists",
+          "description": "Check that a function with the given name exists.",
+          "parameters": [
+            {
+              "name": "func_name",
+              "param_type": "string",
+              "description": "Name of the function"
+            }
+          ],
+          "return_type": "CheckResult",
+          "example": "check rust.function_exists('parse')"
+        },
+        {
+          "name": "trait_exists",
+          "description": "Check that a trait with the given name exists.",
+          "parameters": [
+            {
+              "name": "trait_name",
+              "param_type": "string",
+              "description": "Name of the trait"
+            }
+          ],
+          "return_type": "CheckResult",
+          "example": "check rust.trait_exists('Library')"
+        },
+        {
+          "name": "impl_exists",
+          "description": "Check that an impl block for the given type exists.",
+          "parameters": [
+            {
+              "name": "type_name",
+              "param_type": "string",
+              "description": "Name of the type"
+            }
+          ],
+          "return_type": "CheckResult",
+          "example": "check rust.impl_exists('Parser')"
+        },
+        {
+          "name": "implements",
+          "description": "Check that a type implements a specific trait.",
+          "parameters": [
+            {
+              "name": "type_name",
+              "param_type": "string",
+              "description": "Name of the implementing type"
+            },
+            {
+              "name": "trait_name",
+              "param_type": "string",
+              "description": "Name of the trait"
+            }
+          ],
+          "return_type": "CheckResult",
+          "example": "check rust.implements('FilesLibrary', 'Library')"
+        },
+        {
+          "name": "uses",
+          "description": "Check that a scope uses a specific module.",
+          "parameters": [
+            {
+              "name": "scope",
+              "param_type": "Scope",
+              "description": "The scope to check"
+            },
+            {
+              "name": "module_path",
+              "param_type": "string",
+              "description": "Module path to look for"
+            }
+          ],
+          "return_type": "CheckResult",
+          "example": "check rust.uses(parser_mod, 'crate::lexer')"
+        },
+        {
+          "name": "has_derive",
+          "description": "Check that a scope has a specific derive macro.",
+          "parameters": [
+            {
+              "name": "scope",
+              "param_type": "Scope",
+              "description": "The scope to check"
+            },
+            {
+              "name": "derive_name",
+              "param_type": "string",
+              "description": "Name of the derive (e.g., 'Debug', 'Clone')"
+            }
+          ],
+          "return_type": "CheckResult",
+          "example": "check rust.has_derive(struct_scope, 'Serialize')"
+        },
+        {
+          "name": "has_docs",
+          "description": "Check that a scope has documentation comments.",
+          "parameters": [
+            {
+              "name": "scope",
+              "param_type": "Scope",
+              "description": "The scope to check"
+            }
+          ],
+          "return_type": "CheckResult",
+          "example": "check rust.has_docs(module)"
+        },
+        {
+          "name": "has_tests",
+          "description": "Check that a scope has test functions.",
+          "parameters": [
+            {
+              "name": "scope",
+              "param_type": "Scope",
+              "description": "The scope to check"
+            }
+          ],
+          "return_type": "CheckResult",
+          "example": "check rust.has_tests(module)"
+        },
+        {
+          "name": "depends_on",
+          "description": "Check that scope_a depends on (uses types from) scope_b.",
+          "parameters": [
+            {
+              "name": "scope_a",
+              "param_type": "Scope",
+              "description": "Source scope"
+            },
+            {
+              "name": "scope_b",
+              "param_type": "Scope",
+              "description": "Target scope that should be a dependency"
+            }
+          ],
+          "return_type": "CheckResult",
+          "example": "check rust.depends_on(parser_mod, lexer_mod)"
+        },
+        {
+          "name": "no_dependency",
+          "description": "Check that scope_a does NOT depend on scope_b (architectural boundary).",
+          "parameters": [
+            {
+              "name": "scope_a",
+              "param_type": "Scope",
+              "description": "Source scope"
+            },
+            {
+              "name": "scope_b",
+              "param_type": "Scope",
+              "description": "Target scope that should NOT be a dependency"
+            }
+          ],
+          "return_type": "CheckResult",
+          "example": "check rust.no_dependency(core_mod, cli_mod)"
+        },
+        {
+          "name": "pipeline_connects",
+          "description": "Check that output type from one scope connects to input of another.",
+          "parameters": [
+            {
+              "name": "output_scope",
+              "param_type": "Scope",
+              "description": "Scope producing output"
+            },
+            {
+              "name": "input_scope",
+              "param_type": "Scope",
+              "description": "Scope consuming input"
+            }
+          ],
+          "return_type": "CheckResult",
+          "example": "check rust.pipeline_connects(lexer.tokens, parser.input)"
+        },
+        {
+          "name": "type_compatible",
+          "description": "Check that two scopes have compatible types.",
+          "parameters": [
+            {
+              "name": "scope_a",
+              "param_type": "Scope",
+              "description": "First scope"
+            },
+            {
+              "name": "scope_b",
+              "param_type": "Scope",
+              "description": "Second scope"
+            }
+          ],
+          "return_type": "CheckResult",
+          "example": "check rust.type_compatible(producer_type, consumer_type)"
+        }
+      ]
+    }
+  ]
+}

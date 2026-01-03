@@ -166,6 +166,52 @@ Returns information about the library.
 }
 ```
 
+#### `library.doc` (optional)
+
+Returns detailed documentation for the library, including descriptions of all functions, checks, and their parameters. This enables automatic documentation generation.
+
+**Request:**
+```json
+{"jsonrpc": "2.0", "method": "library.doc", "id": 1}
+```
+
+**Response:**
+```json
+{
+    "jsonrpc": "2.0",
+    "result": {
+        "name": "mylibrary",
+        "description": "Custom library for Python analysis",
+        "version": "1.0.0",
+        "functions": [
+            {
+                "name": "module_selector",
+                "description": "Select Python modules by path pattern",
+                "parameters": [
+                    {"name": "path", "type": "string", "description": "Path pattern"}
+                ],
+                "return_type": "Scope",
+                "example": "mylibrary.module_selector('src/')"
+            }
+        ],
+        "checks": [
+            {
+                "name": "has_init",
+                "description": "Check if a Python package has __init__.py",
+                "parameters": [
+                    {"name": "scope", "type": "Scope", "description": "Package scope"}
+                ],
+                "return_type": "CheckResult",
+                "example": "check mylibrary.has_init(src)"
+            }
+        ]
+    },
+    "id": 1
+}
+```
+
+Use `hielements doc` to generate documentation catalogs that include all libraries (built-in and external) in markdown or JSON format.
+
 #### `library.call`
 
 Calls a selector function and returns a Value.

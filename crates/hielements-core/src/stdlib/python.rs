@@ -471,6 +471,87 @@ impl Library for PythonLibrary {
             _ => Err(LibraryError::new("E499", format!("Unknown check: python.{}", function)))
         }
     }
+
+    fn documentation(&self) -> crate::doc::LibraryDoc {
+        use crate::doc::{FunctionDoc, LibraryDoc};
+        
+        LibraryDoc::new("python")
+            .with_description("Python language analysis library for selecting and checking Python code constructs.")
+            .with_version("1.0.0")
+            // Selectors
+            .with_function(
+                FunctionDoc::new("module_selector", "Select a Python module by name (e.g., 'orders' or 'orders.api').")
+                    .with_param("module_path", "string", "Dotted module path")
+                    .with_return_type("Scope")
+                    .with_example("scope api = python.module_selector('orders.api')")
+            )
+            .with_function(
+                FunctionDoc::new("function_selector", "Select Python functions by name.")
+                    .with_param("func_name", "string", "Name of the function to find")
+                    .with_return_type("Scope")
+                    .with_example("scope handlers = python.function_selector('handle_request')")
+            )
+            .with_function(
+                FunctionDoc::new("class_selector", "Select Python classes by name.")
+                    .with_param("class_name", "string", "Name of the class to find")
+                    .with_return_type("Scope")
+                    .with_example("scope models = python.class_selector('UserModel')")
+            )
+            // Checks - imports
+            .with_check(
+                FunctionDoc::new("imports", "Check that a scope imports a specific module.")
+                    .with_param("scope", "Scope", "The scope to check")
+                    .with_param("module_name", "string", "Module name to look for")
+                    .with_return_type("CheckResult")
+                    .with_example("check python.imports(api_mod, 'typing')")
+            )
+            .with_check(
+                FunctionDoc::new("no_import", "Check that a scope does NOT import a specific module.")
+                    .with_param("scope", "Scope", "The scope to check")
+                    .with_param("module_name", "string", "Module name that should not be imported")
+                    .with_return_type("CheckResult")
+                    .with_example("check python.no_import(core_mod, 'django')")
+            )
+            // Checks - type checking
+            .with_check(
+                FunctionDoc::new("returns_type", "Check that any function in a scope returns a given type.")
+                    .with_param("scope", "Scope", "The scope to check")
+                    .with_param("type_name", "string", "Return type to look for")
+                    .with_return_type("CheckResult")
+                    .with_example("check python.returns_type(api_mod, 'Response')")
+            )
+            .with_check(
+                FunctionDoc::new("function_returns_type", "Check that a specific function returns a given type.")
+                    .with_param("scope", "Scope", "The scope to check")
+                    .with_param("func_name", "string", "Function name")
+                    .with_param("type_name", "string", "Expected return type")
+                    .with_return_type("CheckResult")
+                    .with_example("check python.function_returns_type(api_mod, 'get_user', 'User')")
+            )
+            // Checks - calls/dependencies
+            .with_check(
+                FunctionDoc::new("calls", "Check that a scope calls a specific identifier (function or object).")
+                    .with_param("scope", "Scope", "The scope to check")
+                    .with_param("target", "string", "Identifier to look for")
+                    .with_return_type("CheckResult")
+                    .with_example("check python.calls(service_mod, 'logger')")
+            )
+            .with_check(
+                FunctionDoc::new("calls_function", "Check that a scope calls a specific function in a module.")
+                    .with_param("scope", "Scope", "The scope to check")
+                    .with_param("module_name", "string", "Module name")
+                    .with_param("func_name", "string", "Function name")
+                    .with_return_type("CheckResult")
+                    .with_example("check python.calls_function(api_mod, 'database', 'connect')")
+            )
+            .with_check(
+                FunctionDoc::new("calls_scope", "Check that source scope calls something in target scope.")
+                    .with_param("source_scope", "Scope", "Source scope that should make calls")
+                    .with_param("target_scope", "Scope", "Target scope that should be called")
+                    .with_return_type("CheckResult")
+                    .with_example("check python.calls_scope(api_mod, utils_mod)")
+            )
+    }
 }
 
 #[cfg(test)]
