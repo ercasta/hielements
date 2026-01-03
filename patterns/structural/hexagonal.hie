@@ -1,0 +1,83 @@
+## Hexagonal Architecture (Ports & Adapters) Pattern
+##
+## Description:
+## Isolates the core domain from external concerns through ports (interfaces)
+## and adapters (implementations).
+##
+## Use Cases:
+## - Applications requiring high testability
+## - Systems with multiple external integrations
+
+import files
+import rust
+
+## Hexagonal Architecture Pattern (Ports & Adapters)
+## Core domain is isolated from external dependencies
+pattern hexagonal {
+    ## Core Domain - Pure business logic, no external dependencies
+    element domain {
+        scope module<rust>
+        ref entities: Entity
+        ref value_objects: ValueObject
+        ref domain_services: DomainService
+    }
+    
+    ## Ports - Interfaces defining how the domain interacts with the outside world
+    element ports {
+        ## Inbound ports - How the outside world talks to the domain
+        element inbound {
+            scope module<rust>
+            ref use_cases: UseCase
+        }
+        
+        ## Outbound ports - How the domain talks to the outside world
+        element outbound {
+            scope module<rust>
+            ref repository_ports: RepositoryPort
+            ref service_ports: ServicePort
+        }
+    }
+    
+    ## Adapters - Concrete implementations of ports
+    element adapters {
+        ## Primary adapters - Drive the application (REST, GraphQL, CLI)
+        element primary {
+            scope module<rust>
+            ref http_adapter: HttpAdapter
+            ref cli_adapter: CliAdapter
+        }
+        
+        ## Secondary adapters - Driven by the application (DB, external services)
+        element secondary {
+            scope module<rust>
+            ref db_adapter: DatabaseAdapter
+            ref external_service_adapter: ServiceAdapter
+        }
+    }
+    
+    ## Dependency rules - Domain has no outward dependencies
+    check rust.no_dependency(domain.module, adapters.primary.module)
+    check rust.no_dependency(domain.module, adapters.secondary.module)
+    
+    ## Ports can only depend on domain
+    check rust.depends_on(ports.inbound.module, domain.module)
+    check rust.depends_on(ports.outbound.module, domain.module)
+    
+    ## Adapters implement ports
+    check rust.implements_trait(adapters.secondary.module, ports.outbound.repository_ports)
+}
+
+## Example Implementation
+element payment_service implements hexagonal {
+    ## Domain bindings
+    scope domain_mod<rust> binds hexagonal.domain.module = rust.module_selector('payment::domain')
+    ref entities: Entity binds hexagonal.domain.entities = rust.struct_selector(domain_mod, 'Payment')
+    
+    ## Ports bindings
+    scope inbound_mod<rust> binds hexagonal.ports.inbound.module = rust.module_selector('payment::ports::inbound')
+    scope outbound_mod<rust> binds hexagonal.ports.outbound.module = rust.module_selector('payment::ports::outbound')
+    
+    ## Adapters bindings
+    scope primary_mod<rust> binds hexagonal.adapters.primary.module = rust.module_selector('payment::adapters::http')
+    scope secondary_mod<rust> binds hexagonal.adapters.secondary.module = rust.module_selector('payment::adapters::postgres')
+}

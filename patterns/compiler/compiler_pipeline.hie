@@ -1,0 +1,74 @@
+## Compiler Pipeline Pattern
+##
+## Description:
+## Classic compiler architecture with lexing, parsing, analysis, and code
+## generation phases.
+##
+## Use Cases:
+## - Compilers
+## - Interpreters
+## - DSL implementations
+
+import files
+import rust
+
+## Compiler Pipeline Pattern
+pattern compiler {
+    ## Lexer - Tokenization
+    element lexer {
+        scope module<rust>
+        ref tokens: TokenStream
+        ref token_types: TokenType
+        
+        check rust.struct_exists(module, 'Lexer')
+        check rust.enum_exists(module, 'TokenKind')
+        check rust.function_exists(module, 'tokenize')
+    }
+    
+    ## Parser - Syntax Analysis
+    element parser {
+        scope module<rust>
+        ref ast: AbstractSyntaxTree
+        
+        check rust.struct_exists(module, 'Parser')
+        check rust.function_exists(module, 'parse')
+    }
+    
+    ## Semantic Analyzer
+    element semantic {
+        scope module<rust>
+        ref type_checker: TypeChecker
+        ref symbol_table: SymbolTable
+        
+        check rust.function_exists(module, 'analyze')
+    }
+    
+    ## Intermediate Representation
+    element ir {
+        scope module<rust>
+        ref ir_types: IRNode
+        ref ir_builder: IRBuilder
+    }
+    
+    ## Code Generator
+    element codegen {
+        scope module<rust>
+        ref code_emitter: CodeEmitter
+        
+        check rust.function_exists(module, 'generate')
+    }
+    
+    ## Diagnostics
+    element diagnostics {
+        scope module<rust>
+        ref error_reporter: ErrorReporter
+        ref warning_reporter: WarningReporter
+        
+        check rust.struct_exists(module, 'Diagnostic')
+    }
+    
+    ## Dependencies flow in one direction: lexer → parser → semantic → ir → codegen
+    check rust.no_dependency(lexer.module, parser.module)
+    check rust.no_dependency(parser.module, semantic.module)
+    check rust.no_dependency(semantic.module, codegen.module)
+}

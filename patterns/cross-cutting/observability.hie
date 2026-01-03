@@ -1,0 +1,62 @@
+## Observability Pattern
+##
+## Description:
+## Comprehensive visibility into system behavior through metrics, logging,
+## and tracing (the three pillars of observability).
+##
+## Use Cases:
+## - Production systems requiring monitoring and debugging capabilities
+## - Systems requiring compliance and audit trails
+
+import files
+import rust
+
+## Observability Pattern (Three Pillars)
+pattern observability {
+    ## Metrics
+    element metrics {
+        scope module<rust>
+        ref prometheus_endpoint: MetricsEndpoint
+        ref custom_metrics: MetricDefinition
+        
+        check rust.function_exists(module, 'record_metric')
+        check rust.function_exists(module, 'expose_metrics')
+    }
+    
+    ## Logging
+    element logging {
+        scope module<rust>
+        ref logger: Logger
+        ref log_format: LogFormat
+        
+        ## Structured logging required
+        check rust.uses_crate(module, 'tracing')
+        check rust.function_exists(module, 'log')
+    }
+    
+    ## Distributed Tracing
+    element tracing {
+        scope module<rust>
+        ref tracer: Tracer
+        ref span_context: SpanContext
+        
+        check rust.function_exists(module, 'start_span')
+        check rust.function_exists(module, 'inject_context')
+        check rust.function_exists(module, 'extract_context')
+    }
+    
+    ## Health Checks
+    element health {
+        scope module<rust>
+        ref liveness: LivenessCheck
+        ref readiness: ReadinessCheck
+        
+        check rust.function_exists(module, 'liveness_check')
+        check rust.function_exists(module, 'readiness_check')
+    }
+    
+    ## All pillars must be present
+    requires descendant element metrics_impl
+    requires descendant element logging_impl
+    requires descendant element tracing_impl
+}

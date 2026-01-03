@@ -1,0 +1,110 @@
+## Microservice Architecture Pattern
+##
+## Description:
+## System composed of independently deployable services, each with its own
+## database and API.
+##
+## Use Cases:
+## - Large-scale distributed systems
+## - Teams wanting independent deployments
+
+import files
+import rust
+
+## Microservice Pattern
+## Defines structure for a single, independently deployable service
+pattern microservice {
+    ## API layer - exposes service functionality
+    element api {
+        scope module<rust>
+        ref rest_endpoint: HttpHandler
+        ref api_version: string
+    }
+    
+    ## Domain logic
+    element domain {
+        scope module<rust>
+        ref services: DomainService
+    }
+    
+    ## Data persistence - each service owns its data
+    element persistence {
+        scope module<rust>
+        ref repository: Repository
+        ref database_config: DbConfig
+    }
+    
+    ## Container definition
+    element container {
+        scope dockerfile
+        ref exposed_port: integer
+    }
+    
+    ## Service mesh integration
+    requires descendant element health_check
+    requires descendant check files.exists(container.dockerfile, 'HEALTHCHECK')
+    
+    ## API documentation requirement
+    requires descendant scope api_docs
+    
+    ## Service isolation - no direct database access from other services
+    forbids connection to external_database.*
+}
+
+## Microservices System Pattern
+## Defines a system of microservices with shared concerns
+pattern microservices_system {
+    ## API Gateway
+    element gateway {
+        scope module<rust>
+        ref routing_config: RoutingConfig
+        
+        check rust.function_exists(module, 'route_request')
+    }
+    
+    ## Service registry
+    element registry {
+        scope module<rust>
+        ref service_discovery: ServiceDiscovery
+    }
+    
+    ## At least 2 microservices required
+    requires descendant element service implements microservice
+    
+    ## Shared configuration
+    element config {
+        scope config_files = files.folder_selector('config')
+        check files.exists(config_files, 'services.yaml')
+    }
+}
+
+## Example: E-commerce microservices
+element ecommerce_platform implements microservices_system {
+    scope gateway_mod<rust> binds microservices_system.gateway.module = rust.module_selector('gateway')
+    scope registry_mod<rust> binds microservices_system.registry.module = rust.module_selector('registry')
+    
+    ## Orders Service
+    element orders_service implements microservice {
+        scope api_mod<rust> binds microservice.api.module = rust.module_selector('orders::api')
+        scope domain_mod<rust> binds microservice.domain.module = rust.module_selector('orders::domain')
+        scope persistence_mod<rust> binds microservice.persistence.module = rust.module_selector('orders::db')
+        scope dockerfile binds microservice.container.dockerfile = files.file_selector('orders/Dockerfile')
+        
+        element health_check {
+            scope module<rust> = rust.module_selector('orders::health')
+            check rust.function_exists(module, 'health_check')
+        }
+    }
+    
+    ## Payments Service
+    element payments_service implements microservice {
+        scope api_mod<rust> binds microservice.api.module = rust.module_selector('payments::api')
+        scope domain_mod<rust> binds microservice.domain.module = rust.module_selector('payments::domain')
+        scope persistence_mod<rust> binds microservice.persistence.module = rust.module_selector('payments::db')
+        scope dockerfile binds microservice.container.dockerfile = files.file_selector('payments/Dockerfile')
+        
+        element health_check {
+            scope module<rust> = rust.module_selector('payments::health')
+        }
+    }
+}
