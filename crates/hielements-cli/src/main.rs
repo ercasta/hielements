@@ -462,6 +462,21 @@ fn cmd_doc(workspace: Option<&str>, format: &str, output: Option<&str>, library_
     
     // Write output
     if let Some(output_file) = output {
+        // Validate output path: ensure it's a relative path or within current directory
+        let output_path = Path::new(output_file);
+        
+        // Reject absolute paths for safety
+        if output_path.is_absolute() {
+            eprintln!("{} Absolute paths are not allowed for output files. Use a relative path.", "error:".red().bold());
+            return ExitCode::from(2);
+        }
+        
+        // Reject paths with parent directory references (directory traversal)
+        if output_path.components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+            eprintln!("{} Output path cannot contain parent directory references (..).", "error:".red().bold());
+            return ExitCode::from(2);
+        }
+        
         match fs::write(output_file, &output_content) {
             Ok(_) => {
                 println!("{} Documentation written to '{}'", "Success".green().bold(), output_file);

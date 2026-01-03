@@ -518,9 +518,11 @@ impl Library for ExternalLibrary {
     fn documentation(&self) -> crate::doc::LibraryDoc {
         use crate::doc::{FunctionDoc, LibraryDoc};
         
-        // Try to get documentation from the external process
-        // Note: We need a mutable borrow for send_request, so we create a new process
-        // for documentation requests. This is a limitation of the current design.
+        // Try to get documentation from the external process.
+        // Since `documentation()` takes `&self` but `send_request()` requires `&mut self`,
+        // we create a new temporary process for documentation requests. This is acceptable
+        // because documentation is typically fetched once during catalog generation, not
+        // repeatedly. The temporary process is cleaned up when dropped.
         let mut lib = ExternalLibrary::new(self.config.clone());
         
         match lib.send_request("library.doc", serde_json::json!({})) {
