@@ -507,7 +507,7 @@ fn cmd_doc(workspace: Option<&str>, format: &str, output: Option<&str>, library_
 }
 
 fn cmd_init(project_name: &str, directory: Option<&str>) -> ExitCode {
-    let target_dir = directory.unwrap_or(".");
+    let target_dir = Path::new(directory.unwrap_or("."));
     
     // Validate project name (alphanumeric and underscores)
     if !project_name.chars().all(|c| c.is_alphanumeric() || c == '_') {
@@ -517,17 +517,18 @@ fn cmd_init(project_name: &str, directory: Option<&str>) -> ExitCode {
     
     // Create target directory if it doesn't exist
     if let Err(e) = fs::create_dir_all(target_dir) {
-        eprintln!("{} Failed to create directory '{}': {}", "error:".red().bold(), target_dir, e);
+        eprintln!("{} Failed to create directory '{}': {}", "error:".red().bold(), target_dir.display(), e);
         return ExitCode::from(2);
     }
     
-    let hie_file = format!("{}/{}.hie", target_dir, project_name);
-    let config_file = format!("{}/hielements.toml", target_dir);
-    let guide_file = format!("{}/USAGE_GUIDE.md", target_dir);
+    // Use Path::join for safe path construction
+    let hie_file = target_dir.join(format!("{}.hie", project_name));
+    let config_file = target_dir.join("hielements.toml");
+    let guide_file = target_dir.join("USAGE_GUIDE.md");
     
     // Check if files already exist
-    if Path::new(&hie_file).exists() {
-        eprintln!("{} File '{}' already exists", "error:".red().bold(), hie_file);
+    if hie_file.exists() {
+        eprintln!("{} File '{}' already exists", "error:".red().bold(), hie_file.display());
         return ExitCode::from(2);
     }
     
@@ -728,41 +729,48 @@ element my_component {
     
     // Write files
     if let Err(e) = fs::write(&hie_file, hie_content) {
-        eprintln!("{} Failed to write '{}': {}", "error:".red().bold(), hie_file, e);
+        eprintln!("{} Failed to write '{}': {}", "error:".red().bold(), hie_file.display(), e);
         return ExitCode::from(2);
     }
     
-    let config_existed = Path::new(&config_file).exists();
+    let config_existed = config_file.exists();
     if !config_existed {
         if let Err(e) = fs::write(&config_file, config_content) {
-            eprintln!("{} Failed to write '{}': {}", "error:".red().bold(), config_file, e);
+            eprintln!("{} Failed to write '{}': {}", "error:".red().bold(), config_file.display(), e);
             return ExitCode::from(2);
         }
     } else {
-        println!("{} '{}' already exists, skipping", "Info".blue().bold(), config_file);
+        println!("{} '{}' already exists, skipping", "Info".blue().bold(), config_file.display());
     }
     
-    if let Err(e) = fs::write(&guide_file, guide_content) {
-        eprintln!("{} Failed to write '{}': {}", "error:".red().bold(), guide_file, e);
-        return ExitCode::from(2);
+    let guide_existed = guide_file.exists();
+    if !guide_existed {
+        if let Err(e) = fs::write(&guide_file, guide_content) {
+            eprintln!("{} Failed to write '{}': {}", "error:".red().bold(), guide_file.display(), e);
+            return ExitCode::from(2);
+        }
+    } else {
+        println!("{} '{}' already exists, skipping", "Info".blue().bold(), guide_file.display());
     }
     
     // Success message
     println!("{} Initialized Hielements project '{}'", "Success".green().bold(), project_name);
     println!();
     println!("Created files:");
-    println!("  {} - Initial architecture specification", hie_file.cyan());
+    println!("  {} - Initial architecture specification", hie_file.display().to_string().cyan());
     if !config_existed {
-        println!("  {} - Configuration for custom libraries", config_file.cyan());
+        println!("  {} - Configuration for custom libraries", config_file.display().to_string().cyan());
     }
-    println!("  {} - Quick reference guide", guide_file.cyan());
+    if !guide_existed {
+        println!("  {} - Quick reference guide", guide_file.display().to_string().cyan());
+    }
     println!();
     println!("Next steps:");
-    println!("  1. Edit {} to describe your architecture", hie_file.cyan());
-    println!("  2. Run {} to validate", format!("hielements check {}", hie_file).yellow());
-    println!("  3. Run {} to execute checks", format!("hielements run {}", hie_file).yellow());
+    println!("  1. Edit {} to describe your architecture", hie_file.display().to_string().cyan());
+    println!("  2. Run {} to validate", format!("hielements check {}", hie_file.display()).yellow());
+    println!("  3. Run {} to execute checks", format!("hielements run {}", hie_file.display()).yellow());
     println!();
-    println!("For AI agents: See {} for language syntax and available commands", guide_file.cyan());
+    println!("For AI agents: See {} for language syntax and available commands", guide_file.display().to_string().cyan());
     
     ExitCode::SUCCESS
 }
