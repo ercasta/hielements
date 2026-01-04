@@ -538,6 +538,11 @@ r#"# {} Architecture Specification
 #
 # This file describes the structure of the {} project using Hielements.
 # Learn more at: https://github.com/ercasta/hielements
+#
+# For AI agents and quick reference:
+# - See USAGE_GUIDE.md for language syntax and available commands
+# - Run 'hielements check {}.hie' to validate this specification
+# - Run 'hielements run {}.hie' to execute checks
 
 import files
 
@@ -552,7 +557,7 @@ element {} {{
     # Add more elements, scopes, and checks here to describe your architecture
 }}
 "#,
-        project_name, project_name, project_name, project_name
+        project_name, project_name, project_name, project_name, project_name, project_name
     );
     
     // Generate hielements.toml
