@@ -20,10 +20,17 @@ This guide walks you through using Hielements to describe, document, and enforce
 
 ### Installation
 
-Install Hielements via Cargo (Rust's package manager):
+Hielements is not yet published on cargo. Compile from source:
 
 ```bash
-cargo install hielements
+# Prerequisites: Install Rust toolchain (https://rustup.rs)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Clone and build
+git clone https://github.com/ercasta/hielements.git
+cd hielements
+cargo build --release
+cargo install --path crates/hielements-cli
 ```
 
 Verify the installation:
@@ -31,6 +38,19 @@ Verify the installation:
 ```bash
 hielements --version
 ```
+
+### Initialize Your Project
+
+Create initial configuration for your project:
+
+```bash
+hielements init my_project
+```
+
+This generates:
+- `my_project.hie` - Initial specification with a root element
+- `hielements.toml` - Configuration for custom libraries
+- `USAGE_GUIDE.md` - Quick reference guide
 
 ### Your First Check
 

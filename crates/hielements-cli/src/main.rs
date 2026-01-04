@@ -86,6 +86,16 @@ enum Commands {
         #[arg(short, long)]
         library: Option<String>,
     },
+
+    /// Initialize a new Hielements project
+    Init {
+        /// Project name (used to name the initial element and .hie file)
+        project_name: String,
+
+        /// Target directory (defaults to current directory)
+        #[arg(short, long)]
+        directory: Option<String>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -99,6 +109,9 @@ fn main() -> ExitCode {
         Commands::Parse { file } => cmd_parse(&file),
         Commands::Doc { workspace, format, output, library } => {
             cmd_doc(workspace.as_deref(), &format, output.as_deref(), library.as_deref())
+        }
+        Commands::Init { project_name, directory } => {
+            cmd_init(&project_name, directory.as_deref())
         }
     }
 }
@@ -489,6 +502,267 @@ fn cmd_doc(workspace: Option<&str>, format: &str, output: Option<&str>, library_
     } else {
         println!("{}", output_content);
     }
+    
+    ExitCode::SUCCESS
+}
+
+fn cmd_init(project_name: &str, directory: Option<&str>) -> ExitCode {
+    let target_dir = directory.unwrap_or(".");
+    
+    // Validate project name (alphanumeric and underscores)
+    if !project_name.chars().all(|c| c.is_alphanumeric() || c == '_') {
+        eprintln!("{} Project name must contain only alphanumeric characters and underscores", "error:".red().bold());
+        return ExitCode::from(2);
+    }
+    
+    // Create target directory if it doesn't exist
+    if let Err(e) = fs::create_dir_all(target_dir) {
+        eprintln!("{} Failed to create directory '{}': {}", "error:".red().bold(), target_dir, e);
+        return ExitCode::from(2);
+    }
+    
+    let hie_file = format!("{}/{}.hie", target_dir, project_name);
+    let config_file = format!("{}/hielements.toml", target_dir);
+    let guide_file = format!("{}/USAGE_GUIDE.md", target_dir);
+    
+    // Check if files already exist
+    if Path::new(&hie_file).exists() {
+        eprintln!("{} File '{}' already exists", "error:".red().bold(), hie_file);
+        return ExitCode::from(2);
+    }
+    
+    // Generate initial .hie file
+    let hie_content = format!(
+r#"# {} Architecture Specification
+#
+# This file describes the structure of the {} project using Hielements.
+# Learn more at: https://github.com/ercasta/hielements
+
+import files
+
+## The {} project
+element {} {{
+    # Define the root scope
+    scope root = files.folder_selector('.')
+    
+    # Basic checks
+    check files.exists(root, 'README.md')
+    
+    # Add more elements, scopes, and checks here to describe your architecture
+}}
+"#,
+        project_name, project_name, project_name, project_name
+    );
+    
+    // Generate hielements.toml
+    let config_content = r#"# Hielements Configuration File
+#
+# This file configures external library plugins for the Hielements interpreter.
+# Place this file in your project root (next to your .hie files).
+
+# External Libraries
+# Each entry defines a library that can be imported in .hie files.
+# 
+# Supports two types of plugins:
+#   1. External process plugins (JSON-RPC over stdio)
+#   2. WASM plugins (sandboxed, near-native performance)
+#
+# Format:
+#   [libraries]
+#   # External process plugin
+#   library_name = { executable = "path/to/executable", args = ["arg1", "arg2"] }
+#   # or shorthand when no args:
+#   library_name = { executable = "path/to/executable" }
+#   
+#   # WASM plugin (explicit type)
+#   library_name = { type = "wasm", path = "path/to/plugin.wasm" }
+#   # or inferred from .wasm extension:
+#   library_name = { path = "path/to/plugin.wasm" }
+#
+# Example:
+#   [libraries]
+#   mylib = { executable = "python3", args = ["scripts/mylib_plugin.py"] }
+#   typescript = { type = "wasm", path = "lib/typescript.wasm" }
+
+[libraries]
+# Add your custom libraries here
+# Example:
+# mylib = { executable = "python3", args = ["scripts/mylib_plugin.py"] }
+"#;
+    
+    // Generate USAGE_GUIDE.md
+    let guide_content = r#"# Hielements Quick Reference
+
+This guide provides a brief introduction to using Hielements in your project.
+
+## Commands
+
+### Check Syntax and Semantics
+```bash
+hielements check <file>.hie
+```
+Validates the syntax and semantics of your Hielements specification without running checks.
+
+### Run Checks
+```bash
+hielements run <file>.hie
+```
+Executes all checks defined in your specification against your actual codebase.
+
+Options:
+- `--verbose` - Show progress as each check runs
+- `--filter <pattern>` - Run only checks matching the pattern
+- `--limit <n>` - Limit the number of checks to run
+- `--dry-run` - Show what would be checked without actually running
+
+### Generate Documentation
+```bash
+hielements doc --output library_docs.md
+```
+Generate documentation for available libraries (built-in and custom).
+
+## Language Basics
+
+### Elements
+Elements represent logical components of your system:
+```hielements
+element my_component {
+    # Element content
+}
+```
+
+### Scopes
+Scopes define what code/artifacts belong to an element:
+```hielements
+scope src = files.folder_selector('src/')
+scope config = files.file_selector('config.yaml')
+```
+
+### Checks
+Checks verify properties of your system:
+```hielements
+check files.exists(src, 'main.py')
+check files.no_files_matching(src, '*.pyc')
+```
+
+### Hierarchical Elements
+Elements can contain child elements:
+```hielements
+element parent {
+    element child {
+        scope src = files.folder_selector('child/src')
+    }
+}
+```
+
+### Connection Points (refs)
+Connection points expose interfaces with explicit types:
+```hielements
+ref api: HttpHandler = python.public_functions(module)
+ref config: Config = files.file_selector('config.yaml')
+```
+
+### Patterns (Templates)
+Define reusable architectural blueprints:
+```hielements
+pattern microservice {
+    element api {
+        scope module<python>
+    }
+    element database {
+        ref connection: DatabaseConnection
+    }
+}
+
+element orders_service implements microservice {
+    # Bind pattern to actual implementation
+}
+```
+
+## Built-in Libraries
+
+### files
+- `files.folder_selector(path)` - Select a folder
+- `files.file_selector(path)` - Select a file
+- `files.exists(scope, name)` - Check if file/folder exists
+- `files.no_files_matching(scope, pattern)` - Check no files match pattern
+
+### rust
+- `rust.module_selector(name)` - Select a Rust module
+- `rust.crate_selector(name)` - Select a Rust crate
+- `rust.struct_exists(name)` - Check if struct exists
+- `rust.function_exists(name)` - Check if function exists
+
+### python
+- `python.module_selector(name)` - Select a Python module
+- `python.class_selector(module, name)` - Select a class
+- `python.function_exists(module, name)` - Check if function exists
+
+## Custom Libraries
+
+You can extend Hielements with custom libraries written in any language.
+Configure them in `hielements.toml`:
+
+```toml
+[libraries]
+mylib = { executable = "python3", args = ["scripts/mylib_plugin.py"] }
+```
+
+Then import and use in your .hie files:
+```hielements
+import mylib
+
+element my_component {
+    scope src = mylib.my_selector('src/')
+    check mylib.my_check(src)
+}
+```
+
+## Learn More
+
+- Documentation: https://github.com/ercasta/hielements/blob/main/README.md
+- Usage Guide: https://github.com/ercasta/hielements/blob/main/USAGE.md
+- Pattern Catalog: https://github.com/ercasta/hielements/blob/main/doc/patterns_catalog.md
+- Examples: https://github.com/ercasta/hielements/tree/main/examples
+"#;
+    
+    // Write files
+    if let Err(e) = fs::write(&hie_file, hie_content) {
+        eprintln!("{} Failed to write '{}': {}", "error:".red().bold(), hie_file, e);
+        return ExitCode::from(2);
+    }
+    
+    let config_existed = Path::new(&config_file).exists();
+    if !config_existed {
+        if let Err(e) = fs::write(&config_file, config_content) {
+            eprintln!("{} Failed to write '{}': {}", "error:".red().bold(), config_file, e);
+            return ExitCode::from(2);
+        }
+    } else {
+        println!("{} '{}' already exists, skipping", "Info".blue().bold(), config_file);
+    }
+    
+    if let Err(e) = fs::write(&guide_file, guide_content) {
+        eprintln!("{} Failed to write '{}': {}", "error:".red().bold(), guide_file, e);
+        return ExitCode::from(2);
+    }
+    
+    // Success message
+    println!("{} Initialized Hielements project '{}'", "Success".green().bold(), project_name);
+    println!();
+    println!("Created files:");
+    println!("  {} - Initial architecture specification", hie_file.cyan());
+    if !config_existed {
+        println!("  {} - Configuration for custom libraries", config_file.cyan());
+    }
+    println!("  {} - Quick reference guide", guide_file.cyan());
+    println!();
+    println!("Next steps:");
+    println!("  1. Edit {} to describe your architecture", hie_file.cyan());
+    println!("  2. Run {} to validate", format!("hielements check {}", hie_file).yellow());
+    println!("  3. Run {} to execute checks", format!("hielements run {}", hie_file).yellow());
+    println!();
+    println!("For AI agents: See {} for language syntax and available commands", guide_file.cyan());
     
     ExitCode::SUCCESS
 }
