@@ -388,13 +388,53 @@ Hielements evaluates all rules against your actual codebase and reports violatio
 
 ### Installation
 
+#### From Source (Recommended - Not yet published on cargo)
+
+Hielements is not yet published on cargo. To use it, compile from source:
+
 ```bash
-# Install via cargo (Rust package manager)
+# Prerequisites: Install Rust toolchain (https://rustup.rs)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Clone the repository
+git clone https://github.com/ercasta/hielements.git
+cd hielements
+
+# Build and install
+cargo build --release
+cargo install --path crates/hielements-cli
+
+# Verify installation
+hielements --version
+```
+
+The binary will be installed to `~/.cargo/bin/hielements` (ensure this is in your PATH).
+
+#### From Releases (Future)
+
+```bash
+# Once published, install via cargo (Rust package manager)
 cargo install hielements
 
 # Or download binary from releases
 # https://github.com/ercasta/hielements/releases
 ```
+
+### Initialize a New Project
+
+Use the `init` command to set up Hielements for your project:
+
+```bash
+# Initialize with your project name
+hielements init my_project
+
+# This creates:
+#   - my_project.hie     (Initial specification)
+#   - hielements.toml    (Configuration for custom libraries)
+#   - USAGE_GUIDE.md     (Quick reference for the language and commands)
+```
+
+The generated `.hie` file will contain a basic element structure named after your project.
 
 ### Your First Hielements Spec
 
