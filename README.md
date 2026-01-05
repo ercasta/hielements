@@ -4,7 +4,7 @@
 
 **A language to describe and enforce software architecture.**
 
-Hielements helps you define, document, and enforce the logical structure of your software systems. Unlike traditional architecture documentation that becomes stale, Hielements specifications are formally checked against your actual code—ensuring your architecture stays aligned with reality.
+Hielements (pronounced *hi-elements*) helps you define, document, and enforce the logical structure of your software systems. Unlike traditional architecture documentation that becomes stale, Hielements specifications are formally checked against your actual code—ensuring your architecture stays aligned with reality.
 
 > 📝 **Note**: This documentation describes Hielements V2, which introduces a clearer separation between **prescriptive** (patterns with rules) and **descriptive** (actual implementations) parts of the language. V2 is incompatible with V1.
 
