@@ -1,0 +1,91 @@
+## Payment API - FastAPI Microservice Example
+##
+## This example demonstrates using the fastapi_microservice pattern
+## with the fastapi plugin to verify authentication on all endpoints.
+
+import files
+import python
+
+## Payment Service - Implements fastapi_microservice pattern
+element payment_service {
+    ## API Module
+    element api {
+        scope module<python> = python.module_selector('app/api/payments.py')
+        ref app_instance: FastAPIApp = python.variable_selector(module, 'app')
+        
+        check python.module_exists(module)
+        check python.imports_package(module, 'fastapi')
+        check python.function_exists(module, 'create_payment')
+        check python.function_exists(module, 'get_payment')
+        check python.function_exists(module, 'list_payments')
+    }
+    
+    ## Authentication Module
+    element auth {
+        scope module<python> = python.module_selector('app/auth/__init__.py')
+        ref get_current_user: AuthDependency = python.function_selector(module, 'get_current_user')
+        ref oauth2_scheme: SecurityScheme = python.variable_selector(module, 'oauth2_scheme')
+        
+        check python.module_exists(module)
+        check python.function_exists(module, 'get_current_user')
+        check python.function_exists(module, 'verify_token')
+    }
+    
+    ## Models Module
+    element models {
+        scope module<python> = python.module_selector('app/models/__init__.py')
+        
+        check python.module_exists(module)
+        check python.imports_package(module, 'pydantic')
+        check python.class_exists(module, 'PaymentRequest')
+        check python.class_exists(module, 'PaymentResponse')
+    }
+    
+    ## Dependencies
+    element dependencies {
+        scope requirements_file = files.file_selector('requirements.txt')
+        
+        check files.exists(requirements_file, 'requirements.txt')
+        check files.contains(requirements_file, 'fastapi')
+        check files.contains(requirements_file, 'uvicorn')
+    }
+    
+    ## Container
+    element container {
+        scope dockerfile = files.file_selector('Dockerfile')
+        
+        check files.exists(dockerfile, 'Dockerfile')
+    }
+    
+    ## Verify API depends on auth
+    check python.imports_from(api.module, auth.module)
+    
+    ## Verify API depends on models
+    check python.imports_from(api.module, models.module)
+}
+
+## With fastapi plugin installed, you can add these additional checks:
+## 
+## import fastapi
+## 
+## element payment_service_with_auth_checks {
+##     element api {
+##         scope module<python> = python.module_selector('app/api/payments.py')
+##         
+##         ## Verify all routes have authentication
+##         check fastapi.all_routes_authenticated(module)
+##         
+##         ## Verify POST routes are authenticated
+##         check fastapi.post_routes_authenticated(module)
+##         
+##         ## Verify GET routes are authenticated  
+##         check fastapi.get_routes_authenticated(module)
+##     }
+##     
+##     element auth {
+##         scope module<python> = python.module_selector('app/auth/__init__.py')
+##         
+##         ## Verify authentication scheme exists
+##         check fastapi.has_authentication_scheme(module)
+##     }
+## }
