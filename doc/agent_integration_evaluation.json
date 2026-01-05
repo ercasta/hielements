@@ -1,0 +1,267 @@
+{
+  "document": "agent_integration_evaluation",
+  "version": "1.0",
+  "date": "2026-01-05",
+  "purpose": "Evaluate options for making Hielements easier to use by AI agents",
+  
+  "current_state": {
+    "strengths": [
+      "Structured declarative language",
+      "CLI with JSON output support",
+      "Self-describing system (hielements.hie)",
+      "Extensible plugin system (JSON-RPC)",
+      "Auto-generated documentation"
+    ],
+    "limitations": [
+      "No standardized agent interface",
+      "Limited introspection capabilities",
+      "No agent context management",
+      "Static documentation format",
+      "Integration complexity"
+    ]
+  },
+  
+  "evaluated_options": [
+    {
+      "name": "Model Context Protocol (MCP)",
+      "implementation_time": "3-4 weeks",
+      "complexity": "medium",
+      "standardization": 5,
+      "agent_fit": 5,
+      "pros": [
+        "Industry-standard protocol",
+        "Works with multiple AI platforms",
+        "Rich capabilities (resources + tools + prompts)",
+        "Built-in discoverability",
+        "Growing ecosystem"
+      ],
+      "cons": [
+        "New implementation required",
+        "Protocol still evolving",
+        "Separate process management",
+        "Learning curve"
+      ]
+    },
+    {
+      "name": "Enhanced JSON-RPC Interface",
+      "implementation_time": "1-2 weeks",
+      "complexity": "low-medium",
+      "standardization": 2,
+      "agent_fit": 4,
+      "pros": [
+        "Quick implementation",
+        "Reuses existing infrastructure",
+        "Familiar protocol",
+        "Lightweight",
+        "Self-contained"
+      ],
+      "cons": [
+        "Not standardized",
+        "Limited discoverability",
+        "No ecosystem benefits",
+        "Custom integration per agent"
+      ]
+    },
+    {
+      "name": "REST API Server",
+      "implementation_time": "2-3 weeks",
+      "complexity": "medium-high",
+      "standardization": 3,
+      "agent_fit": 3,
+      "pros": [
+        "Universal HTTP access",
+        "Web integration ready",
+        "Scalable",
+        "Standard monitoring/auth"
+      ],
+      "cons": [
+        "Higher complexity",
+        "Deployment overhead",
+        "Network latency",
+        "Not typical for local agents"
+      ]
+    },
+    {
+      "name": "LSP Extensions",
+      "implementation_time": "4-6 weeks",
+      "complexity": "high",
+      "standardization": 4,
+      "agent_fit": 3,
+      "pros": [
+        "Standard protocol",
+        "Rich features",
+        "IDE integration included"
+      ],
+      "cons": [
+        "Not agent-specific",
+        "High complexity",
+        "LSP not yet implemented",
+        "Overengineered for agents"
+      ]
+    },
+    {
+      "name": "Native Python/JavaScript SDKs",
+      "implementation_time": "3-4 weeks per language",
+      "complexity": "medium",
+      "standardization": 2,
+      "agent_fit": 5,
+      "pros": [
+        "Idiomatic to agent languages",
+        "Type safety",
+        "Easy integration",
+        "Good developer experience"
+      ],
+      "cons": [
+        "High maintenance burden",
+        "Multiple SDKs needed",
+        "Version synchronization",
+        "Limited by CLI capabilities"
+      ]
+    },
+    {
+      "name": "Hybrid Approach",
+      "implementation_time": "9-12 weeks (phased)",
+      "complexity": "medium-high",
+      "standardization": 5,
+      "agent_fit": 5,
+      "pros": [
+        "Incremental value delivery",
+        "Multiple integration paths",
+        "Future-proof",
+        "Best of all approaches"
+      ],
+      "cons": [
+        "Highest maintenance",
+        "Most code to write",
+        "Long-term commitment",
+        "Resource intensive"
+      ]
+    }
+  ],
+  
+  "recommendation": {
+    "approach": "Hybrid (Phased)",
+    "rationale": "Balances immediate value with long-term strategic positioning",
+    "phases": [
+      {
+        "phase": 1,
+        "name": "JSON-RPC Agent Interface",
+        "timeline": "Weeks 1-2",
+        "deliverables": [
+          "hielements agent subcommand",
+          "Agent-specific RPC methods",
+          "Protocol documentation",
+          "Example scripts"
+        ],
+        "value": "Quick win for agent integration"
+      },
+      {
+        "phase": 2,
+        "name": "MCP Server",
+        "timeline": "Weeks 3-6",
+        "deliverables": [
+          "hielements-mcp crate",
+          "Resources implementation",
+          "Tools implementation",
+          "Prompt templates",
+          "Integration guide"
+        ],
+        "value": "Standard interface for AI ecosystem"
+      },
+      {
+        "phase": 3,
+        "name": "Python SDK",
+        "timeline": "Weeks 7-9",
+        "deliverables": [
+          "Python package (pip)",
+          "Type hints",
+          "Documentation",
+          "Examples",
+          "PyPI distribution"
+        ],
+        "value": "Idiomatic interface for Python agents"
+      }
+    ]
+  },
+  
+  "capabilities_to_expose": {
+    "discovery": [
+      "List capabilities",
+      "List available patterns",
+      "List libraries and functions",
+      "Query type information"
+    ],
+    "validation": [
+      "Check syntax",
+      "Check semantics",
+      "Validate against patterns",
+      "Get actionable errors"
+    ],
+    "execution": [
+      "Run checks",
+      "Filter checks",
+      "Get structured results",
+      "Handle errors"
+    ],
+    "generation": [
+      "Generate specifications",
+      "Create patterns",
+      "Suggest improvements",
+      "Apply templates"
+    ],
+    "exploration": [
+      "Query element hierarchies",
+      "Get element details",
+      "Explore relationships",
+      "View documentation"
+    ]
+  },
+  
+  "success_metrics": {
+    "quantitative": [
+      "Number of agent integrations",
+      "API calls per week",
+      "MCP server downloads",
+      "SDK installs",
+      "GitHub stars/forks"
+    ],
+    "qualitative": [
+      "Integration ease feedback",
+      "Documentation quality",
+      "Use cases enabled",
+      "Architecture quality improvements",
+      "Time saved in development"
+    ]
+  },
+  
+  "risks": [
+    {
+      "risk": "MCP protocol evolution",
+      "impact": "high",
+      "mitigation": "Follow spec closely, engage with community, version implementation"
+    },
+    {
+      "risk": "Limited adoption",
+      "impact": "medium",
+      "mitigation": "Create compelling examples, direct outreach, iterate on feedback"
+    },
+    {
+      "risk": "Maintenance burden",
+      "impact": "medium",
+      "mitigation": "Shared core logic, automated testing, community contributions"
+    },
+    {
+      "risk": "Resource constraints",
+      "impact": "high",
+      "mitigation": "Phased approach, start with JSON-RPC only, defer SDK if needed"
+    }
+  ],
+  
+  "resources": {
+    "full_evaluation": "agent-changelog/agent-integration-evaluation.md",
+    "summary": "doc/agent_integration_summary.md",
+    "mcp_specification": "https://github.com/modelcontextprotocol/specification",
+    "mcp_servers": "https://github.com/modelcontextprotocol/servers",
+    "current_plugin_guide": "doc/external_libraries.md"
+  }
+}
