@@ -72,40 +72,6 @@ element orders_service:
 
 Run `hielements check` and Hielements will verify your architecture against the actual code. If someone changes the Dockerfile or renames the module, the checks will fail—keeping your architecture in sync.
 
-### Reusable Patterns
-
-Define architectural patterns once and reuse them across your system:
-
-```hielements
-# Define a pattern for microservices (prescriptive)
-pattern microservice {
-    element api {
-        scope module<python>  # Unbounded scope in pattern
-        ref rest_endpoint: RestEndpoint
-    }
-    element database {
-        ref connection: DatabaseConnection
-    }
-    check microservice.api.exposes_rest()
-}
-
-# Implement the pattern multiple times (descriptive + prescriptive)
-element orders_service implements microservice {
-    # Bind pattern scopes to actual code using V2 syntax
-    scope api_mod<python> binds microservice.api.module = python.module_selector('orders.api')
-    ref endpoint: RestEndpoint binds microservice.api.rest_endpoint = python.public_functions(api_mod)
-    ref db: DatabaseConnection binds microservice.database.connection = postgres.database_selector('orders_db')
-}
-
-element payments_service implements microservice {
-    scope api_mod<python> binds microservice.api.module = python.module_selector('payments.api')
-    ref endpoint: RestEndpoint binds microservice.api.rest_endpoint = python.public_functions(api_mod)
-    ref db: DatabaseConnection binds microservice.database.connection = postgres.database_selector('payments_db')
-}
-```
-
-Patterns ensure consistency across similar components and make architectural constraints explicit.
-
 ---
 
 ## Key Features
@@ -151,6 +117,36 @@ Hielements includes a comprehensive **pattern library** (`patterns/` directory) 
 
 This approach ensures patterns are living artifacts that can be validated, tested, and evolved alongside your code.
 
+
+### 🤖 MCP Server — Agent Control Plane
+
+Hielements includes an optional MCP Server (Multi-Client Platform) — a fast, secure, and delightful control plane that makes coordinating AI agents and automating architecture workflows effortless. Spin up sandboxed agent tasks, orchestrate discovery and pattern application, propose safe .hie edits with human-in-the-loop review, and enforce policies with full auditing and authenticated access — all designed to accelerate architecture discovery, governance, and reliable automation.
+
+Key capabilities:
+- Orchestrate multiple agents (MCP clients) via JSON-RPC/HTTP
+- Provide authenticated, audited access to repository specs and pattern catalogs
+- Execute sandboxed analysis tasks (WASM or controlled external plugins)
+- Offer proposal/patch workflows: agents submit suggested .hie edits which can be reviewed and applied
+- Expose telemetry and policy hooks for CI/CD enforcement
+
+Quick start:
+```bash
+# Start server (defaults: port 8765, TLS optional)
+hielements mcp serve --config hielements.toml
+```
+
+Configuration highlights (hielements.toml):
+- enabled = true
+- listen = "0.0.0.0:8765"
+- auth = { type = "api_key" | "oauth" }
+- sandbox = { wasm = true, external_time_limit = "30s" }
+
+Security & best practices:
+- Always enable TLS and strict authentication in shared environments
+- Prefer WASM plugins for untrusted agent tasks
+- Use audit logs and human review for automated patch application
+
+See doc/agent_integration_summary.md for full protocol, message schema, and example agent clients.
 ### 🔒 Type-Safe Connection Points
 
 Explicit type annotations are **required** for all connection points, enabling correct integration across multiple libraries and languages. Below are examples of connection points typing added for better interfacing:
@@ -614,27 +610,3 @@ Linters check code quality and style within a single file or module. Hielements 
 ---
 
 **Build software that stays true to its design. Start with Hielements.**
-
----
-
-## Self-Describing Architecture
-
-Hielements literally documents and checks itself — how cool is that?! The repository is driven by a living specification written in `hielements.hie`, and we continuously validate that spec during AI-assisted coding sessions (and in CI) so architectural drift gets caught early.
-
-Peek at the live self-description: [hielements.hie](hielements.hie)
-
-```hielements
-# Live excerpt from hielements.hie
-element hielements_repo:
-    # sanity checks that run as part of validation
-    check files.exists('README.md')
-    check struct_exists('Interpreter')
-```
-
-Want to see it in action? Run:
-
-```bash
-hielements check hielements.hie
-```
-
-We use this feedback loop to keep the code, docs, and architecture in sync — and it makes AI-assisted development far more reliable and trustworthy!
