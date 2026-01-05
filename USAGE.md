@@ -379,6 +379,36 @@ element my_component:
     check mylib.my_check(src)
 ```
 
+### Model Context Protocol (MCP) Support
+
+Hielements can also connect to long-running Model Context Protocol (MCP) servers to provide libraries and heavy analysis services. Use an MCP server when you want persistent analyzers, language integrations, or multi-repository services.
+
+- **Build the MCP server from source:**
+
+    - `cd crates/hielements-mcp`
+    - `cargo build --release`
+
+- **Run the MCP server (example):**
+
+    - `target/release/hielements-mcp --listen 127.0.0.1:50051 --workspace .`
+    - or via cargo: `cargo run --manifest-path crates/hielements-mcp/Cargo.toml --release -- --listen 127.0.0.1:50051`
+
+- **Configure `hielements.toml` to use the MCP server** (adapt to your project):
+
+```toml
+[libraries]
+mcp_local = { mcp = { host = "127.0.0.1", port = 50051 } }
+```
+
+- **Usage**:
+
+    1. Start the MCP server.
+    2. Run Hielements as usual: `hielements check architecture.hie` — Hielements will connect to the configured MCP server and use the exposed selectors and checks.
+
+- **Notes:**
+    - Adjust host/port and CLI flags to match the MCP server version.
+    - Running an MCP server is useful for caching, expensive analyses, or shared language services across repositories.
+
 ### Detailed Documentation
 
 For complete documentation on creating custom libraries, including:
