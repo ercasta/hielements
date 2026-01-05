@@ -478,6 +478,7 @@ Install the Hielements extension for VSCode:
 - 📚 **[Pattern Catalog](doc/patterns_catalog.md)** - Extensive collection of software engineering patterns
 - 🔌 [External Libraries Guide](doc/external_libraries.md) - Creating custom libraries
 - 📖 **[Library Catalog](doc/library_catalog.md)** - Auto-generated documentation for all built-in libraries
+- 🤖 **[Agent Integration Guide](doc/agent_integration_summary.md)** - Making Hielements easier for AI agents (MCP, JSON-RPC, SDKs)
 - 🏗️ [Technical Architecture](doc/technical_architecture.md) - Implementation details
 - 🔍 [Related Work](doc/related_work.md) - Comparison with similar tools
 - 📝 [Summary](doc/summary.md) - High-level overview
