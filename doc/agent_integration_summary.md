@@ -37,6 +37,14 @@
 | **Python SDK** | 3-4 weeks | Easy Python agent integration | ✅ Recommended Phase 3 |
 | **Hybrid** | 9-12 weeks | Best of all approaches | ✅ **RECOMMENDED** |
 
+## Current Implementation Status
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| **MCP Server** | ✅ **IMPLEMENTED** | `hielements-mcp` crate available |
+| **JSON-RPC** | ⏳ Pending | Phase 1 |
+| **Python SDK** | ⏳ Pending | Phase 3 |
+
 ## Recommended Implementation
 
 ### Phase 1: JSON-RPC Interface (Weeks 1-2)
