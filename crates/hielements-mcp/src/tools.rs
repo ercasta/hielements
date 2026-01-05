@@ -23,6 +23,23 @@ impl ToolHandler {
         Self { workspace }
     }
 
+    /// Get workspace path as string, with proper error handling
+    fn workspace_str(&self) -> &str {
+        self.workspace.to_str().unwrap_or_else(|| {
+            tracing::warn!("Workspace path contains non-UTF8 characters, using '.'");
+            "."
+        })
+    }
+
+    /// Helper to create a successful JSON result response
+    fn json_result(result: Value) -> Result<CallToolResult, CallToolError> {
+        Ok(CallToolResult::text_content(vec![TextContent::from(
+            serde_json::to_string_pretty(&result).unwrap_or_else(|e| {
+                format!("{{\"error\": \"Failed to serialize result: {}\"}}", e)
+            })
+        )]))
+    }
+
     /// Create a property map for a tool parameter
     fn make_prop(description: &str, param_type: &str) -> Map<String, Value> {
         let mut prop = Map::new();
@@ -187,7 +204,7 @@ impl ToolHandler {
             .and_then(|v| v.as_str())
             .unwrap_or("input.hie");
 
-        let mut interpreter = Interpreter::new(self.workspace.to_str().unwrap_or("."));
+        let mut interpreter = Interpreter::new(self.workspace_str());
         let (program, diagnostics) = interpreter.validate(content, filename);
 
         let result = json!({
@@ -210,9 +227,7 @@ impl ToolHandler {
             }
         });
 
-        Ok(CallToolResult::text_content(vec![TextContent::from(
-            serde_json::to_string_pretty(&result).unwrap_or_default()
-        )]))
+        Self::json_result(result)
     }
 
     /// Check a file in the workspace
@@ -263,7 +278,7 @@ impl ToolHandler {
             .and_then(|v| v.as_str())
             .unwrap_or("input.hie");
 
-        let mut interpreter = Interpreter::new(self.workspace.to_str().unwrap_or("."));
+        let mut interpreter = Interpreter::new(self.workspace_str());
         let (program, diagnostics) = interpreter.validate(&content, filename);
 
         if diagnostics.has_errors() {
@@ -434,7 +449,7 @@ impl ToolHandler {
         let library_filter = args.get("library").and_then(|v| v.as_str());
         
         let registry = LibraryRegistry::with_workspace(
-            self.workspace.to_str().unwrap_or(".")
+            self.workspace_str()
         );
         let mut catalog = registry.generate_documentation();
 

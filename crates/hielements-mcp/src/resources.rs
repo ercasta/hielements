@@ -207,9 +207,11 @@ impl ResourceHandler {
     fn read_library_docs(&self) -> Result<Vec<ReadResourceContent>, String> {
         use hielements_core::LibraryRegistry;
 
-        let registry = LibraryRegistry::with_workspace(
-            self.workspace.to_str().unwrap_or(".")
-        );
+        let workspace_str = self.workspace.to_str().unwrap_or_else(|| {
+            tracing::warn!("Workspace path contains non-UTF8 characters, using '.'");
+            "."
+        });
+        let registry = LibraryRegistry::with_workspace(workspace_str);
         let catalog = registry.generate_documentation();
         
         Ok(vec![Self::make_text_content(
