@@ -18,7 +18,7 @@
 //! - OAuth2: OAuth2PasswordBearer, OAuth2AuthorizationCodeBearer
 
 use serde::{Deserialize, Serialize};
-use std::alloc::{alloc, dealloc, Layout};
+use std::alloc::{alloc as sys_alloc, dealloc, Layout};
 use std::slice;
 
 /// Simplified Python AST representation
@@ -158,7 +158,7 @@ fn extract_route_info(decorators: &[Decorator]) -> Option<(String, String)> {
 }
 
 fn match_route_decorator(func: &Expression, args: &[Expression]) -> Option<(String, String)> {
-    if let Expression::Attribute { value, attr } = func {
+    if let Expression::Attribute { value: _, attr } = func {
         // Check if it's app.get, app.post, router.get, api.post, etc.
         let method = attr.to_uppercase();
         
@@ -234,7 +234,7 @@ fn check_auth_dependency(expr: &Expression) -> Option<String> {
 }
 
 /// Check if all routes have authentication
-fn check_all_routes_authenticated(routes: &[Route]) -> CheckResult {
+fn check_routes_auth(routes: &[Route]) -> CheckResult {
     if routes.is_empty() {
         return CheckResult::Pass { Pass: None };
     }
@@ -305,7 +305,7 @@ fn check_method_routes_authenticated(routes: &[Route], method: &str) -> CheckRes
 #[no_mangle]
 pub extern "C" fn alloc(size: i32) -> *mut u8 {
     let layout = Layout::from_size_align(size as usize, 1).unwrap();
-    unsafe { alloc(layout) }
+    unsafe { sys_alloc(layout) }
 }
 
 #[no_mangle]
@@ -339,7 +339,7 @@ pub extern "C" fn check_all_routes_authenticated(ast_json_ptr: i32, ast_json_len
     let result = match serde_json::from_str::<Module>(&ast_json) {
         Ok(module) => {
             let routes = analyze_module(module);
-            check_all_routes_authenticated(&routes)
+            check_routes_auth(&routes)
         }
         Err(e) => CheckResult::Error {
             Error: format!("Failed to parse AST JSON: {}", e),

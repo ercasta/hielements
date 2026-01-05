@@ -5,6 +5,9 @@ members = [
     "crates/hielements-cli",
     "crates/hielements-mcp",
 ]
+exclude = [
+    "wasm_plugins/*",
+]
 
 [workspace.package]
 version = "0.1.0"

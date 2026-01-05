@@ -5,6 +5,9 @@ edition = "2021"
 authors = ["Hielements Contributors"]
 description = "WASM plugin for FastAPI authentication checking"
 
+# This is a standalone WASM plugin, not part of the main workspace
+[workspace]
+
 [lib]
 crate-type = ["cdylib"]
 
