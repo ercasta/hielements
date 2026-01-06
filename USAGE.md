@@ -13,6 +13,7 @@ This guide walks you through using Hielements to describe, document, and enforce
 5. [Best Practices](#best-practices)
 6. [Integration with CI/CD](#integration-with-cicd)
 7. [IDE Integration](#ide-integration)
+8. [Model Context Protocol (MCP) Support](#model-context-protocol-mcp-support)
 
 ---
 
@@ -399,20 +400,13 @@ Hielements can also connect to long-running Model Context Protocol (MCP) servers
             - Debug run: `cargo run --manifest-path crates/hielements-mcp/Cargo.toml -- --workspace .`
             - Release run: `cargo run --manifest-path crates/hielements-mcp/Cargo.toml --release -- --workspace .`
 
-- **Configure `hielements.toml` to use the MCP server** (adapt to your project):
-
-```toml
-[libraries]
-mcp_local = { mcp = { host = "127.0.0.1", port = 50051 } }
-```
-
-- **Usage**:
+-- **Usage**:
 
     1. Start the MCP server.
-    2. Run Hielements as usual: `hielements check architecture.hie` — Hielements will connect to the configured MCP server and use the exposed selectors and checks.
+    2. Run Hielements as usual: `hielements check architecture.hie` — Hielements will use an MCP server when available.
 
-- **Notes:**
-    - Adjust host/port and CLI flags to match the MCP server version.
+-- **Notes:**
+    - The current Hielements MCP server communicates over stdio (not TCP), so no host/port entry is required in `hielements.toml`.
     - Running an MCP server is useful for caching, expensive analyses, or shared language services across repositories.
 
 ### Detailed Documentation

@@ -114,7 +114,7 @@ if (Test-Path $vsCodeDir) {
         <pre>$([System.Web.HttpUtility]::HtmlEncode($logContent))</pre>
       </body>
     </html>
-    "@
+"@
 
             $html | Out-File -FilePath $htmlPath -Encoding utf8
             Write-Host "[hielements] Log written to: $logPath"
