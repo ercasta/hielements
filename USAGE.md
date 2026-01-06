@@ -390,8 +390,14 @@ Hielements can also connect to long-running Model Context Protocol (MCP) servers
 
 - **Run the MCP server (example):**
 
-    - `target/release/hielements-mcp --listen 127.0.0.1:50051 --workspace .`
-    - or via cargo: `cargo run --manifest-path crates/hielements-mcp/Cargo.toml --release -- --listen 127.0.0.1:50051`
+        - Run the built release binary:
+
+            - `target/release/hielements-mcp --workspace .`
+
+        - Or run via cargo:
+
+            - Debug run: `cargo run --manifest-path crates/hielements-mcp/Cargo.toml -- --workspace .`
+            - Release run: `cargo run --manifest-path crates/hielements-mcp/Cargo.toml --release -- --workspace .`
 
 - **Configure `hielements.toml` to use the MCP server** (adapt to your project):
 
