@@ -1,0 +1,1 @@
+/home/runner/work/hielements/hielements/wasm_plugins/fastapi_auth/target/wasm32-unknown-unknown/release/fastapi_auth_wasm.wasm: /home/runner/work/hielements/hielements/wasm_plugins/fastapi_auth/src/lib.rs

@@ -1,0 +1,8 @@
+# Configuration for FastAPI example with external Python plugin
+
+[libraries]
+# External Python plugin using libcst for deep FastAPI analysis
+fastapi = { executable = "python3", args = ["../plugins/fastapi_plugin.py"] }
+
+# Note: When WASM runtime integration is complete, you can also use:
+# fastapi_auth = { path = "lib/fastapi_auth.wasm" }

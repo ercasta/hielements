@@ -1,0 +1,156 @@
+## FastAPI Microservice with Authentication Pattern
+##
+## Description:
+## FastAPI-based microservice pattern that ensures all API endpoints (especially
+## POST and GET) have proper authentication mechanisms in place.
+##
+## Use Cases:
+## - Secure REST APIs built with FastAPI
+## - Microservices requiring authentication
+## - Systems with strict security requirements
+
+import files
+import python
+
+## FastAPI Microservice Pattern
+## Defines structure for a FastAPI service with mandatory authentication
+pattern fastapi_microservice {
+    ## API Module - Contains FastAPI app and route definitions
+    element api {
+        scope module<python>
+        ref app_instance: FastAPIApp
+        ref routes: RouteCollection
+        ref route_handlers: RouteHandlers
+        
+        ## Core requirements
+        check python.module_exists(module)
+        check python.imports_package(module, 'fastapi')
+        
+        ## Authentication requirement - all routes must be authenticated
+        ## This check requires the fastapi plugin to be installed
+        ## requires descendant check fastapi.all_routes_authenticated(module)
+    }
+    
+    ## Authentication Module - Auth logic and dependencies
+    element auth {
+        scope module<python>
+        ref auth_dependencies: AuthDependencies
+        ref security_schemes: SecuritySchemes
+        
+        check python.module_exists(module)
+        
+        ## Should implement authentication mechanisms
+        ## Typical patterns:
+        ## - OAuth2PasswordBearer
+        ## - HTTPBearer
+        ## - Custom Depends() functions
+    }
+    
+    ## Data Models - Request/Response schemas
+    element models {
+        scope module<python>
+        ref request_models: PydanticModels
+        ref response_models: PydanticModels
+        
+        check python.module_exists(module)
+        check python.imports_package(module, 'pydantic')
+    }
+    
+    ## Container Definition
+    element container {
+        scope dockerfile
+        ref exposed_port: integer
+        
+        ## Container best practices
+        check files.exists(dockerfile, 'Dockerfile')
+        requires descendant check files.contains(dockerfile, 'HEALTHCHECK')
+    }
+    
+    ## Dependencies
+    element dependencies {
+        scope requirements_file
+        
+        check files.exists(requirements_file, 'requirements.txt')
+        check files.contains(requirements_file, 'fastapi')
+        check files.contains(requirements_file, 'uvicorn')
+    }
+    
+    ## API depends on auth for security
+    check python.imports_from(api.module, auth.module)
+    
+    ## API depends on models for schemas
+    check python.imports_from(api.module, models.module)
+}
+
+## Enhanced FastAPI Microservice with Observability
+pattern fastapi_microservice_observable {
+    ## Includes basic fastapi_microservice requirements
+    element api {
+        scope module<python>
+        ref app_instance: FastAPIApp
+    }
+    
+    element auth {
+        scope module<python>
+        ref auth_dependencies: AuthDependencies
+    }
+    
+    ## Observability components
+    element observability {
+        scope module<python>
+        ref metrics: MetricsCollector
+        ref logging: Logger
+        
+        ## Should include monitoring libraries
+        check python.imports_package(module, 'prometheus_client')
+    }
+    
+    element health {
+        scope module<python>
+        ref health_checks: HealthCheckHandlers
+        
+        check python.function_exists(module, 'liveness_check')
+        check python.function_exists(module, 'readiness_check')
+    }
+}
+
+## Example Implementation: Payment Service
+element payment_service implements fastapi_microservice {
+    ## API bindings
+    scope api_mod<python> binds fastapi_microservice.api.module = 
+        python.module_selector('app.api.payments')
+    ref app_instance: FastAPIApp binds fastapi_microservice.api.app_instance = 
+        python.variable_selector(api_mod, 'app')
+    ref routes: RouteCollection binds fastapi_microservice.api.routes = 
+        python.function_selector(api_mod, '*')
+    
+    ## Auth bindings
+    scope auth_mod<python> binds fastapi_microservice.auth.module = 
+        python.module_selector('app.auth')
+    ref auth_deps: AuthDependencies binds fastapi_microservice.auth.auth_dependencies = 
+        python.function_selector(auth_mod, 'get_current_user')
+    ref security: SecuritySchemes binds fastapi_microservice.auth.security_schemes = 
+        python.variable_selector(auth_mod, 'oauth2_scheme')
+    
+    ## Models bindings
+    scope models_mod<python> binds fastapi_microservice.models.module = 
+        python.module_selector('app.models')
+    ref req_models: PydanticModels binds fastapi_microservice.models.request_models = 
+        python.class_selector(models_mod, 'PaymentRequest')
+    ref resp_models: PydanticModels binds fastapi_microservice.models.response_models = 
+        python.class_selector(models_mod, 'PaymentResponse')
+    
+    ## Container bindings
+    scope dockerfile binds fastapi_microservice.container.dockerfile = 
+        files.file_selector('Dockerfile')
+    ref port: integer binds fastapi_microservice.container.exposed_port = 8080
+    
+    ## Dependencies bindings
+    scope reqs_file binds fastapi_microservice.dependencies.requirements_file = 
+        files.file_selector('requirements.txt')
+    
+    ## Additional service-specific checks
+    check python.function_exists(api_mod, 'create_payment')
+    check python.function_exists(api_mod, 'get_payment')
+    check python.function_exists(api_mod, 'list_payments')
+}
