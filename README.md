@@ -120,33 +120,39 @@ This approach ensures patterns are living artifacts that can be validated, teste
 
 ### 🤖 MCP Server — Agent Control Plane
 
-Hielements includes an optional MCP Server (Multi-Client Platform) — a fast, secure, and delightful control plane that makes coordinating AI agents and automating architecture workflows effortless. Spin up sandboxed agent tasks, orchestrate discovery and pattern application, propose safe .hie edits with human-in-the-loop review, and enforce policies with full auditing and authenticated access — all designed to accelerate architecture discovery, governance, and reliable automation.
+Hielements includes an optional MCP (Model Context Protocol) Server that provides a standardized interface for AI agents to interact with Hielements. The server exposes tools, resources, and prompts that enable agents to validate specifications, run checks, explore patterns, and get guidance on using the language.
 
 Key capabilities:
-- Orchestrate multiple agents (MCP clients) via JSON-RPC/HTTP
-- Provide authenticated, audited access to repository specs and pattern catalogs
-- Execute sandboxed analysis tasks (WASM or controlled external plugins)
-- Offer proposal/patch workflows: agents submit suggested .hie edits which can be reviewed and applied
-- Expose telemetry and policy hooks for CI/CD enforcement
+- **Resources**: Access specifications, patterns, libraries, and documentation
+- **Tools**: Validate specs, run checks, list patterns, generate elements, and more
+- **Prompts**: Guided templates for common architectural tasks
+- **Stdio transport**: Works with Claude Desktop and other MCP clients
 
 Quick start:
 ```bash
-# Start server (defaults: port 8765, TLS optional)
-hielements mcp serve --config hielements.toml
+# Install the MCP server
+cargo install --path crates/hielements-mcp
+
+# Start server with stdio transport
+hielements-mcp --workspace /path/to/project
+
+# Or use verbose logging
+hielements-mcp --workspace . --verbose
 ```
 
-Configuration highlights (hielements.toml):
-- enabled = true
-- listen = "0.0.0.0:8765"
-- auth = { type = "api_key" | "oauth" }
-- sandbox = { wasm = true, external_time_limit = "30s" }
+Configuration for Claude Desktop (`~/.config/claude-desktop/config.json`):
+```json
+{
+  "mcpServers": {
+    "hielements": {
+      "command": "hielements-mcp",
+      "args": ["--workspace", "/path/to/your/project"]
+    }
+  }
+}
+```
 
-Security & best practices:
-- Always enable TLS and strict authentication in shared environments
-- Prefer WASM plugins for untrusted agent tasks
-- Use audit logs and human review for automated patch application
-
-See doc/agent_integration_summary.md for full protocol, message schema, and example agent clients.
+See [MCP Server README](crates/hielements-mcp/README.md) for detailed usage and [Agent Integration Guide](doc/agent_integration_summary.md) for protocol details.
 ### 🔒 Type-Safe Connection Points
 
 Explicit type annotations are **required** for all connection points, enabling correct integration across multiple libraries and languages. Below are examples of connection points typing added for better interfacing:
