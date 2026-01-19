@@ -14,7 +14,7 @@ path = "src/main.rs"
 hielements-core = { path = "../hielements-core" }
 
 # MCP protocol implementation
-rust-mcp-sdk = { version = "0.8.1", default-features = false, features = ["server", "macros", "stdio"] }
+rust-mcp-sdk = { version = "0.8.2", default-features = false, features = ["server", "macros", "stdio"] }
 
 # Async
 async-trait = "0.1"
