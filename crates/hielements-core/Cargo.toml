@@ -26,4 +26,4 @@ default = []
 
 [dev-dependencies]
 insta.workspace = true
-tempfile = "3.24"
+tempfile = "3.26"
