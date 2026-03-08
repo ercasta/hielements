@@ -2,16 +2,14 @@
 ## This file describes the structure of the Hielements project itself,
 ## demonstrating the language's ability to model hierarchical software systems.
 ##
-## Updated to use V3 syntax: curly brackets, ref, and uses keywords
+## V3 syntax: curly brackets, ref, and uses keywords
 ##
-## The specification is split into multiple files for easier navigation:
-## - specs/core.hie        - Core library (lexer, parser, AST, interpreter)
-## - specs/stdlib.hie      - Standard library (files, rust, external, wasm)
-## - specs/cli.hie         - CLI module
-## - specs/vscode.hie      - VS Code extension
-## - specs/documentation.hie - Documentation structure
-## - specs/examples.hie    - Examples validation
-## - specs/cicd.hie        - CI/CD configuration
+## Hielements is primarily a CLI tool. The project structure is:
+## - crates/hielements-core  - Core library (lexer, parser, AST, interpreter, stdlib)
+## - crates/hielements-cli   - CLI binary (the main entry point)
+## - specs/                  - Detailed specification files (for reference)
+## - patterns/               - Reusable architectural pattern library
+## - examples/               - Example .hie specifications
 
 import files
 import rust

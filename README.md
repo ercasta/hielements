@@ -6,7 +6,7 @@
 
 Hielements (pronounced *hi-elements*) helps you define, document, and enforce the logical structure of your software systems. Unlike traditional architecture documentation that becomes stale, Hielements specifications are formally checked against your actual code—ensuring your architecture stays aligned with reality.
 
-> 📝 **Note**: This documentation describes Hielements V2, which introduces a clearer separation between **prescriptive** (patterns with rules) and **descriptive** (actual implementations) parts of the language. V2 is incompatible with V1.
+> 📝 **Note**: This documentation describes Hielements V3, which introduces curly bracket syntax, `ref` keyword, `uses` declarations, and a clearer separation between **prescriptive** (patterns with rules) and **descriptive** (actual implementations) parts of the language.
 
 ---
 
@@ -30,7 +30,7 @@ Modern software systems are complex. As codebases grow, their actual structure d
 
 ## Prescriptive vs Descriptive
 
-Hielements V2 separates two key concerns:
+Hielements V3 separates two key concerns:
 
 **🏗️ Prescriptive** — Define the rules and constraints
 - **Patterns** (declared with `pattern`) establish architectural blueprints
@@ -118,41 +118,23 @@ Hielements includes a comprehensive **pattern library** (`patterns/` directory) 
 This approach ensures patterns are living artifacts that can be validated, tested, and evolved alongside your code.
 
 
-### 🤖 MCP Server — Agent Control Plane
+### 🤖 AI Agent Integration
 
-Hielements includes an optional MCP (Model Context Protocol) Server that provides a standardized interface for AI agents to interact with Hielements. The server exposes tools, resources, and prompts that enable agents to validate specifications, run checks, explore patterns, and get guidance on using the language.
+Hielements is designed as a CLI tool that integrates naturally into CI/CD pipelines and developer workflows. Its JSON output mode (`--format json`) makes it easy for AI agents and automated tools to consume results:
 
-Key capabilities:
-- **Resources**: Access specifications, patterns, libraries, and documentation
-- **Tools**: Validate specs, run checks, list patterns, generate elements, and more
-- **Prompts**: Guided templates for common architectural tasks
-- **Stdio transport**: Works with Claude Desktop and other MCP clients
-
-Quick start:
 ```bash
-# Install the MCP server
-cargo install --path crates/hielements-mcp
+# Validate a specification and get JSON output
+hielements check architecture.hie --format json
 
-# Start server with stdio transport
-hielements-mcp --workspace /path/to/project
+# Run checks and get structured results
+hielements run architecture.hie --format json
 
-# Or use verbose logging
-hielements-mcp --workspace . --verbose
+# Generate library documentation in JSON for agents
+hielements doc --format json
 ```
 
-Configuration for Claude Desktop (`~/.config/claude-desktop/config.json`):
-```json
-{
-  "mcpServers": {
-    "hielements": {
-      "command": "hielements-mcp",
-      "args": ["--workspace", "/path/to/your/project"]
-    }
-  }
-}
-```
+> 📝 **Note**: An experimental MCP (Model Context Protocol) server is available in `crates/hielements-mcp/` but is not part of the default build. The CLI is the primary interface.
 
-See [MCP Server README](crates/hielements-mcp/README.md) for detailed usage and [Agent Integration Guide](doc/agent_integration_summary.md) for protocol details.
 ### 🔒 Type-Safe Connection Points
 
 Explicit type annotations are **required** for all connection points, enabling correct integration across multiple libraries and languages. Below are examples of connection points typing added for better interfacing:
@@ -355,8 +337,9 @@ Hielements evaluates all rules against your actual codebase and reports violatio
 ## Architecture
 
 - **Interpreter**: Written in Rust for performance and reliability
+- **CLI tool**: Primary interface for validation and check execution
 - **Extensible**: Language support via pluggable libraries
-- **Language Server Protocol**: Full IDE integration (VSCode, with more coming)
+- **IDE Support**: VSCode extension for syntax highlighting
 - **External Tools**: Libraries can invoke existing static analysis tools
 
 ```
@@ -480,7 +463,7 @@ Install the Hielements extension for VSCode:
 - 📚 **[Pattern Catalog](doc/patterns_catalog.md)** - Extensive collection of software engineering patterns
 - 🔌 [External Libraries Guide](doc/external_libraries.md) - Creating custom libraries
 - 📖 **[Library Catalog](doc/library_catalog.md)** - Auto-generated documentation for all built-in libraries
-- 🤖 **[Agent Integration Guide](doc/agent_integration_summary.md)** - Making Hielements easier for AI agents (MCP, JSON-RPC, SDKs)
+- 🤖 **[Agent Integration Guide](doc/agent_integration_summary.md)** - Integrating Hielements with AI agents and automation
 - 🏗️ [Technical Architecture](doc/technical_architecture.md) - Implementation details
 - 🔍 [Related Work](doc/related_work.md) - Comparison with similar tools
 - 📝 [Summary](doc/summary.md) - High-level overview
@@ -529,12 +512,13 @@ These patterns are not just documentation—they're executable Hielements specif
 
 ### Roadmap
 
-- [x] Language design and specification
+- [x] Language design and specification (V3)
 - [x] Core interpreter implementation (Rust)
-- [x] Standard libraries (Python, Docker, files)
+- [x] Standard libraries (Python, Rust, files)
 - [x] Patterns (formerly "element templates") for reusable architectural constraints
-- [ ] VSCode extension
-- [ ] Language Server Protocol
+- [x] CLI tool with check, run, parse, doc, and init commands
+- [ ] Scope binding enforcement (template implementation validation)
+- [ ] VSCode extension (syntax highlighting available, LSP planned)
 - [ ] CI/CD integration templates
 - [ ] Additional language libraries (JavaScript, Go, Terraform)
 
