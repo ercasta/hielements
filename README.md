@@ -313,8 +313,9 @@ Hielements evaluates all rules against your actual codebase and reports violatio
 ## Architecture
 
 - **Interpreter**: Written in Rust for performance and reliability
+- **CLI tool**: Primary interface for validation and check execution
 - **Extensible**: Language support via pluggable libraries
-- **Language Server Protocol**: Full IDE integration (VSCode, with more coming)
+- **IDE Support**: VSCode extension for syntax highlighting
 - **External Tools**: Libraries can invoke existing static analysis tools
 
 ```

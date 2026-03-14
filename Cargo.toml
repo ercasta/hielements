@@ -5,6 +5,7 @@ members = [
     "crates/hielements-cli",
 ]
 exclude = [
+    "crates/hielements-mcp",
     "wasm_plugins/*",
 ]
 
