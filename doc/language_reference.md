@@ -1,16 +1,6 @@
-# Hielements Language Reference (V3)
+# Hielements Language Reference
 
-This document provides a complete reference for the Hielements V3 language syntax and semantics. Hielements is a declarative language for describing and enforcing software architecture.
-
-**Version**: 3.0 (This version adds curly bracket syntax, `ref` keyword, and `uses` declarations)
-
-## Design Philosophy
-
-Hielements V3 introduces several improvements over V2:
-
-- **Curly brackets `{}`**: Alternative to indentation-based blocks for clearer scope delimiters
-- **`ref` keyword**: Renamed from `connection_point` to avoid confusion with `uses` declarations
-- **`uses` keyword**: Explicit dependency declarations between elements/scopes
+This document provides a complete reference for the Hielements language syntax and semantics. Hielements is a declarative language for describing and enforcing software architecture.
 
 It is possible to use only the descriptive part without the prescriptive one; in this case, no enforcement/checks are performed.
 
@@ -22,8 +12,8 @@ It is possible to use only the descriptive part without the prescriptive one; in
 2. [Program Structure](#2-program-structure)
 3. [Elements](#3-elements)
 4. [Scopes](#4-scopes)
-5. [Refs](#5-refs-formerly-connection-points)
-6. [Uses Declarations](#6-uses-declarations-v3)
+5. [Refs](#5-refs)
+6. [Uses Declarations](#6-uses-declarations)
 7. [Rules (Checks)](#7-rules-checks)
 8. [Children Elements](#8-children-elements)
 9. [Patterns](#9-patterns)
@@ -37,7 +27,6 @@ It is possible to use only the descriptive part without the prescriptive one; in
 17. [Appendix A: Error Messages](#appendix-a-error-messages)
 18. [Appendix B: CLI Reference](#appendix-b-cli-reference)
 19. [Appendix C: Best Practices](#appendix-c-best-practices)
-20. [Appendix D: Migration Guide (V1/V2 → V3)](#appendix-d-migration-guide-v1v2--v3)
 
 ---
 
@@ -78,14 +67,12 @@ The following are reserved keywords:
 | Keyword | Description |
 |---------|-------------|
 | `element` | Declares an element |
-| `pattern` | Declares a pattern (reusable architectural blueprint, preferred in V3) |
-| `template` | Declares a pattern (supported for backward compatibility, prefer `pattern`) |
+| `pattern` | Declares a pattern (reusable architectural blueprint) |
 | `implements` | Declares that an element implements pattern(s) |
 | `binds` | Binds a scope/ref to a pattern declaration |
 | `scope` | Declares a scope selector |
-| `ref` | Declares a reference point (V3, preferred over `connection_point`) |
-| `connection_point` | Declares a connection point (supported for backward compatibility, prefer `ref`) |
-| `uses` | Declares a dependency on another element/scope (V3) |
+| `ref` | Declares a reference point |
+| `uses` | Declares a dependency on another element/scope |
 | `check` | Declares a rule/check |
 | `import` | Imports a library or module |
 | `as` | Alias for imports |
@@ -144,7 +131,7 @@ false
 | `.` | Member access |
 | `,` | Argument separator |
 | `:` | Block start, type annotation |
-| `{` `}` | Block delimiters (V3 alternative to indentation) |
+| `{` `}` | Block delimiters |
 | `(` `)` | Function call, grouping |
 | `[` `]` | List literals |
 | `<` `>` | Language specification in scopes |
@@ -188,13 +175,13 @@ Elements are the fundamental building blocks of Hielements. An element represent
 
 ### 3.1 Syntax
 
-V3 supports two styles for block delimiters: curly brackets `{}` or colon and indentation:
+Hielements supports two styles for block delimiters: curly brackets `{}` or colon and indentation:
 
 ```
-# Curly bracket syntax (V3)
+# Curly bracket syntax
 element_declaration ::= 'element' identifier '{' element_body '}'
 
-# Indentation syntax (V2/V3)
+# Indentation syntax
 element_declaration ::= 'element' identifier ':' element_body
 
 element_body ::= (scope_declaration 
@@ -206,7 +193,7 @@ element_body ::= (scope_declaration
 
 ### 3.2 Basic Element
 
-Curly bracket syntax (V3):
+Curly bracket syntax:
 ```hielements
 element orders_service {
     scope src = files.folder_selector('src/orders')
@@ -214,7 +201,7 @@ element orders_service {
 }
 ```
 
-Indentation syntax (V2/V3):
+Indentation syntax:
 ```hielements
 element orders_service:
     scope src = files.folder_selector('src/orders')
@@ -256,9 +243,9 @@ element payment_gateway:
 
 Scopes define what code, files, or artifacts belong to an element. Scopes are specified using **selectors** from libraries.
 
-### 4.1 Syntax (V2)
+### 4.1 Syntax
 
-In V2, scopes can be either **bound** (in elements) or **unbounded** (in templates). Language is specified using angular brackets:
+Scopes can be either **bound** (in elements) or **unbounded** (in patterns). Language is specified using angular brackets:
 
 ```
 # Bound scope (in elements)
@@ -278,7 +265,7 @@ scope src_folder = files.folder_selector('src/')
 scope config_file = files.file_selector('config.yaml')
 scope all_python = files.glob_selector('**/*.py')
 
-# Language-specific selectors with V2 angular bracket syntax
+# Language-specific selectors with angular bracket syntax
 scope orders<python> = python.module_selector('orders')
 scope backend<rust> = rust.module_selector('backend')
 
@@ -287,13 +274,13 @@ scope dockerfile = docker.file_selector('Dockerfile')
 scope compose = docker.compose_selector('docker-compose.yml')
 ```
 
-### 4.3 Scopes with Language Annotations (V2)
+### 4.3 Scopes with Language Annotations
 
 Scopes can optionally include a language annotation using **angular brackets** to explicitly declare which programming language the scope belongs to:
 
 ```hielements
 element my_service:
-    # Scope with explicit language annotation (V2 syntax)
+    # Scope with explicit language annotation
     scope src<python> = python.module_selector('my_service')
     scope backend<rust> = rust.module_selector('backend')
     
@@ -305,7 +292,7 @@ The language annotation is specified in angular brackets immediately after the s
 
 ### 4.4 Unbounded Scopes in Patterns
 
-In patterns (declared with `template`), scopes are **unbounded** (declared without a selector expression). They serve as placeholders to be bound by implementing elements:
+In patterns (declared with `pattern`), scopes are **unbounded** (declared without a selector expression). They serve as placeholders to be bound by implementing elements:
 
 ```hielements
 pattern observable:
@@ -315,7 +302,7 @@ pattern observable:
         ref prometheus: MetricsHandler
 ```
 
-### 4.5 Binding Scopes with `binds` (V2)
+### 4.5 Binding Scopes with `binds`
 
 When an element implements a pattern, it uses the `binds` keyword to connect its scopes to the pattern's unbounded scopes:
 
@@ -365,11 +352,9 @@ element api_layer:
 
 ---
 
-## 5. Refs (formerly Connection Points)
+## 5. Refs
 
 Refs (reference points) expose interfaces, APIs, or dependencies that other elements can reference. They make inter-element relationships explicit and verifiable.
-
-**Note**: In V3, `ref` is the preferred keyword. `connection_point` is deprecated but still supported for backward compatibility.
 
 ### 5.1 Syntax
 
@@ -480,7 +465,7 @@ Different libraries expose different types of connection points:
 
 ---
 
-## 6. Uses Declarations (V3)
+## 6. Uses Declarations
 
 Uses declarations explicitly declare dependencies between elements or scopes. This makes architectural dependencies visible and verifiable.
 
@@ -691,13 +676,13 @@ element microservices:
 
 Patterns (declared with the `pattern` keyword) allow creating reusable architectural blueprints that define conformance requirements. Patterns establish structural constraints that elements can implement with concrete scopes and checks.
 
-> **Note**: The `pattern` keyword is preferred in V3. The `template` keyword is still supported for backward compatibility. See the [Pattern Catalog](patterns_catalog.md) for an extensive collection of common software engineering patterns.
+> **Note**: See the [Pattern Catalog](patterns_catalog.md) for an extensive collection of common software engineering patterns.
 
 Patterns define **unbounded** scopes that serve as placeholders, while implementing elements use the **`binds`** keyword to provide concrete bindings.
 
 ### 9.1 Pattern Declaration
 
-Patterns are declared using the `pattern` keyword (or `template` for backward compatibility) and define a structure with **unbounded scopes**:
+Patterns are declared using the `pattern` keyword and define a structure with **unbounded scopes**:
 
 ```hielements
 pattern observable {
@@ -717,7 +702,6 @@ pattern observable {
 - Scopes in patterns are **unbounded** (no `=` expression)
 - Language is specified via **angular brackets** (`<rust>`)
 - Patterns can include `allows`/`requires`/`forbids` constraints
-- Both `pattern` and `template` keywords are accepted (`pattern` is preferred in V3)
 
 ### 9.2 Implementing Patterns with `binds`
 
@@ -925,7 +909,7 @@ The unified syntax uses `requires`, `allows`, and `forbids` keywords with an opt
 
 ```hielements
 pattern dockerized:
-    ## At least one descendant must have a docker scope (V2 syntax with unbounded scope)
+    ## At least one descendant must have a docker scope
     requires descendant scope dockerfile
     
     ## At least one descendant must satisfy this check
@@ -1291,7 +1275,7 @@ false
 
 ```hielements
 my_scope                    # Reference a scope
-parent.child.connection_pt  # Qualified reference
+parent.child.ref_point      # Qualified reference
 ```
 
 ### 12.3 Function Calls
@@ -1305,7 +1289,7 @@ files.glob_selector('**/*.py')
 ### 12.4 Member Access
 
 ```hielements
-element.connection_point
+element.ref_point
 library.function
 parent.child.scope
 ```
@@ -1484,9 +1468,9 @@ element orders_service:
 
 ---
 
-## 15. Complete Grammar (V3)
+## 15. Complete Grammar
 
-The following is the complete EBNF grammar for Hielements V2:
+The following is the complete EBNF grammar for Hielements:
 
 ```ebnf
 (* Program structure *)
@@ -1506,9 +1490,8 @@ parameter_list       ::= parameter (',' parameter)*
 parameter            ::= identifier ':' 'scope' '[' ']'
 
 (* Patterns - with unbounded scopes *)
-(* Note: The 'pattern' keyword is preferred, 'template' is supported for backward compatibility *)
-pattern_declaration ::= doc_comment? ('pattern' | 'template') identifier ':' NEWLINE INDENT pattern_body DEDENT
-                      | doc_comment? ('pattern' | 'template') identifier '{' pattern_body '}'
+pattern_declaration ::= doc_comment? 'pattern' identifier ':' NEWLINE INDENT pattern_body DEDENT
+                      | doc_comment? 'pattern' identifier '{' pattern_body '}'
 pattern_body        ::= pattern_item+
 pattern_item        ::= scope_declaration_pattern
                       | ref_declaration_pattern
@@ -1521,8 +1504,8 @@ scope_declaration_pattern ::= 'scope' identifier language_annotation? NEWLINE
                             | 'scope' identifier language_annotation? '=' expression NEWLINE
 
 (* Ref (connection point) in patterns - can be unbounded (no '=' expression) *)
-ref_declaration_pattern ::= ('ref' | 'connection_point') identifier ':' type_name NEWLINE
-                          | ('ref' | 'connection_point') identifier ':' type_name '=' expression NEWLINE
+ref_declaration_pattern ::= 'ref' identifier ':' type_name NEWLINE
+                          | 'ref' identifier ':' type_name '=' expression NEWLINE
 
 (* Elements *)
 (* Note: Elements do NOT support component_requirement - requires/allows/forbids are only in patterns *)
@@ -1547,16 +1530,16 @@ component_spec        ::= scope_declaration_pattern
 
 element_spec          ::= 'element' identifier [':' type_name] ['implements' identifier] [':' NEWLINE INDENT element_body DEDENT]
 connection_spec       ::= 'connection' ['to'] connection_pattern NEWLINE
-ref_spec             ::= ('ref' | 'connection_point') identifier ':' type_name ['=' expression] NEWLINE
+ref_spec             ::= 'ref' identifier ':' type_name ['=' expression] NEWLINE
 connection_pattern    ::= identifier ('.' identifier)* ('.' '*')?
 language_spec         ::= 'language' identifier NEWLINE
 
-(* Declarations - V2/V3 syntax with angular brackets, binds, ref, and uses *)
+(* Declarations *)
 language_annotation  ::= '<' identifier '>'
 binds_clause         ::= 'binds' qualified_identifier
 
 scope_declaration           ::= 'scope' identifier language_annotation? binds_clause? '=' expression NEWLINE
-ref_declaration            ::= ('ref' | 'connection_point') identifier ':' type_name binds_clause? '=' expression NEWLINE
+ref_declaration            ::= 'ref' identifier ':' type_name binds_clause? '=' expression NEWLINE
 check_declaration           ::= 'check' function_call NEWLINE
 uses_declaration            ::= identifier 'uses' qualified_identifier NEWLINE
 
@@ -1613,7 +1596,6 @@ import rust
 ## Order Management Service
 ## Handles order creation, updates, and fulfillment.
 element orders_service:
-    # Source code scope with V2 language annotation
     scope rust_module<rust> = rust.module_selector('orders')
     scope tests = files.folder_selector('tests/orders')
     
@@ -1839,7 +1821,7 @@ pattern compiler:
 ## Rust Compiler Implementation
 ## Implements the compiler pattern for Rust code.
 element rust_compiler implements compiler:
-    # Bind lexer with V2 binds syntax
+    # Bind lexer
     scope lexer_mod<rust> binds compiler.lexer.module = rust.module_selector('rustcompiler::lexer')
     ref tokens: TokenStream binds compiler.lexer.tokens = rust.function_selector(lexer_mod, 'tokenize')
     
@@ -1881,9 +1863,9 @@ pattern resilient:
         scope module<rust>
         ref breaker_config: BreakerConfig
 
-## Production Service with Multiple Patterns (V2 syntax)
+## Production Service with Multiple Patterns
 element production_service implements microservice, observable, resilient:
-    # Microservice bindings with V2 binds syntax
+    # Microservice bindings
     scope api_mod<rust> binds microservice.api.module = rust.module_selector('service::api')
     scope db_mod<rust> binds microservice.database.module = rust.module_selector('service::db')
     scope dockerfile binds microservice.container.dockerfile = files.file_selector('service.dockerfile')
@@ -1976,234 +1958,3 @@ hielements check --format sarif architecture.hie
 - Use specific selectors over broad glob patterns
 - Leverage caching in CI/CD pipelines
 - Split large specifications into multiple files
-
----
-
-## Appendix D: Migration Guide (V1/V2 → V3)
-
-This section helps migrate existing Hielements code to V3 syntax.
-
-### D.1 Overview of Changes (V1 → V2/V3)
-
-| Feature | V1 Syntax | V3 Syntax |
-|---------|-----------|-----------|
-| Language annotation | `scope name : lang = expr` | `scope name<lang> = expr` |
-| Template scopes | `scope name = expr` | `scope name<lang>` (unbounded) |
-| Binding scopes | `template.element.scope = expr` | `scope name<lang> binds template.element.scope = expr` |
-| Connection points | `ref name: Type = expr` | `ref name: Type binds path = expr` (for bindings) |
-
-### D.2 Language Annotation Changes
-
-**V1 (Deprecated):**
-```hielements
-element my_service:
-    scope src : python = python.module_selector('my_service')
-    scope backend : rust = rust.module_selector('backend')
-```
-
-**V2 (Current):**
-```hielements
-element my_service:
-    scope src<python> = python.module_selector('my_service')
-    scope backend<rust> = rust.module_selector('backend')
-```
-
-**Migration**: Replace `: language` with `<language>` after the scope name.
-
-### D.3 Pattern Unbounded Scopes
-
-**V1 (Deprecated):**
-```hielements
-pattern compiler:
-    element lexer:
-        scope module = rust.module_selector('lexer')  # Bound in pattern
-        ref tokens: TokenStream = rust.function_selector(module, 'tokenize')
-```
-
-**V2 (Current):**
-```hielements
-pattern compiler:
-    element lexer:
-        scope module<rust>  # Unbounded - no '=' expression
-        ref tokens: TokenStream
-```
-
-**Migration**: Remove the `= expression` part from pattern scopes. They become placeholders.
-
-### D.4 Element Bindings with `binds`
-
-**V1 (Deprecated):**
-```hielements
-element my_compiler implements compiler:
-    compiler.lexer.scope = rust.module_selector('mycompiler::lexer')
-    compiler.lexer.tokens = rust.function_selector(compiler.lexer.scope, 'tokenize')
-```
-
-**V2 (Current):**
-```hielements
-element my_compiler implements compiler:
-    scope lexer_mod<rust> binds compiler.lexer.module = rust.module_selector('mycompiler::lexer')
-    ref tokens: TokenStream binds compiler.lexer.tokens = rust.function_selector(lexer_mod, 'tokenize')
-```
-
-**Migration**:
-1. Change `pattern.element.scope = expr` to `scope name<lang> binds pattern.element.scope = expr`
-2. Change `pattern.element.ref = expr` to `ref name: Type binds pattern.element.ref = expr`
-
-### D.5 Descriptive-Only Mode
-
-V2 supports using the language without patterns or bindings. If you're not using prescriptive features, you can write V2 code that looks similar to V1:
-
-```hielements
-# V2 descriptive-only (no patterns, no binds)
-element my_service:
-    scope src<rust> = rust.module_selector('my_service')
-    ref api: HttpHandler = rust.public_functions(src)
-    check rust.function_exists(src, 'main')
-```
-
-### D.6 Complete Migration Example
-
-**V1 Code:**
-```hielements
-import python
-import docker
-
-pattern microservice:
-    element api:
-        scope module = python.module_selector('api')
-        ref endpoint = python.public_functions(module)
-    
-    element container:
-        scope dockerfile = docker.file_selector('Dockerfile')
-    
-    check docker.exposes_port(dockerfile, 8080)
-
-element orders implements microservice:
-    microservice.api.scope = python.module_selector('orders.api')
-    microservice.api.endpoint = python.public_functions(microservice.api.scope)
-    microservice.container.dockerfile = docker.file_selector('orders.dockerfile')
-```
-
-**V2 Code:**
-```hielements
-import files
-import rust
-
-pattern microservice:
-    element api:
-        scope module<rust>  # Unbounded
-        ref endpoint: HttpHandler
-    
-    element container:
-        scope dockerfile
-    
-    check files.exists(container.dockerfile, 'Dockerfile')
-
-element orders implements microservice:
-    scope api_mod<rust> binds microservice.api.module = rust.module_selector('orders::api')
-    ref endpoint: HttpHandler binds microservice.api.endpoint = rust.public_functions(api_mod)
-    scope dockerfile binds microservice.container.dockerfile = files.file_selector('orders.dockerfile')
-```
-
-### D.7 Migration Checklist
-
-- [ ] Update all language annotations from `: lang` to `<lang>`
-- [ ] Remove `= expression` from pattern scopes (make them unbounded)
-- [ ] Remove `= expression` from pattern connection points (make them unbounded)
-- [ ] Add `binds pattern.path` clause to element scopes that bind to patterns
-- [ ] Add `binds pattern.path` clause to element connection points that bind to patterns
-- [ ] Update any references to use the new local scope names
-- [ ] Test that all checks pass with the new syntax
-
-### D.8 Backward Compatibility Note
-
-**Hielements V2 syntax is NOT backward compatible with V1.** The V1 syntax is deprecated and no longer supported. All existing V1 code must be migrated.
-
-The key philosophy changes (V1 → V3):
-- **Patterns are prescriptive** - they define structure without implementation
-- **Elements are descriptive** - they bind to actual code
-- **`binds` makes connections explicit** - clearer separation of concerns
-- **Angular brackets for language** - more consistent with type syntax conventions
-
----
-
-### D.9 V2 → V3 Migration
-
-V3 introduces new syntactic features while remaining backward compatible with V2. V2 code continues to work in V3.
-
-#### New Features in V3
-
-| Feature | Description |
-|---------|-------------|
-| Curly bracket syntax `{}` | Alternative to indentation-based blocks |
-| `ref` keyword | Preferred over `connection_point` for declaring reference points |
-| `uses` declarations | Explicit dependency declarations between elements/scopes |
-| `pattern` keyword | Preferred over `template` for declaring patterns |
-
-#### Updating `connection_point` to `ref`
-
-**V2:**
-```hielements
-element api_server:
-    scope module = python.module_selector('api')
-    connection_point rest_api: HttpHandler = python.public_functions(module)
-```
-
-**V3 (preferred):**
-```hielements
-element api_server {
-    scope module = python.module_selector('api')
-    ref rest_api: HttpHandler = python.public_functions(module)
-}
-```
-
-**Migration**: Replace `connection_point` with `ref`. Both keywords are still supported.
-
-#### Updating `template` to `pattern`
-
-**V2:**
-```hielements
-template microservice:
-    element api:
-        scope module<rust>
-```
-
-**V3 (preferred):**
-```hielements
-pattern microservice {
-    element api {
-        scope module<rust>
-    }
-}
-```
-
-**Migration**: Replace `template` with `pattern`. Both keywords are still supported.
-
-#### Adding `uses` Declarations
-
-V3 allows explicit dependency declarations to make architectural relationships visible:
-
-```hielements
-element core {
-    element lexer {
-        scope module = rust.module_selector('lexer')
-    }
-
-    element parser {
-        scope module = rust.module_selector('parser')
-        scope lexer_module = rust.module_selector('lexer')
-
-        ## Explicit dependency: parser uses lexer
-        lexer_module uses lexer
-    }
-}
-```
-
-#### V2 → V3 Migration Checklist
-
-- [ ] (Optional) Replace `connection_point` with `ref`
-- [ ] (Optional) Replace `template` with `pattern`
-- [ ] (Optional) Convert indentation-based blocks to curly brackets `{}`
-- [ ] (Optional) Add `uses` declarations to document explicit dependencies
-- [ ] Test that all checks pass after migration

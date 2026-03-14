@@ -9,7 +9,7 @@ use crate::span::Span;
 /// Note: 'requires', 'allows', 'forbids' are only allowed in templates, not elements.
 const EXPECTED_ELEMENT_BODY_TOKENS: &str = "'scope', 'ref', 'uses', 'check', or 'element'";
 
-/// Expected tokens in template body for error messages.
+/// Expected tokens in pattern body for error messages.
 const EXPECTED_TEMPLATE_BODY_TOKENS: &str = "'scope', 'ref', 'check', 'element', 'requires', 'allows', or 'forbids'";
 
 /// Parser for the Hielements language.
@@ -70,7 +70,7 @@ impl<'a> Parser<'a> {
             // Skip doc comments before templates/elements
             let doc_comment = self.parse_doc_comment();
 
-            if self.check(TokenKind::Template) || self.check(TokenKind::Pattern) {
+            if self.check(TokenKind::Pattern) {
                 match self.parse_template(doc_comment) {
                     Ok(template) => templates.push(template),
                     Err(diag) => {
@@ -97,7 +97,7 @@ impl<'a> Parser<'a> {
             } else if !self.is_at_end() {
                 let token = self.current();
                 self.diagnostics.push(
-                    Diagnostic::error("E001", format!("Expected 'template', 'element', or 'language', found {:?}", token.kind))
+                    Diagnostic::error("E001", format!("Expected 'pattern', 'element', or 'language', found {:?}", token.kind))
                         .with_file(&self.file_path)
                         .with_span(token.span)
                         .build(),
@@ -325,14 +325,14 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse an element declaration.
-    /// `in_template` indicates whether this element is inside a template (allows unbounded scopes).
+    /// `in_template` indicates whether this element is inside a pattern (allows unbounded scopes).
     /// Supports both curly bracket syntax `element name { ... }` and indentation syntax `element name:\n    ...`
     fn parse_element_with_context(&mut self, doc_comment: Option<String>, in_template: bool) -> Result<Element, Diagnostic> {
         let start_span = self.current_span();
         self.expect(TokenKind::Element)?;
         let name = self.parse_identifier()?;
         
-        // Parse optional template implementation
+        // Parse optional pattern implementation
         let mut implements = Vec::new();
         if self.check(TokenKind::Implements) {
             self.advance();
@@ -393,8 +393,8 @@ impl<'a> Parser<'a> {
 
             if self.check(TokenKind::Scope) {
                 scopes.push(self.parse_scope()?);
-            } else if self.check(TokenKind::Ref) || self.check(TokenKind::ConnectionPoint) {
-                // Support both 'ref' and 'connection_point' keywords
+            } else if self.check(TokenKind::Ref) {
+                // Parse ref declaration
                 refs.push(self.parse_ref()?);
             } else if self.check(TokenKind::Uses) {
                 // Parse uses declaration: `source uses target`
@@ -410,7 +410,7 @@ impl<'a> Parser<'a> {
                 return Err(Diagnostic::error(
                     "E012",
                     format!(
-                        "'{}' is only allowed in templates, not in regular elements. Define a template with this constraint and have the element implement it.",
+                        "'{}' is only allowed in patterns, not in regular elements. Define a pattern with this constraint and have the element implement it.",
                         token.text
                     ),
                 )
@@ -420,7 +420,7 @@ impl<'a> Parser<'a> {
             } else if self.check(TokenKind::Identifier) {
                 // Could be:
                 // 1. A uses declaration: `identifier uses target`
-                // 2. A template binding: `template.element.scope = ...`
+                // 2. A pattern binding: `pattern.element.scope = ...`
                 let pos = self.pos;
                 self.advance(); // consume identifier
                 
@@ -429,17 +429,17 @@ impl<'a> Parser<'a> {
                     self.pos = pos; // restore position
                     uses.push(self.parse_uses()?);
                 } else if self.check(TokenKind::Dot) {
-                    // Looks like a template binding, restore and try to parse it
+                    // Looks like a pattern binding, restore and try to parse it
                     self.pos = pos;
                     match self.try_parse_template_binding() {
                         Ok(binding) => template_bindings.push(binding),
                         Err(err) => {
-                            // Failed to parse as template binding
+                            // Failed to parse as pattern binding
                             return Err(err);
                         }
                     }
                 } else {
-                    // Not a template binding or uses (no dot or uses keyword after identifier)
+                    // Not a pattern binding or uses (no dot or uses keyword after identifier)
                     self.pos = pos; // restore
                     let token = self.current();
                     return Err(Diagnostic::error(
@@ -488,15 +488,15 @@ impl<'a> Parser<'a> {
         let end_span = self.previous_span();
 
         // Validate: unbounded scopes (no expression) are NOT allowed in regular elements
-        // They are only allowed in templates. Provide helpful error message.
-        // Skip validation if we're inside a template (in_template = true)
+        // They are only allowed in patterns. Provide helpful error message.
+        // Skip validation if we're inside a pattern (in_template = true)
         if !in_template {
             for scope in &scopes {
                 if scope.expression.is_none() {
                     return Err(Diagnostic::error(
                         "E014",
                         format!(
-                            "Unbounded scope '{}' is only allowed in templates, not in regular elements. \
+                            "Unbounded scope '{}' is only allowed in patterns, not in regular elements. \
                             Provide an expression: `scope {} = <expression>`",
                             scope.name.name, scope.name.name
                         ),
@@ -513,7 +513,7 @@ impl<'a> Parser<'a> {
                     return Err(Diagnostic::error(
                         "E015",
                         format!(
-                            "Unbounded ref '{}' is only allowed in templates, not in regular elements. \
+                            "Unbounded ref '{}' is only allowed in patterns, not in regular elements. \
                             Provide an expression: `ref {}: {} = <expression>`",
                             r.name.name, r.name.name, r.type_annotation.type_name.name
                         ),
@@ -534,32 +534,30 @@ impl<'a> Parser<'a> {
             uses,
             checks,
             template_bindings,
-            component_requirements: Vec::new(), // Always empty - requires/allows/forbids only allowed in templates
+            component_requirements: Vec::new(), // Always empty - requires/allows/forbids only allowed in patterns
             children,
             span: start_span.merge(&end_span),
         })
     }
 
-    /// Convenience wrapper to parse element at top level (not in template)
+    /// Convenience wrapper to parse element at top level (not in a pattern)
     fn parse_element(&mut self, doc_comment: Option<String>) -> Result<Element, Diagnostic> {
         self.parse_element_with_context(doc_comment, false)
     }
 
-    /// Parse a template declaration.
+    /// Parse a pattern declaration.
     /// Supports both curly bracket syntax `pattern name { ... }` and indentation syntax `pattern name:\n    ...`
-    /// Also accepts `template` for backward compatibility.
     fn parse_template(&mut self, doc_comment: Option<String>) -> Result<Template, Diagnostic> {
         let start_span = self.current_span();
-        // Accept both 'pattern' (preferred) and 'template' (backward compatibility)
-        if !self.check(TokenKind::Pattern) && !self.check(TokenKind::Template) {
+        if !self.check(TokenKind::Pattern) {
             return Err(Diagnostic::error(
                 "E001",
-                format!("Expected 'pattern' or 'template' keyword, found {:?}", self.current().kind)
+                format!("Expected 'pattern' keyword, found {:?}", self.current().kind)
             ).with_file(&self.file_path)
              .with_span(start_span)
              .build());
         }
-        self.advance(); // consume 'pattern' or 'template'
+        self.advance(); // consume 'pattern'
         let name = self.parse_identifier()?;
         
         // Support both curly bracket syntax `{ ... }` and colon/indent syntax `: ...`
@@ -603,8 +601,8 @@ impl<'a> Parser<'a> {
 
             if self.check(TokenKind::Scope) {
                 scopes.push(self.parse_scope()?);
-            } else if self.check(TokenKind::Ref) || self.check(TokenKind::ConnectionPoint) {
-                // Support both 'ref' and 'connection_point' keywords
+            } else if self.check(TokenKind::Ref) {
+                // Parse ref declaration
                 refs.push(self.parse_ref()?);
             } else if self.check(TokenKind::Check) {
                 checks.push(self.parse_check()?);
@@ -627,7 +625,7 @@ impl<'a> Parser<'a> {
                 return Err(Diagnostic::error(
                     "E002",
                     format!(
-                        "Expected {} in template, found {:?}",
+                        "Expected {} in pattern, found {:?}",
                         EXPECTED_TEMPLATE_BODY_TOKENS,
                         token.kind
                     ),
@@ -663,19 +661,19 @@ impl<'a> Parser<'a> {
         })
     }
 
-    /// Try to parse a template binding (e.g., template.element.scope = expression).
+    /// Try to parse a pattern binding (e.g., pattern.element.scope = expression).
     fn try_parse_template_binding(&mut self) -> Result<TemplateBinding, Diagnostic> {
         let start_span = self.current_span();
         let start_pos = self.pos;
         
-        // Parse the qualified path (template.element.property)
+        // Parse the qualified path (pattern.element.property)
         let mut path = vec![self.parse_identifier()?];
         
-        // Must have at least one dot for it to be a template binding
+        // Must have at least one dot for it to be a pattern binding
         if !self.check(TokenKind::Dot) {
             // Restore position and fail
             self.pos = start_pos;
-            return Err(Diagnostic::error("E003", "Not a template binding")
+            return Err(Diagnostic::error("E003", "Not a pattern binding")
                 .with_file(&self.file_path)
                 .with_span(start_span)
                 .build());
@@ -686,11 +684,11 @@ impl<'a> Parser<'a> {
             path.push(self.parse_identifier()?);
         }
         
-        // Template bindings must have at least 2 parts (template.property) and use =
+        // Pattern bindings must have at least 2 parts (pattern.property) and use =
         if path.len() < 2 || !self.check(TokenKind::Equals) {
             // Restore position and fail
             self.pos = start_pos;
-            return Err(Diagnostic::error("E003", "Not a template binding")
+            return Err(Diagnostic::error("E003", "Not a pattern binding")
                 .with_file(&self.file_path)
                 .with_span(start_span)
                 .build());
@@ -708,9 +706,9 @@ impl<'a> Parser<'a> {
         })
     }
 
-    /// Parse a scope declaration (V2 syntax).
+    /// Parse a scope declaration.
     /// Syntax: `scope <name> [<language>] [binds <path>] [= <expression>]`
-    /// Unbounded scopes (no `=`) are allowed in templates.
+    /// Unbounded scopes (no `=`) are allowed in patterns.
     fn parse_scope(&mut self) -> Result<ScopeDeclaration, Diagnostic> {
         let start_span = self.current_span();
         self.expect(TokenKind::Scope)?;
@@ -722,15 +720,11 @@ impl<'a> Parser<'a> {
             let lang = self.parse_identifier()?;
             self.expect(TokenKind::RAngle)?; // consume '>'
             Some(lang)
-        } else if self.check(TokenKind::Colon) {
-            // Also support legacy colon syntax for backward compatibility during migration
-            self.advance(); // consume ':'
-            Some(self.parse_identifier()?)
         } else {
             None
         };
         
-        // Check for optional binds clause: `binds template.element.scope`
+        // Check for optional binds clause: `binds pattern.element.scope`
         let binds = if self.check(TokenKind::Binds) {
             self.advance(); // consume 'binds'
             Some(self.parse_qualified_path()?)
@@ -738,7 +732,7 @@ impl<'a> Parser<'a> {
             None
         };
         
-        // Expression is optional for unbounded scopes in templates
+        // Expression is optional for unbounded scopes in patterns
         let expression = if self.check(TokenKind::Equals) {
             self.expect(TokenKind::Equals)?;
             Some(self.parse_expression()?)
@@ -758,25 +752,19 @@ impl<'a> Parser<'a> {
         })
     }
 
-    /// Parse a ref declaration (V2 syntax - renamed from connection_point).
+    /// Parse a ref declaration.
     /// Syntax: `ref <name> : <type> [binds <path>] [= <expression>]`
-    /// Also accepts `connection_point` for backward compatibility.
-    /// Unbounded refs (no `=`) are allowed in templates.
+    /// Unbounded refs (no `=`) are allowed in patterns.
     fn parse_ref(&mut self) -> Result<RefDeclaration, Diagnostic> {
         let start_span = self.current_span();
-        // Accept both 'ref' and 'connection_point' keywords
-        if self.check(TokenKind::Ref) {
-            self.advance();
-        } else {
-            self.expect(TokenKind::ConnectionPoint)?;
-        }
+        self.expect(TokenKind::Ref)?;
         let name = self.parse_identifier()?;
         
         // Parse mandatory type annotation: `: <type>`
         self.expect(TokenKind::Colon)?;
         let type_annotation = self.parse_type_annotation()?;
         
-        // Check for optional binds clause: `binds template.element.ref`
+        // Check for optional binds clause: `binds pattern.element.ref`
         let binds = if self.check(TokenKind::Binds) {
             self.advance(); // consume 'binds'
             Some(self.parse_qualified_path()?)
@@ -784,7 +772,7 @@ impl<'a> Parser<'a> {
             None
         };
         
-        // Expression is optional for unbounded refs in templates
+        // Expression is optional for unbounded refs in patterns
         let expression = if self.check(TokenKind::Equals) {
             self.expect(TokenKind::Equals)?;
             Some(self.parse_expression()?)
@@ -840,7 +828,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    /// Parse a qualified path for binds clauses: `template.element.scope`
+    /// Parse a qualified path for binds clauses: `pattern.element.scope`
     fn parse_qualified_path(&mut self) -> Result<Vec<Identifier>, Diagnostic> {
         let mut path = vec![self.parse_identifier()?];
         while self.check(TokenKind::Dot) {
@@ -895,7 +883,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse a component requirement.
-    /// Syntax: (requires | allows | forbids) [descendant] (scope | check | element | connection | connection_point)
+    /// Syntax: (requires | allows | forbids) [descendant] (scope | check | element | connection | ref)
     fn parse_component_requirement(&mut self, action: RequirementAction) -> Result<ComponentRequirement, Diagnostic> {
         let start_span = self.current_span();
         
@@ -926,8 +914,7 @@ impl<'a> Parser<'a> {
             let pattern = self.parse_connection_pattern()?;
             self.expect_newline()?;
             ComponentSpec::Connection(pattern)
-        } else if self.check(TokenKind::Ref) || self.check(TokenKind::ConnectionPoint) {
-            // Support both 'ref' and 'connection_point' keywords
+        } else if self.check(TokenKind::Ref) {
             self.parse_ref_component_spec()?
         } else if self.check(TokenKind::Implements) {
             // Support for shorthand: `requires descendant implements template_name`
@@ -977,7 +964,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse an element component specification.
-    /// Syntax: element name [: Type] [implements template] [: body]
+    /// Syntax: element name [: Type] [implements pattern] [: body]
     fn parse_element_component_spec(&mut self) -> Result<ComponentSpec, Diagnostic> {
         self.advance(); // consume 'element'
         
@@ -1055,7 +1042,7 @@ impl<'a> Parser<'a> {
 
                     if self.check(TokenKind::Scope) {
                         scopes.push(self.parse_scope()?);
-                    } else if self.check(TokenKind::Ref) || self.check(TokenKind::ConnectionPoint) {
+                    } else if self.check(TokenKind::Ref) {
                         refs.push(self.parse_ref()?);
                     } else if self.check(TokenKind::Check) {
                         checks.push(self.parse_check()?);
@@ -1119,11 +1106,10 @@ impl<'a> Parser<'a> {
         })
     }
 
-    /// Parse a ref component specification (formerly connection_point).
+    /// Parse a ref component specification.
     /// Syntax: ref name: Type [= expression]
-    /// Also accepts connection_point for backward compatibility.
     fn parse_ref_component_spec(&mut self) -> Result<ComponentSpec, Diagnostic> {
-        self.advance(); // consume 'ref' or 'connection_point'
+        self.advance(); // consume 'ref'
         
         let name = self.parse_identifier()?;
         self.expect(TokenKind::Colon)?;
@@ -1262,13 +1248,13 @@ impl<'a> Parser<'a> {
             let token = self.advance();
             Ok(Identifier::new(token.text, token.span))
         } else {
-            // In some contexts (like template binding paths), keywords can be used as identifiers
+            // In some contexts (like pattern binding paths), keywords can be used as identifiers
             // Allow certain keywords to be treated as identifiers
             let token = self.current();
             match token.kind {
                 TokenKind::Scope | TokenKind::Element | TokenKind::Check | 
-                TokenKind::ConnectionPoint | TokenKind::Ref | TokenKind::Uses |
-                TokenKind::Template | TokenKind::Pattern | TokenKind::Implements |
+                TokenKind::Ref | TokenKind::Uses |
+                TokenKind::Pattern | TokenKind::Implements |
                 TokenKind::Binds | TokenKind::To |
                 // Unified keywords can also be used as identifiers in some contexts
                 TokenKind::Requires | TokenKind::Allows | TokenKind::Forbids |
@@ -1508,12 +1494,12 @@ element service:
     }
 
     #[test]
-    fn test_parse_template_declaration() {
-        let source = r#"template compiler:
+    fn test_parse_pattern_declaration() {
+        let source = r#"pattern compiler:
     element lexer:
-        connection_point tokens: TokenStream = rust.function_selector('tokenize')
+        ref tokens: TokenStream = rust.function_selector('tokenize')
     element parser:
-        connection_point ast: AbstractSyntaxTree = rust.function_selector('parse')
+        ref ast: AbstractSyntaxTree = rust.function_selector('parse')
     check compiler.lexer.tokens.compatible_with(compiler.parser.input)
 "#;
         let parser = Parser::new(source, "test.hie");
@@ -1582,12 +1568,12 @@ element service:
     }
 
     #[test]
-    fn test_parse_template_with_scopes_and_checks() {
-        let source = r#"template microservice:
+    fn test_parse_pattern_with_scopes_and_checks() {
+        let source = r#"pattern microservice:
     scope config = files.file_selector('config.yaml')
     
     element api:
-        connection_point endpoint: HttpHandler = rust.function_selector('api_handler')
+        ref endpoint: HttpHandler = rust.function_selector('api_handler')
     
     check microservice.api.endpoint.is_valid()
 "#;
@@ -1603,11 +1589,11 @@ element service:
     }
 
     #[test]
-    fn test_parse_connection_point_with_type() {
+    fn test_parse_ref_with_type() {
         let source = r#"element api_service:
-    connection_point port: integer = docker.exposed_port(dockerfile)
-    connection_point url: string = config.get_api_url()
-    connection_point enabled: boolean = config.get_flag('api_enabled')
+    ref port: integer = docker.exposed_port(dockerfile)
+    ref url: string = config.get_api_url()
+    ref enabled: boolean = config.get_flag('api_enabled')
 "#;
         let parser = Parser::new(source, "test.hie");
         let (program, diagnostics) = parser.parse();
@@ -1618,23 +1604,24 @@ element service:
         let element = &program.elements[0];
         assert_eq!(element.refs.len(), 3);
         
-        // Check first connection point with type
+        // Check first ref with type
         assert_eq!(element.refs[0].name.name, "port");
         assert_eq!(element.refs[0].type_annotation.type_name.name, "integer");
         
-        // Check second connection point with type
+        // Check second ref with type
         assert_eq!(element.refs[1].name.name, "url");
         assert_eq!(element.refs[1].type_annotation.type_name.name, "string");
         
-        // Check third connection point with type
+        // Check third ref with type
         assert_eq!(element.refs[2].name.name, "enabled");
         assert_eq!(element.refs[2].type_annotation.type_name.name, "boolean");
     }
 
     #[test]
-    fn test_parse_connection_point_without_type_fails() {
+    fn test_parse_ref_without_type_fails() {
+        // ref without type annotation should fail - the parser expects `: type` after name
         let source = r#"element api_service:
-    connection_point endpoint = python.public_functions(module)
+    ref endpoint
 "#;
         let parser = Parser::new(source, "test.hie");
         let (_program, diagnostics) = parser.parse();
@@ -1644,12 +1631,12 @@ element service:
     }
 
     #[test]
-    fn test_parse_connection_point_with_custom_type() {
-        let source = r#"template compiler:
+    fn test_parse_ref_with_custom_type() {
+        let source = r#"pattern compiler:
     element lexer:
-        connection_point tokens: TokenStream = rust.struct_selector('Token')
+        ref tokens: TokenStream = rust.struct_selector('Token')
     element parser:
-        connection_point ast: AbstractSyntaxTree = rust.struct_selector('Program')
+        ref ast: AbstractSyntaxTree = rust.struct_selector('Program')
 "#;
         let parser = Parser::new(source, "test.hie");
         let (program, diagnostics) = parser.parse();
@@ -1660,12 +1647,12 @@ element service:
         let template = &program.templates[0];
         assert_eq!(template.elements.len(), 2);
         
-        // Check lexer connection point with custom type
+        // Check lexer ref with custom type
         let lexer = &template.elements[0];
         assert_eq!(lexer.refs[0].name.name, "tokens");
         assert_eq!(lexer.refs[0].type_annotation.type_name.name, "TokenStream");
         
-        // Check parser connection point with custom type
+        // Check parser ref with custom type
         let parser_elem = &template.elements[1];
         assert_eq!(parser_elem.refs[0].name.name, "ast");
         assert_eq!(parser_elem.refs[0].type_annotation.type_name.name, "AbstractSyntaxTree");
@@ -1677,7 +1664,7 @@ element service:
 
     #[test]
     fn test_parse_requires_descendant_scope() {
-        let source = r#"template dockerized:
+        let source = r#"pattern dockerized:
     requires descendant scope dockerfile = docker.file_selector('Dockerfile')
 "#;
         let parser = Parser::new(source, "test.hie");
@@ -1703,7 +1690,7 @@ element service:
 
     #[test]
     fn test_parse_requires_descendant_element() {
-        let source = r#"template observable:
+        let source = r#"pattern observable:
     requires descendant element metrics_service implements metrics_provider
 "#;
         let parser = Parser::new(source, "test.hie");
@@ -1729,9 +1716,9 @@ element service:
     }
 
     #[test]
-    fn test_parse_forbids_descendant_connection_point() {
-        let source = r#"template secure_zone:
-    forbids descendant connection_point external_api: HttpHandler
+    fn test_parse_forbids_descendant_ref() {
+        let source = r#"pattern secure_zone:
+    forbids descendant ref external_api: HttpHandler
 "#;
         let parser = Parser::new(source, "test.hie");
         let (program, diagnostics) = parser.parse();
@@ -1751,13 +1738,13 @@ element service:
                 assert_eq!(name.name, "external_api");
                 assert_eq!(type_annotation.type_name.name, "HttpHandler");
             }
-            _ => panic!("Expected connection_point component"),
+            _ => panic!("Expected ref component"),
         }
     }
 
     #[test]
     fn test_parse_allows_connection() {
-        let source = r#"template frontend_zone:
+        let source = r#"pattern frontend_zone:
     allows connection to api_gateway.public_api
 "#;
         let parser = Parser::new(source, "test.hie");
@@ -1786,7 +1773,7 @@ element service:
 
     #[test]
     fn test_parse_forbids_connection_with_wildcard() {
-        let source = r#"template secure_zone:
+        let source = r#"pattern secure_zone:
     forbids connection to external.*
 "#;
         let parser = Parser::new(source, "test.hie");
@@ -1815,7 +1802,7 @@ element service:
     #[test]
     fn test_parse_requires_element_immediate() {
         // Without 'descendant' modifier - requires immediate child
-        let source = r#"template microservice:
+        let source = r#"pattern microservice:
     requires element api implements api_handler
 "#;
         let parser = Parser::new(source, "test.hie");
@@ -1842,8 +1829,8 @@ element service:
 
     #[test]
     fn test_parse_requires_descendant_implements_shorthand() {
-        // Shorthand: requires descendant implements template_name
-        let source = r#"template production_ready:
+        // Shorthand: requires descendant implements pattern_name
+        let source = r#"pattern production_ready:
     requires descendant implements dockerized
 "#;
         let parser = Parser::new(source, "test.hie");
@@ -1869,7 +1856,7 @@ element service:
 
     #[test]
     fn test_parse_all_requirement_types() {
-        let source = r#"template complete:
+        let source = r#"pattern complete:
     requires descendant scope config = files.file_selector('config.yaml')
     requires descendant check files.exists(config, 'required.txt')
     allows connection to api.*
@@ -1888,10 +1875,10 @@ element service:
 
     #[test]
     fn test_parse_element_with_body() {
-        let source = r#"template observable:
+        let source = r#"pattern observable:
     requires descendant element metrics:
         scope module = rust.module_selector('metrics')
-        connection_point handler: MetricsHandler = rust.function_selector(module, 'handler')
+        ref handler: MetricsHandler = rust.function_selector(module, 'handler')
 "#;
         let parser = Parser::new(source, "test.hie");
         let (program, diagnostics) = parser.parse();
@@ -1918,7 +1905,7 @@ element service:
 
     #[test]
     fn test_parse_requires_check() {
-        let source = r#"template validated:
+        let source = r#"pattern validated:
     requires descendant check files.exists(src, 'README.md')
 "#;
         let parser = Parser::new(source, "test.hie");
@@ -1942,7 +1929,7 @@ element service:
 
     #[test]
     fn test_parse_requires_in_element_fails() {
-        // requires/allows/forbids should only be allowed in templates, not elements
+        // requires/allows/forbids should only be allowed in patterns, not elements
         let source = r#"element test_element:
     scope src = files.folder_selector('src')
     requires connection to logging.*
@@ -1952,14 +1939,14 @@ element service:
 
         // Should have errors because requires is not allowed in elements
         assert!(diagnostics.has_errors(), "Expected error for 'requires' in element");
-        // Check that the error message mentions templates
+        // Check that the error message mentions patterns
         let error_msg = diagnostics.iter().next().unwrap().message.clone();
-        assert!(error_msg.contains("template"), "Error message should mention templates: {}", error_msg);
+        assert!(error_msg.contains("pattern"), "Error message should mention patterns: {}", error_msg);
     }
 
     #[test]
     fn test_parse_allows_in_element_fails() {
-        // requires/allows/forbids should only be allowed in templates, not elements
+        // requires/allows/forbids should only be allowed in patterns, not elements
         let source = r#"element test_element:
     allows connection to api.*
 "#;
@@ -1972,7 +1959,7 @@ element service:
 
     #[test]
     fn test_parse_forbids_in_element_fails() {
-        // requires/allows/forbids should only be allowed in templates, not elements
+        // requires/allows/forbids should only be allowed in patterns, not elements
         let source = r#"element test_element:
     forbids connection to external.*
 "#;
@@ -2043,7 +2030,7 @@ language java
     #[test]
     fn test_parse_scope_with_language() {
         let source = r#"element test:
-    scope src : python = python.module_selector('test')
+    scope src<python> = python.module_selector('test')
 "#;
         let parser = Parser::new(source, "test.hie");
         let (program, diagnostics) = parser.parse();
@@ -2080,7 +2067,7 @@ language java
 
     #[test]
     fn test_parse_requires_language() {
-        let source = r#"template python_only:
+        let source = r#"pattern python_only:
     requires language python
 "#;
         let parser = Parser::new(source, "test.hie");
@@ -2106,7 +2093,7 @@ language java
 
     #[test]
     fn test_parse_forbids_language() {
-        let source = r#"template no_rust:
+        let source = r#"pattern no_rust:
     forbids language rust
 "#;
         let parser = Parser::new(source, "test.hie");
@@ -2131,7 +2118,7 @@ language java
 
     #[test]
     fn test_parse_allows_language() {
-        let source = r#"template multilingual:
+        let source = r#"pattern multilingual:
     allows language python
     allows language rust
 "#;
@@ -2167,12 +2154,12 @@ language java
     connection_check no_circular(scopes: scope[]):
         python.no_circular_imports(scopes)
 
-template python_service:
+pattern python_service:
     requires language python
     forbids language rust
 
 element my_api implements python_service:
-    scope src : python = python.module_selector('my_api')
+    scope src<python> = python.module_selector('my_api')
     check python.has_docstrings(src)
 "#;
         let parser = Parser::new(source, "test.hie");
@@ -2197,11 +2184,11 @@ element my_api implements python_service:
     }
 
     // ========================================================================
-    // Tests for V2 syntax: angular brackets, binds keyword, unbounded scopes
+    // Tests for: angular brackets, binds keyword, unbounded scopes
     // ========================================================================
 
     #[test]
-    fn test_parse_v2_angular_bracket_language() {
+    fn test_parse_angular_bracket_language() {
         let source = r#"element test:
     scope src<rust> = rust.module_selector('test')
 "#;
@@ -2221,11 +2208,11 @@ element my_api implements python_service:
     }
 
     #[test]
-    fn test_parse_v2_unbounded_scope_in_template() {
-        let source = r#"template observable:
+    fn test_parse_unbounded_scope_in_pattern() {
+        let source = r#"pattern observable:
     element metrics:
         scope module<rust>
-        connection_point prometheus: MetricsHandler
+        ref prometheus: MetricsHandler
 "#;
         let parser = Parser::new(source, "test.hie");
         let (program, diagnostics) = parser.parse();
@@ -2246,16 +2233,16 @@ element my_api implements python_service:
         // Unbounded scope - no expression
         assert!(scope.expression.is_none());
         
-        // Connection point - unbounded
+        // Unbounded ref
         assert_eq!(metrics.refs.len(), 1);
-        let cp = &metrics.refs[0];
-        assert_eq!(cp.name.name, "prometheus");
-        assert_eq!(cp.type_annotation.type_name.name, "MetricsHandler");
-        assert!(cp.expression.is_none());
+        let r = &metrics.refs[0];
+        assert_eq!(r.name.name, "prometheus");
+        assert_eq!(r.type_annotation.type_name.name, "MetricsHandler");
+        assert!(r.expression.is_none());
     }
 
     #[test]
-    fn test_parse_v2_scope_with_binds() {
+    fn test_parse_scope_with_binds() {
         let source = r#"element component implements observable:
     scope main_module<rust> binds observable.metrics.module = rust.module_selector('api')
 "#;
@@ -2287,9 +2274,9 @@ element my_api implements python_service:
     }
 
     #[test]
-    fn test_parse_v2_connection_point_with_binds() {
+    fn test_parse_ref_with_binds() {
         let source = r#"element component implements observable:
-    connection_point handler: MetricsHandler binds observable.metrics.prometheus = rust.function_selector(module, 'handler')
+    ref handler: MetricsHandler binds observable.metrics.prometheus = rust.function_selector(module, 'handler')
 "#;
         let parser = Parser::new(source, "test.hie");
         let (program, diagnostics) = parser.parse();
@@ -2318,16 +2305,16 @@ element my_api implements python_service:
     }
 
     #[test]
-    fn test_parse_v2_complete_template_and_implementation() {
-        let source = r#"template observable:
+    fn test_parse_complete_pattern_and_implementation() {
+        let source = r#"pattern observable:
     allows language rust
     element metrics:
         scope module<rust>
-        connection_point prometheus: MetricsHandler
+        ref prometheus: MetricsHandler
 
 element observable_component implements observable:
     scope main_module<rust> binds observable.metrics.module = rust.module_selector('payments::api')
-    connection_point main_handler: MetricsHandler binds observable.metrics.prometheus = rust.function_selector(main_module, 'handler')
+    ref main_handler: MetricsHandler binds observable.metrics.prometheus = rust.function_selector(main_module, 'handler')
 "#;
         let parser = Parser::new(source, "test.hie");
         let (program, diagnostics) = parser.parse();
@@ -2335,14 +2322,14 @@ element observable_component implements observable:
         assert!(!diagnostics.has_errors(), "Errors: {:?}", diagnostics);
         let program = program.unwrap();
         
-        // Check template
+        // Check pattern
         assert_eq!(program.templates.len(), 1);
         let template = &program.templates[0];
         assert_eq!(template.name.name, "observable");
         assert_eq!(template.elements.len(), 1);
         assert_eq!(template.component_requirements.len(), 1); // allows language rust
         
-        // Check template element has unbounded scope
+        // Check pattern element has unbounded scope
         let template_metrics = &template.elements[0];
         assert!(template_metrics.scopes[0].expression.is_none());
         assert!(template_metrics.refs[0].expression.is_none());
@@ -2360,16 +2347,16 @@ element observable_component implements observable:
         assert!(scope.binds.is_some());
         assert!(scope.expression.is_some());
         
-        // Check element has bound connection point
+        // Check element has bound ref
         assert_eq!(element.refs.len(), 1);
-        let cp = &element.refs[0];
-        assert!(cp.binds.is_some());
-        assert!(cp.expression.is_some());
+        let r = &element.refs[0];
+        assert!(r.binds.is_some());
+        assert!(r.expression.is_some());
     }
 
     #[test]
-    fn test_parse_v2_unbounded_scope_in_element_fails() {
-        // Unbounded scopes are only allowed in templates, not in regular elements
+    fn test_parse_unbounded_scope_in_element_fails() {
+        // Unbounded scopes are only allowed in patterns, not in regular elements
         let source = r#"element test:
     scope src<rust>
 "#;
@@ -2379,26 +2366,26 @@ element observable_component implements observable:
         // Should have errors because unbounded scope is not allowed in elements
         assert!(diagnostics.has_errors(), "Expected error for unbounded scope in element");
         let error_msg = diagnostics.iter().next().unwrap().message.clone();
-        assert!(error_msg.contains("only allowed in templates"), "Error message should mention templates: {}", error_msg);
+        assert!(error_msg.contains("only allowed in patterns"), "Error message should mention patterns: {}", error_msg);
     }
 
     #[test]
-    fn test_parse_v2_unbounded_connection_point_in_element_fails() {
-        // Unbounded connection points are only allowed in templates, not in regular elements
+    fn test_parse_unbounded_ref_in_element_fails() {
+        // Unbounded refs are only allowed in patterns, not in regular elements
         let source = r#"element test:
-    connection_point api: HttpHandler
+    ref api: HttpHandler
 "#;
         let parser = Parser::new(source, "test.hie");
         let (_program, diagnostics) = parser.parse();
 
-        // Should have errors because unbounded connection point is not allowed in elements
-        assert!(diagnostics.has_errors(), "Expected error for unbounded connection point in element");
+        // Should have errors because unbounded ref is not allowed in elements
+        assert!(diagnostics.has_errors(), "Expected error for unbounded ref in element");
         let error_msg = diagnostics.iter().next().unwrap().message.clone();
-        assert!(error_msg.contains("only allowed in templates"), "Error message should mention templates: {}", error_msg);
+        assert!(error_msg.contains("only allowed in patterns"), "Error message should mention patterns: {}", error_msg);
     }
 
     // ========================================================================
-    // Tests for V3 syntax: curly brackets, ref keyword, uses keyword
+    // Tests for: curly brackets, ref keyword, uses keyword
     // ========================================================================
 
     #[test]
@@ -2420,8 +2407,8 @@ element observable_component implements observable:
     }
 
     #[test]
-    fn test_parse_curly_brackets_template() {
-        let source = r#"template observable {
+    fn test_parse_curly_brackets_pattern() {
+        let source = r#"pattern observable {
     element metrics {
         scope module<rust>
         ref prometheus: MetricsHandler

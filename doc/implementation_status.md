@@ -15,19 +15,17 @@ This document tracks the implementation status of each Hielements language featu
 | `scope` declarations (bound) | ✅ Implemented | With selector expressions |
 | `scope` declarations (unbounded, in patterns) | ✅ Implemented | Without `=` expression, placeholder for `binds` |
 | Language annotations `<lang>` | ✅ Implemented | Stored in AST, used in connection checks |
-| `ref` declarations | ✅ Implemented | V3 preferred keyword (alias for `connection_point`) |
-| `connection_point` declarations | ✅ Implemented | V2/backward compat, parsed as `ref` |
+| `ref` declarations | ✅ Implemented | Declares reference points with type annotations |
 | `check` declarations | ✅ Implemented | Evaluated at runtime via library calls |
 | `uses` declarations (syntax) | ✅ Parsed | AST node stored, dependency not validated |
 | `import` statements | ✅ Implemented | Loads built-in and external libraries |
 | Doc comments (`##`) | ✅ Implemented | Stored in AST for tooling |
 
-### Pattern / Template Features
+### Pattern Features
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| `pattern` keyword | ✅ Implemented | V3 preferred keyword |
-| `template` keyword | ✅ Implemented | V2/backward compat, equivalent to `pattern` |
+| `pattern` keyword | ✅ Implemented | Declares reusable architectural blueprints |
 | `implements` keyword (syntax) | ✅ Parsed | Stored in AST; binding completeness **not enforced** |
 | `binds` keyword (syntax) | ✅ Parsed | Stored in AST; path resolution **not enforced** |
 | Pattern-level `requires` | ✅ Implemented | Hierarchical requirements evaluated |
@@ -45,8 +43,8 @@ This document tracks the implementation status of each Hielements language featu
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Indentation-based blocks | ✅ Implemented | V2/V3 compatible |
-| Curly bracket blocks `{}` | ✅ Implemented | V3 feature |
+| Indentation-based blocks | ✅ Implemented | Supported alongside curly bracket syntax |
+| Curly bracket blocks `{}` | ✅ Implemented | Supported alongside indentation syntax |
 | Both syntaxes mixed | ✅ Implemented | Can be used in the same file |
 
 ### Built-in Libraries

@@ -1,22 +1,25 @@
-# Example: Hielements V3 Syntax
-# Demonstrates the new V3 language features:
-# - Curly brackets { } for block delimiters instead of colons and indentation
-# - 'ref' keyword instead of 'connection_point'
-# - 'uses' keyword for declaring dependencies between elements/scopes
+# Example: Hielements Syntax
+# Demonstrates key language features:
+# - Curly brackets { } for block delimiters
+# - Indentation-based blocks (both styles are supported)
+# - 'ref' keyword for reference points
+# - 'uses' keyword for declaring dependencies
+# - Angular brackets for language annotations: scope module<rust>
+# - 'binds' keyword for connecting scopes to patterns
 
 import files
 import rust
 
 ###
 Compiler Core
-Demonstrates the new V3 syntax with curly brackets and uses declarations.
+Demonstrates curly bracket syntax and uses declarations.
 ###
 element core {
     ## Lexer - tokenizes .hie source files
     element lexer {
         scope module = rust.module_selector('lexer')
         
-        # Refs (formerly connection_point) - what the lexer produces
+        ## Refs - what the lexer produces
         ref token_output: Token = rust.struct_selector('Token')
         ref token_kinds: TokenKind = rust.enum_selector('TokenKind')
         
@@ -29,7 +32,7 @@ element core {
         scope module = rust.module_selector('parser')
         scope lexer_module = rust.module_selector('lexer')
         
-        # The lexer_module scope uses (depends on) the lexer element
+        ## The lexer_module scope uses (depends on) the lexer element
         lexer_module uses lexer
         
         ref ast_output: Program = rust.struct_selector('Program')
@@ -42,7 +45,7 @@ element core {
     element interpreter {
         scope module = rust.module_selector('interpreter')
         
-        # Interpreter uses parser (for AST types)
+        ## Interpreter uses parser (for AST types)
         module uses parser
         
         ref check_output: CheckResult = rust.enum_selector('CheckResult')
@@ -52,16 +55,16 @@ element core {
 }
 
 ###
-Pattern with V3 syntax
-Shows that patterns also work with curly brackets
+Observable Pattern
+Shows patterns using curly brackets, with unbounded scopes and refs.
 ###
-template observable {
+pattern observable {
     allows language rust
     
     element metrics {
-        # Unbounded scope in pattern
+        ## Unbounded scope in pattern - must be bound by implementing elements
         scope module<rust>
-        # Unbounded ref in pattern
+        ## Unbounded ref in pattern - must be bound by implementing elements
         ref prometheus: MetricsHandler
         
         check rust.function_exists(module, 'metrics_handler')
@@ -69,23 +72,30 @@ template observable {
 }
 
 ###
-Element implementing pattern with V3 syntax
+Payments Service implementing the observable pattern
 ###
 element payments_service implements observable {
     scope root = files.folder_selector('src/payments')
     
-    # Bind scope using new syntax
+    ## Bind scope using angular bracket language annotation and binds keyword
     scope metrics_mod<rust> binds observable.metrics.module = rust.module_selector('payments::metrics')
     
-    # Bind ref (not connection_point)
+    ## Bind ref
     ref handler: MetricsHandler binds observable.metrics.prometheus = rust.function_selector(metrics_mod, 'handler')
     
     element api {
         scope module<rust> = rust.module_selector('payments::api')
         
-        # API uses the metrics module
+        ## API uses the metrics module
         module uses metrics_mod
         
         check rust.function_exists(module, 'process_payment')
     }
 }
+
+## Simple element using indentation syntax (both styles are supported)
+element simple_service:
+    scope src<rust> = rust.module_selector('simple_service')
+    ref api: HttpHandler = rust.public_functions(src)
+    
+    check rust.function_exists(src, 'handle_request')

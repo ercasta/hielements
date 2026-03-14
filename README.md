@@ -53,7 +53,7 @@ Imagine a microservice with Python code and a Dockerfile. You want to ensure:
 
 ```hielements
 element orders_service:
-    # Define scopes with language annotations (V2 syntax)
+    # Define scopes with language annotations
     scope python_module<python> = python.module_selector('orders')
     scope dockerfile<docker> = docker.file_selector('orders_service.dockerfile')
     
@@ -76,18 +76,18 @@ Define architectural patterns once and reuse them across your codebase:
 ```hielements
 pattern compiler {
     element lexer {
-        scope module<rust>  # Unbounded scope (V2)
+        scope module<rust>  # Unbounded scope in pattern
         ref tokens: TokenStream
     }
     element parser {
-        scope module<rust>  # Unbounded scope (V2)
+        scope module<rust>  # Unbounded scope in pattern
         ref ast: AbstractSyntaxTree
     }
     check compiler.lexer.tokens.compatible_with(compiler.parser.input)
 }
 
 element python_compiler implements compiler {
-    # Bind pattern scopes using V2 binds keyword
+    # Bind pattern scopes using binds keyword
     scope lexer_mod<rust> binds compiler.lexer.module = rust.module_selector('pycompiler::lexer')
     ref lexer_tokens: TokenStream binds compiler.lexer.tokens = rust.function_selector(lexer_mod, 'tokenize')
     
@@ -270,7 +270,7 @@ Reject PRs that violate architectural rules.
 ### 1. Define Elements (Descriptive)
 
 Elements represent logical components with:
-- **Scope**: What code/artifacts belong to this element (with V2 language annotations like `<rust>`)
+- **Scope**: What code/artifacts belong to this element (with language annotations like `<rust>`)
 - **Connection Points**: APIs, interfaces, or dependencies the element exposes
 - **Children**: Sub-elements for hierarchical composition
 
@@ -504,7 +504,7 @@ Check out our [Contributing Guide](CONTRIBUTING.md) (coming soon).
 - **Multi-level**: From high-level system design to low-level module structure
 - **Flexible**: Support both description (documenting what exists) and prescription (enforcing what should be)
 
-**Hielements V2 makes this possible** through:
+**Hielements makes this possible** through:
 - **Descriptive mode**: Document your architecture without enforcement
 - **Prescriptive mode**: Use patterns and checks to enforce architectural rules
 - **Hybrid approach**: Mix both modes as needed for different parts of your system
