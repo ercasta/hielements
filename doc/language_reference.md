@@ -22,21 +22,22 @@ It is possible to use only the descriptive part without the prescriptive one; in
 2. [Program Structure](#2-program-structure)
 3. [Elements](#3-elements)
 4. [Scopes](#4-scopes)
-5. [Connection Points](#5-connection-points)
-6. [Rules (Checks)](#6-rules-checks)
-7. [Children Elements](#7-children-elements)
-8. [Patterns](#8-patterns)
-9. [Language Declarations](#9-language-declarations)
-10. [Imports and Modules](#10-imports-and-modules)
-11. [Expressions](#11-expressions)
-12. [Built-in Libraries](#12-built-in-libraries)
-13. [Comments](#13-comments)
-14. [Complete Grammar](#14-complete-grammar)
-15. [Examples](#15-examples)
-16. [Appendix A: Error Messages](#appendix-a-error-messages)
-17. [Appendix B: CLI Reference](#appendix-b-cli-reference)
-18. [Appendix C: Best Practices](#appendix-c-best-practices)
-19. [Appendix D: Migration Guide from V1](#appendix-d-migration-guide-from-v1)
+5. [Refs](#5-refs-formerly-connection-points)
+6. [Uses Declarations](#6-uses-declarations-v3)
+7. [Rules (Checks)](#7-rules-checks)
+8. [Children Elements](#8-children-elements)
+9. [Patterns](#9-patterns)
+10. [Language Declarations](#10-language-declarations)
+11. [Imports and Modules](#11-imports-and-modules)
+12. [Expressions](#12-expressions)
+13. [Built-in Libraries](#13-built-in-libraries)
+14. [Comments](#14-comments)
+15. [Complete Grammar](#15-complete-grammar)
+16. [Examples](#16-examples)
+17. [Appendix A: Error Messages](#appendix-a-error-messages)
+18. [Appendix B: CLI Reference](#appendix-b-cli-reference)
+19. [Appendix C: Best Practices](#appendix-c-best-practices)
+20. [Appendix D: Migration Guide (V1/V2 → V3)](#appendix-d-migration-guide-v1v2--v3)
 
 ---
 
@@ -78,7 +79,7 @@ The following are reserved keywords:
 |---------|-------------|
 | `element` | Declares an element |
 | `pattern` | Declares a pattern (reusable architectural blueprint, preferred in V3) |
-| `template` | Declares a pattern (supported for backward compatibility, prefer `pattern`) THIS HAS TO BE REMOVED|
+| `template` | Declares a pattern (supported for backward compatibility, prefer `pattern`) |
 | `implements` | Declares that an element implements pattern(s) |
 | `binds` | Binds a scope/ref to a pattern declaration |
 | `scope` | Declares a scope selector |
@@ -479,11 +480,11 @@ Different libraries expose different types of connection points:
 
 ---
 
-## 5a. Uses Declarations (V3)
+## 6. Uses Declarations (V3)
 
 Uses declarations explicitly declare dependencies between elements or scopes. This makes architectural dependencies visible and verifiable.
 
-### 5a.1 Syntax
+### 6.1 Syntax
 
 ```
 uses_declaration ::= identifier 'uses' qualified_identifier
@@ -491,7 +492,7 @@ uses_declaration ::= identifier 'uses' qualified_identifier
 
 Where `qualified_identifier` is a path like `lexer` or `core.lexer`.
 
-### 5a.2 Basic Uses Declarations
+### 6.2 Basic Uses Declarations
 
 ```hielements
 element core {
@@ -509,7 +510,7 @@ element core {
 }
 ```
 
-### 5a.3 Qualified Target Paths
+### 6.3 Qualified Target Paths
 
 Uses declarations can reference elements using qualified paths:
 
@@ -522,7 +523,7 @@ element parser {
 }
 ```
 
-### 5a.4 Uses Semantics
+### 6.4 Uses Semantics
 
 - Uses declarations are **explicit** - they document architectural dependencies
 - The source identifier must be a **scope** defined in the same element
@@ -532,17 +533,17 @@ element parser {
 
 ---
 
-## 6. Rules (Checks)
+## 7. Rules (Checks)
 
 Checks enforce architectural rules. They are the mechanism by which Hielements validates your codebase against specifications.
 
-### 6.1 Syntax
+### 7.1 Syntax
 
 ```
 check_declaration ::= 'check' function_call
 ```
 
-### 6.2 Basic Checks
+### 7.2 Basic Checks
 
 ```hielements
 element my_service:
@@ -559,7 +560,7 @@ element my_service:
     check python.no_circular_imports(src)
 ```
 
-### 6.3 Check Categories
+### 7.3 Check Categories
 
 #### Existence Checks
 Verify that something exists:
@@ -597,7 +598,7 @@ check python.no_circular_imports(module)
 check docker.no_root_user(dockerfile)
 ```
 
-### 6.4 Check Results
+### 7.4 Check Results
 
 Checks produce one of three results:
 
@@ -607,7 +608,7 @@ Checks produce one of three results:
 | **Fail** | The check failed (architectural violation) |
 | **Error** | The check could not be evaluated (e.g., file not found) |
 
-### 6.5 Check Semantics
+### 7.5 Check Semantics
 
 - Checks are evaluated **after** all scopes are resolved
 - Checks are **independent** - one failing check doesn't prevent others from running
@@ -616,11 +617,11 @@ Checks produce one of three results:
 
 ---
 
-## 7. Children Elements
+## 8. Children Elements
 
 Elements can contain nested (children) elements to create hierarchical structures.
 
-### 7.1 Syntax
+### 8.1 Syntax
 
 Nested elements are declared inside a parent element:
 
@@ -633,7 +634,7 @@ element parent:
         # child_b body
 ```
 
-### 7.2 Hierarchical Example
+### 8.2 Hierarchical Example
 
 ```hielements
 element ecommerce_platform:
@@ -653,7 +654,7 @@ element ecommerce_platform:
     check python.can_import(orders_service.module, payments_service.module)
 ```
 
-### 7.3 Referencing Children
+### 8.3 Referencing Children
 
 Children elements are referenced using dot notation:
 
@@ -669,7 +670,7 @@ element system:
         check python.imports(module, service_a.api)
 ```
 
-### 7.4 Scope Inheritance
+### 8.4 Scope Inheritance
 
 Children elements inherit the context of their parent but have their own scope:
 
@@ -686,21 +687,21 @@ element microservices:
 
 ---
 
-## 8. Patterns
+## 9. Patterns
 
-Patterns (declared with the `template` keyword) allow creating reusable architectural blueprints that define conformance requirements. Patterns establish structural constraints that elements can implement with concrete scopes and checks.
+Patterns (declared with the `pattern` keyword) allow creating reusable architectural blueprints that define conformance requirements. Patterns establish structural constraints that elements can implement with concrete scopes and checks.
 
-> **Note**: The `template` keyword is used for declaring patterns. The term "pattern" better reflects the intent: defining architectural patterns that implementations must conform to. See the [Pattern Catalog](patterns_catalog.md) for an extensive collection of common software engineering patterns.
+> **Note**: The `pattern` keyword is preferred in V3. The `template` keyword is still supported for backward compatibility. See the [Pattern Catalog](patterns_catalog.md) for an extensive collection of common software engineering patterns.
 
-In V2, patterns define **unbounded** scopes that serve as placeholders, while implementing elements use the **`binds`** keyword to provide concrete bindings.
+Patterns define **unbounded** scopes that serve as placeholders, while implementing elements use the **`binds`** keyword to provide concrete bindings.
 
-### 8.1 Pattern Declaration (V2)
+### 9.1 Pattern Declaration
 
-Patterns are declared using the `template` keyword and define a structure with **unbounded scopes**:
+Patterns are declared using the `pattern` keyword (or `template` for backward compatibility) and define a structure with **unbounded scopes**:
 
 ```hielements
-pattern observable:
-    element metrics implements measurable:
+pattern observable {
+    element metrics implements measurable {
         allows language rust
         
         # Unbounded scope - angular brackets specify language
@@ -708,14 +709,17 @@ pattern observable:
         ref prometheus: MetricsHandler
         
         check files.exists(module, 'Cargo.toml')
+    }
+}
 ```
 
-**Key V2 Changes:**
+**Key features:**
 - Scopes in patterns are **unbounded** (no `=` expression)
 - Language is specified via **angular brackets** (`<rust>`)
 - Patterns can include `allows`/`requires`/`forbids` constraints
+- Both `pattern` and `template` keywords are accepted (`pattern` is preferred in V3)
 
-### 8.2 Implementing Patterns with `binds` (V2)
+### 9.2 Implementing Patterns with `binds`
 
 Elements implement patterns using the `implements` keyword, then use **`binds`** to connect their scopes:
 
@@ -730,7 +734,7 @@ element observable_component implements observable:
 
 The `binds` keyword creates an explicit connection between the element's scope and the pattern's placeholder.
 
-### 8.3 Descriptive-Only Mode
+### 9.3 Descriptive-Only Mode
 
 The `implements` and `binds` keywords are **optional**. When omitted, Hielements operates in "descriptive-only" mode without prescriptive enforcement:
 
@@ -741,7 +745,7 @@ element simple_component:
     check rust.function_exists(src, 'main')
 ```
 
-### 8.4 Absolute References
+### 9.4 Absolute References
 
 Pattern properties are referenced using absolute paths prefixed with the pattern name (e.g., `observable.metrics`). This prevents name clashes when implementing multiple patterns:
 
@@ -765,7 +769,7 @@ element my_service implements microservice, observable:
     check microservice.api.rest_endpoint.port != observable.api.metrics_endpoint.port
 ```
 
-### 8.5 Multiple Pattern Implementation
+### 9.5 Multiple Pattern Implementation
 
 An element can implement multiple patterns:
 
@@ -789,7 +793,7 @@ element production_service implements microservice, resilient, secured:
     scope auth<rust> binds secured.authentication.module = rust.module_selector('auth')
 ```
 
-### 8.6 Pattern Requirements
+### 9.6 Pattern Requirements
 
 When implementing a pattern, all unbounded scopes must be bound:
 
@@ -816,7 +820,7 @@ element incomplete_service implements web_service:
     # ERROR: web_service.backend bindings missing
 ```
 
-### 8.7 Pattern Checks
+### 9.7 Pattern Checks
 
 Checks defined in patterns are automatically included when the pattern is implemented. The checks use absolute references and are evaluated with the concrete bindings:
 
@@ -841,7 +845,7 @@ element orders_service implements microservice:
     # The pattern checks are automatically evaluated with bound scopes
 ```
 
-### 8.8 Library-Defined Patterns
+### 9.8 Library-Defined Patterns
 
 Patterns can be defined in external libraries and imported for use:
 
@@ -857,7 +861,7 @@ element my_service implements architecture_patterns.hexagonal:
 
 External libraries can provide patterns via the library protocol. See the [External Library Plugin Guide](external_libraries.md) for details.
 
-### 8.9 Pattern Semantics (V2)
+### 9.9 Pattern Semantics
 
 - Patterns define **structure** with **unbounded scopes**
 - Elements implementing patterns use **`binds`** to connect scopes
@@ -868,7 +872,7 @@ External libraries can provide patterns via the library protocol. See the [Exter
 - Patterns **cannot be nested** (a pattern cannot implement another pattern)
 - Pattern names must be **unique** within their scope
 
-### 8.10 Pattern-Level Connection Points
+### 9.10 Pattern-Level Connection Points
 
 Patterns can declare connection points at the pattern level (not just within child elements). These connection points can be used in pattern checks and must be bound when implementing the pattern.
 
@@ -911,7 +915,7 @@ element payments_service implements microservice:
 - **Type Safety**: Connection points have type annotations ensuring correctness
 - **Clarity**: Makes pattern dependencies and parameters explicit
 
-### 8.11 Hierarchical Checks
+### 9.11 Hierarchical Checks
 
 Hierarchical checks allow parent elements to prescribe requirements that must be satisfied by at least one of their descendants (children, grandchildren, etc.). This is useful for expressing architectural constraints that span multiple levels of the hierarchy.
 
@@ -994,7 +998,7 @@ pattern microservice:
     requires descendant element metrics implements observable
 ```
 
-### 8.12 Connection Boundaries
+### 9.12 Connection Boundaries
 
 Connection boundaries allow specifying constraints on architectural dependencies (imports/dependencies) between elements. These boundaries are inherited by all descendants. **Note**: "Connections" refer to logical/architectural dependencies like module imports, not network connections.
 
@@ -1096,7 +1100,7 @@ When A is allowed to connect to B, and B is allowed to connect to C:
 - Wildcards (`.*`) match **any path suffix** (library-specific interpretation)
 - Actual verification is **language-specific** - libraries check imports/dependencies
 
-### 8.12 Language Constraints
+### 9.13 Language Constraints
 
 Patterns can constrain which programming languages elements may use through `requires`, `allows`, and `forbids` with the `language` keyword:
 
@@ -1118,11 +1122,11 @@ When an element implements a pattern with language constraints:
 
 ---
 
-## 9. Language Declarations
+## 10. Language Declarations
 
 Language declarations define supported languages and their connection verification checks.
 
-### 9.1 Simple Language Declaration
+### 10.1 Simple Language Declaration
 
 A simple language declaration just registers a language name:
 
@@ -1132,7 +1136,7 @@ language rust
 language java
 ```
 
-### 9.2 Language with Connection Checks
+### 10.2 Language with Connection Checks
 
 Languages can define connection checks that verify connections between scopes:
 
@@ -1149,7 +1153,7 @@ language rust:
         rust.dependency_exists(source, target)
 ```
 
-### 9.3 Connection Check Semantics
+### 10.3 Connection Check Semantics
 
 Connection checks:
 - Accept `scope[]` parameters representing arrays of scopes
@@ -1157,7 +1161,7 @@ Connection checks:
 - Are automatically applied recursively along the parent-children hierarchy
 - Are language-specific - only applied to scopes with matching language annotation
 
-### 9.4 Connection Verification Process
+### 10.4 Connection Verification Process
 
 When verifying element connections:
 1. For each language used by an element, gather all scopes of that language
@@ -1190,11 +1194,11 @@ The `can_import` check will verify that:
 
 ---
 
-## 10. Imports and Modules
+## 11. Imports and Modules
 
 Imports bring libraries and other Hielements specifications into scope.
 
-### 8.1 Library Imports
+### 11.1 Library Imports
 
 ```hielements
 # Import entire library
@@ -1209,7 +1213,7 @@ import kubernetes as k8s
 from python import module_selector, function_exists
 ```
 
-### 8.2 File Imports
+### 11.2 File Imports
 
 Import other Hielements files:
 
@@ -1221,14 +1225,14 @@ import './modules/backend.hie'
 import './shared/common.hie' as common
 ```
 
-### 8.3 Import Resolution
+### 11.3 Import Resolution
 
 Import paths are resolved:
 1. **Bare imports** (`import python`) - Look up in library registry
 2. **Relative paths** (`import './foo.hie'`) - Relative to current file
 3. **Absolute paths** (`import '/path/to/foo.hie'`) - Absolute filesystem path
 
-### 8.4 Built-in Libraries
+### 11.4 Built-in Libraries
 
 The following libraries are built-in:
 
@@ -1237,7 +1241,7 @@ The following libraries are built-in:
 | `files` | File and folder operations |
 | `rust` | Rust code analysis |
 
-### 8.5 External Libraries (Plugins)
+### 11.5 External Libraries (Plugins)
 
 Hielements supports user-defined libraries through external processes. External libraries are configured in a `hielements.toml` file in your workspace root.
 
@@ -1267,11 +1271,11 @@ External libraries communicate via JSON-RPC 2.0 over stdin/stdout. See the [Exte
 
 ---
 
-## 10. Expressions
+## 12. Expressions
 
 Expressions compute values for scopes, connection points, and check arguments.
 
-### 9.1 Literal Expressions
+### 12.1 Literal Expressions
 
 ```hielements
 "string literal"
@@ -1283,14 +1287,14 @@ false
 ['list', 'of', 'items']
 ```
 
-### 9.2 Identifier References
+### 12.2 Identifier References
 
 ```hielements
 my_scope                    # Reference a scope
 parent.child.connection_pt  # Qualified reference
 ```
 
-### 9.3 Function Calls
+### 12.3 Function Calls
 
 ```hielements
 python.module_selector('orders')
@@ -1298,7 +1302,7 @@ docker.exposes_port(dockerfile, 8080)
 files.glob_selector('**/*.py')
 ```
 
-### 9.4 Member Access
+### 12.4 Member Access
 
 ```hielements
 element.connection_point
@@ -1306,7 +1310,7 @@ library.function
 parent.child.scope
 ```
 
-### 9.5 List Expressions
+### 12.5 List Expressions
 
 ```hielements
 check docker.exposes_ports(dockerfile, [80, 443, 8080])
@@ -1314,9 +1318,9 @@ check docker.exposes_ports(dockerfile, [80, 443, 8080])
 
 ---
 
-## 11. Built-in Libraries
+## 13. Built-in Libraries
 
-### 11.1 `files` Library
+### 13.1 `files` Library
 
 The `files` library provides selectors and checks for files and folders.
 
@@ -1351,7 +1355,7 @@ element source_code:
     check files.no_files_matching(src, '__pycache__')
 ```
 
-### 11.2 `python` Library
+### 13.2 `python` Library
 
 The `python` library provides analysis for Python code.
 
@@ -1397,7 +1401,7 @@ element api_module:
     check python.has_docstring(public_api)
 ```
 
-### 11.3 `docker` Library
+### 13.3 `docker` Library
 
 The `docker` library provides analysis for Dockerfiles.
 
@@ -1445,9 +1449,9 @@ element containerized_service:
 
 ---
 
-## 12. Comments
+## 14. Comments
 
-### 12.1 Single-line Comments
+### 14.1 Single-line Comments
 
 ```hielements
 # This is a comment
@@ -1455,7 +1459,7 @@ element my_service:  # Inline comment
     scope src = files.folder_selector('src/')  # Another comment
 ```
 
-### 12.2 Multi-line Comments
+### 14.2 Multi-line Comments
 
 ```hielements
 ###
@@ -1466,7 +1470,7 @@ element my_service:
     scope src = files.folder_selector('src/')
 ```
 
-### 12.3 Documentation Comments
+### 14.3 Documentation Comments
 
 Documentation comments (doc comments) provide descriptions for elements:
 
@@ -1480,7 +1484,7 @@ element orders_service:
 
 ---
 
-## 14. Complete Grammar (V2)
+## 15. Complete Grammar (V3)
 
 The following is the complete EBNF grammar for Hielements V2:
 
@@ -1598,9 +1602,9 @@ DEDENT             ::= <decrease in indentation level>
 
 ---
 
-## 15. Examples
+## 16. Examples
 
-### 15.1 Simple Service (V2)
+### 16.1 Simple Service
 
 ```hielements
 import files
@@ -1628,7 +1632,7 @@ element orders_service:
     check files.exists(dockerfile, 'Dockerfile')
 ```
 
-### 15.2 Pattern with Unbounded Scopes (V2)
+### 16.2 Pattern with Unbounded Scopes
 
 ```hielements
 import files
@@ -1655,7 +1659,7 @@ element metrics_service implements observable:
     ref handler: MetricsHandler binds observable.metrics.prometheus = rust.function_selector(metrics_mod, 'handler')
 ```
 
-### 15.3 Microservices Architecture (V2)
+### 16.3 Microservices Architecture
 
 ```hielements
 import files
@@ -1700,7 +1704,7 @@ element ecommerce_platform:
     check rust.no_dependency(payments_service.api_mod, orders_service.api_mod)
 ```
 
-### 15.4 Hexagonal Architecture
+### 16.4 Hexagonal Architecture
 
 ```hielements
 import files
@@ -1748,7 +1752,7 @@ element hexagonal_app:
         check rust.imports(module, domain.module)
 ```
 
-### 15.5 Infrastructure Validation
+### 16.5 Infrastructure Validation
 
 ```hielements
 import files
@@ -1781,7 +1785,7 @@ element infrastructure:
         check files.no_files_matching(config_dir, '*password*')
 ```
 
-### 15.6 Testing Requirements
+### 16.6 Testing Requirements
 
 ```hielements
 import files
@@ -1810,7 +1814,7 @@ element testing_standards:
         check rust.function_exists(tests, 'test_create_order')
 ```
 
-### 15.7 Patterns (V2)
+### 16.7 Patterns
 
 ```hielements
 import files
@@ -1975,13 +1979,13 @@ hielements check --format sarif architecture.hie
 
 ---
 
-## Appendix D: Migration Guide from V1
+## Appendix D: Migration Guide (V1/V2 → V3)
 
-This section helps migrate existing Hielements V1 code to V2 syntax.
+This section helps migrate existing Hielements code to V3 syntax.
 
-### D.1 Overview of Changes
+### D.1 Overview of Changes (V1 → V2/V3)
 
-| Feature | V1 Syntax | V2 Syntax |
+| Feature | V1 Syntax | V3 Syntax |
 |---------|-----------|-----------|
 | Language annotation | `scope name : lang = expr` | `scope name<lang> = expr` |
 | Template scopes | `scope name = expr` | `scope name<lang>` (unbounded) |
@@ -2114,10 +2118,92 @@ element orders implements microservice:
 
 ### D.8 Backward Compatibility Note
 
-**Hielements V2 is NOT backward compatible with V1.** The V1 syntax is deprecated and no longer supported. All existing V1 code must be migrated to V2 syntax.
+**Hielements V2 syntax is NOT backward compatible with V1.** The V1 syntax is deprecated and no longer supported. All existing V1 code must be migrated.
 
-The key philosophy changes:
+The key philosophy changes (V1 → V3):
 - **Patterns are prescriptive** - they define structure without implementation
 - **Elements are descriptive** - they bind to actual code
 - **`binds` makes connections explicit** - clearer separation of concerns
 - **Angular brackets for language** - more consistent with type syntax conventions
+
+---
+
+### D.9 V2 → V3 Migration
+
+V3 introduces new syntactic features while remaining backward compatible with V2. V2 code continues to work in V3.
+
+#### New Features in V3
+
+| Feature | Description |
+|---------|-------------|
+| Curly bracket syntax `{}` | Alternative to indentation-based blocks |
+| `ref` keyword | Preferred over `connection_point` for declaring reference points |
+| `uses` declarations | Explicit dependency declarations between elements/scopes |
+| `pattern` keyword | Preferred over `template` for declaring patterns |
+
+#### Updating `connection_point` to `ref`
+
+**V2:**
+```hielements
+element api_server:
+    scope module = python.module_selector('api')
+    connection_point rest_api: HttpHandler = python.public_functions(module)
+```
+
+**V3 (preferred):**
+```hielements
+element api_server {
+    scope module = python.module_selector('api')
+    ref rest_api: HttpHandler = python.public_functions(module)
+}
+```
+
+**Migration**: Replace `connection_point` with `ref`. Both keywords are still supported.
+
+#### Updating `template` to `pattern`
+
+**V2:**
+```hielements
+template microservice:
+    element api:
+        scope module<rust>
+```
+
+**V3 (preferred):**
+```hielements
+pattern microservice {
+    element api {
+        scope module<rust>
+    }
+}
+```
+
+**Migration**: Replace `template` with `pattern`. Both keywords are still supported.
+
+#### Adding `uses` Declarations
+
+V3 allows explicit dependency declarations to make architectural relationships visible:
+
+```hielements
+element core {
+    element lexer {
+        scope module = rust.module_selector('lexer')
+    }
+
+    element parser {
+        scope module = rust.module_selector('parser')
+        scope lexer_module = rust.module_selector('lexer')
+
+        ## Explicit dependency: parser uses lexer
+        lexer_module uses lexer
+    }
+}
+```
+
+#### V2 → V3 Migration Checklist
+
+- [ ] (Optional) Replace `connection_point` with `ref`
+- [ ] (Optional) Replace `template` with `pattern`
+- [ ] (Optional) Convert indentation-based blocks to curly brackets `{}`
+- [ ] (Optional) Add `uses` declarations to document explicit dependencies
+- [ ] Test that all checks pass after migration
