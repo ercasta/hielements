@@ -49,7 +49,7 @@ pub struct Template {
     pub name: Identifier,
     /// Scope declarations
     pub scopes: Vec<ScopeDeclaration>,
-    /// Ref declarations (formerly connection_point)
+    /// Ref declarations
     pub refs: Vec<RefDeclaration>,
     /// Check declarations
     pub checks: Vec<CheckDeclaration>,
@@ -92,7 +92,7 @@ pub struct Element {
     pub implements: Vec<TemplateImplementation>,
     /// Scope declarations
     pub scopes: Vec<ScopeDeclaration>,
-    /// Ref declarations (formerly connection_point, renamed to avoid confusion with uses)
+    /// Ref declarations
     pub refs: Vec<RefDeclaration>,
     /// Uses declarations - dependencies on other elements or scopes
     pub uses: Vec<UsesDeclaration>,
@@ -108,7 +108,7 @@ pub struct Element {
     pub span: Span,
 }
 
-/// A scope declaration (V2 supports unbounded scopes and bindings).
+/// A scope declaration (supports unbounded scopes and bindings).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScopeDeclaration {
     /// Scope name
@@ -123,8 +123,7 @@ pub struct ScopeDeclaration {
     pub span: Span,
 }
 
-/// A ref declaration (V2 supports unbounded refs and bindings).
-/// Renamed from connection_point to avoid confusion with 'uses' declarations.
+/// A ref declaration (supports unbounded refs and bindings).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RefDeclaration {
     /// Ref name
@@ -138,9 +137,6 @@ pub struct RefDeclaration {
     /// Source span
     pub span: Span,
 }
-
-/// Type alias for backward compatibility
-pub type ConnectionPointDeclaration = RefDeclaration;
 
 /// A uses declaration - declares that this element/scope uses another element or scope.
 /// This represents a dependency relationship (calling/importing).
@@ -278,10 +274,10 @@ impl BooleanLiteral {
 // New Unified Syntax Types
 // ============================================================================
 
-/// Unified component requirement that supports the new syntax:
+/// Unified component requirement that supports the syntax:
 /// `requires [descendant] element name [: Type] [implements template]`
 /// `allows [descendant] connection to pattern`
-/// `forbids [descendant] connection_point name: Type`
+/// `forbids [descendant] ref name: Type`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComponentRequirement {
     /// The action: requires, allows, or forbids
@@ -325,7 +321,7 @@ pub enum ComponentSpec {
     },
     /// Connection requirement: `connection to pattern` (deprecated, use UsesDeclaration)
     Connection(ConnectionPattern),
-    /// Ref requirement: `ref name: Type [= expr]` (formerly connection_point)
+    /// Ref requirement: `ref name: Type [= expr]`
     Ref {
         /// Ref name
         name: Identifier,

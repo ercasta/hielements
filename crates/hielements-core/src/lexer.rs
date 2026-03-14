@@ -14,9 +14,6 @@ pub enum TokenKind {
     #[token("element")]
     Element,
 
-    #[token("template")]
-    Template,
-
     #[token("pattern")]
     Pattern,
 
@@ -28,9 +25,6 @@ pub enum TokenKind {
 
     #[token("scope")]
     Scope,
-
-    #[token("connection_point")]
-    ConnectionPoint,
 
     #[token("ref")]
     Ref,
@@ -418,16 +412,16 @@ mod tests {
 
     #[test]
     fn test_keywords() {
-        let source = "element template implements scope connection_point check import from as true false";
+        let source = "element pattern implements scope ref check import from as true false";
         let mut lexer = Lexer::new(source);
         let tokens = lexer.tokenize();
 
         let kinds: Vec<_> = tokens.iter().map(|t| &t.kind).collect();
         assert!(kinds.contains(&&TokenKind::Element));
-        assert!(kinds.contains(&&TokenKind::Template));
+        assert!(kinds.contains(&&TokenKind::Pattern));
         assert!(kinds.contains(&&TokenKind::Implements));
         assert!(kinds.contains(&&TokenKind::Scope));
-        assert!(kinds.contains(&&TokenKind::ConnectionPoint));
+        assert!(kinds.contains(&&TokenKind::Ref));
         assert!(kinds.contains(&&TokenKind::Check));
         assert!(kinds.contains(&&TokenKind::Import));
         assert!(kinds.contains(&&TokenKind::From));
@@ -437,13 +431,13 @@ mod tests {
     }
 
     #[test]
-    fn test_template_keyword() {
-        let source = "template compiler:\n    element lexer";
+    fn test_pattern_keyword() {
+        let source = "pattern compiler:\n    element lexer";
         let mut lexer = Lexer::new(source);
         let tokens = lexer.tokenize();
 
         let kinds: Vec<_> = tokens.iter().map(|t| &t.kind).collect();
-        assert!(kinds.contains(&&TokenKind::Template));
+        assert!(kinds.contains(&&TokenKind::Pattern));
         assert!(kinds.contains(&&TokenKind::Identifier));
         assert!(kinds.contains(&&TokenKind::Colon));
         assert!(kinds.contains(&&TokenKind::Element));
@@ -544,7 +538,7 @@ mod tests {
     }
 
     #[test]
-    fn test_v2_scope_with_binds() {
+    fn test_scope_with_binds() {
         let source = "scope main_module<rust> binds observable.metrics.module = rust.module_selector('api')";
         let mut lexer = Lexer::new(source);
         let tokens = lexer.tokenize();
