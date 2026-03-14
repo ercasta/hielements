@@ -1,8 +1,6 @@
-## Hielements Self-Description (V3 Syntax)
+## Hielements Self-Description
 ## This file describes the structure of the Hielements project itself,
 ## demonstrating the language's ability to model hierarchical software systems.
-##
-## V3 syntax: curly brackets, ref, and uses keywords
 ##
 ## Hielements is primarily a CLI tool. The project structure is:
 ## - crates/hielements-core  - Core library (lexer, parser, AST, interpreter, stdlib)
@@ -75,7 +73,7 @@ element hielements {
             check rust.struct_exists('Element')
             check rust.enum_exists('Expression')
             
-            ## Pattern support structures (patterns are declared with `template` keyword)
+            ## Pattern support structures (patterns are declared with `pattern` keyword)
             check rust.struct_exists('Template')
             check rust.struct_exists('TemplateImplementation')
             check rust.struct_exists('TemplateBinding')
@@ -86,7 +84,7 @@ element hielements {
             check rust.enum_exists('ComponentSpec')
             check rust.struct_exists('ConnectionPattern')
             
-            ## V3 ref and uses declaration structures
+            ## Ref and uses declaration structures
             check rust.struct_exists('RefDeclaration')
             check rust.struct_exists('UsesDeclaration')
             
@@ -368,8 +366,7 @@ element hielements {
         check files.exists(examples, 'hierarchical.hie')
         check files.exists(examples, 'language_example.hie')
         check files.exists(examples, 'python_example.hie')
-        check files.exists(examples, 'v2_syntax_example.hie')
-        check files.exists(examples, 'v3_syntax_example.hie')
+        check files.exists(examples, 'syntax_example.hie')
         check files.exists(examples, 'hielements.toml')
         check files.exists(examples, 'hielements_hybrid.toml')
     }
