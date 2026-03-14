@@ -177,7 +177,7 @@ element containerized_service:
 
 ## Using Patterns
 
-Patterns are reusable architectural blueprints that can be instantiated with concrete implementations. Patterns (declared with the `template` keyword) help enforce consistent structure across similar components.
+Patterns are reusable architectural blueprints that can be instantiated with concrete implementations. Patterns (declared with the `pattern` keyword) help enforce consistent structure across similar components.
 
 > 📚 **See the [Pattern Catalog](doc/patterns_catalog.md)** for an extensive collection of common software engineering patterns with their Hielements implementations.
 

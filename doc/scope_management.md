@@ -114,7 +114,7 @@ element system:
 
 ### Pattern Placeholders
 
-Patterns (declared with `template`) define scope placeholders that implementations must bind:
+Patterns (declared with `pattern`) define scope placeholders that implementations must bind:
 
 ```hielements
 pattern microservice:

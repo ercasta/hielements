@@ -123,14 +123,14 @@ impl Interpreter {
         file_path: &str,
         diagnostics: &mut Diagnostics,
     ) {
-        // Validate scopes (expression is optional for unbounded scopes in V2)
+        // Validate scopes (expression is optional for unbounded scopes in patterns)
         for scope in &template.scopes {
             if let Some(ref expr) = scope.expression {
                 self.validate_expression(expr, file_path, diagnostics);
             }
         }
 
-        // Validate refs (expression is optional for unbounded in V2)
+        // Validate refs (expression is optional for unbounded in patterns)
         for r in &template.refs {
             if let Some(ref expr) = r.expression {
                 self.validate_expression(expr, file_path, diagnostics);
@@ -172,14 +172,14 @@ impl Interpreter {
             let _ = template_impl; // Acknowledge the field
         }
 
-        // Validate scopes (expression is optional for unbounded scopes in V2)
+        // Validate scopes (expression is optional for unbounded scopes in patterns)
         for scope in &element.scopes {
             if let Some(ref expr) = scope.expression {
                 self.validate_expression(expr, file_path, diagnostics);
             }
         }
 
-        // Validate refs (expression is optional for unbounded in V2)
+        // Validate refs (expression is optional for unbounded in patterns)
         for r in &element.refs {
             if let Some(ref expr) = r.expression {
                 self.validate_expression(expr, file_path, diagnostics);
@@ -326,7 +326,7 @@ impl Interpreter {
             if options.verbose {
                 eprintln!("[verbose] Evaluating scope: {}", scope_name);
             }
-            // V2: expression is optional for unbounded scopes
+            // Expression is optional for unbounded scopes in patterns
             if let Some(ref expr) = scope.expression {
                 match self.evaluate_expression(expr) {
                     Ok(value) => {

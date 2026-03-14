@@ -1,6 +1,6 @@
-# Example: Language Declarations and Connection Checks (V2 Syntax)
+# Example: Language Declarations and Connection Checks
 # Demonstrates the language keyword and connection verification
-# Updated to V2 syntax with angular brackets for language annotation
+# Demonstrates the language keyword and connection verification
 
 import files
 import rust
@@ -32,7 +32,7 @@ pattern multilingual_app {
 
 ## A Python-only service implementing the python_service pattern
 element api_service implements python_service {
-    # V2 syntax: angular brackets for language annotation
+    # Angular brackets for language annotation
     scope src<python> = files.folder_selector('src/api')
     scope tests<python> = files.folder_selector('tests/api')
 

@@ -1,6 +1,5 @@
 ## Core Library Specification
 ## Defines the structure of the hielements-core crate.
-## Updated to use V3 syntax: curly brackets, ref, and uses keywords
 
 import files
 import rust
