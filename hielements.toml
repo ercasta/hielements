@@ -1,0 +1,10 @@
+# Hielements configuration
+# Workspace directory (relative to this file)
+workspace = "."
+
+# Libraries configuration
+# Examples below show common plugin invocation styles. Adjust paths/args for your environment.
+[libraries]
+# External process plugin (JSON-RPC over stdin/stdout)
+mylib = { executable = "python3", args = ["scripts/mylib.py"] }
+

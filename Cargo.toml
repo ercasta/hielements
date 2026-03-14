@@ -3,7 +3,6 @@ resolver = "2"
 members = [
     "crates/hielements-core",
     "crates/hielements-cli",
-    "crates/hielements-mcp",
 ]
 exclude = [
     "wasm_plugins/*",

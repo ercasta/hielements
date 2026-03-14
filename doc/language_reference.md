@@ -78,7 +78,7 @@ The following are reserved keywords:
 |---------|-------------|
 | `element` | Declares an element |
 | `pattern` | Declares a pattern (reusable architectural blueprint, preferred in V3) |
-| `template` | Declares a pattern (supported for backward compatibility, prefer `pattern`) |
+| `template` | Declares a pattern (supported for backward compatibility, prefer `pattern`) THIS HAS TO BE REMOVED|
 | `implements` | Declares that an element implements pattern(s) |
 | `binds` | Binds a scope/ref to a pattern declaration |
 | `scope` | Declares a scope selector |

@@ -13,7 +13,6 @@ This guide walks you through using Hielements to describe, document, and enforce
 5. [Best Practices](#best-practices)
 6. [Integration with CI/CD](#integration-with-cicd)
 7. [IDE Integration](#ide-integration)
-8. [Model Context Protocol (MCP) Support](#model-context-protocol-mcp-support)
 
 ---
 
@@ -188,7 +187,7 @@ Patterns define the **structure** and **requirements** that elements must satisf
 
 ### Defining a Pattern
 
-Use the `template` keyword to define reusable patterns:
+Use the `pattern` keyword to define reusable patterns:
 
 ```hielements
 import rust
@@ -379,35 +378,6 @@ element my_component:
     scope src = mylib.my_selector('src/')
     check mylib.my_check(src)
 ```
-
-### Model Context Protocol (MCP) Support
-
-Hielements can also connect to long-running Model Context Protocol (MCP) servers to provide libraries and heavy analysis services. Use an MCP server when you want persistent analyzers, language integrations, or multi-repository services.
-
-- **Build the MCP server from source:**
-
-    - `cd crates/hielements-mcp`
-    - `cargo build --release`
-
-- **Run the MCP server (example):**
-
-        - Run the built release binary:
-
-            - `target/release/hielements-mcp --workspace .`
-
-        - Or run via cargo:
-
-            - Debug run: `cargo run --manifest-path crates/hielements-mcp/Cargo.toml -- --workspace .`
-            - Release run: `cargo run --manifest-path crates/hielements-mcp/Cargo.toml --release -- --workspace .`
-
--- **Usage**:
-
-    1. Start the MCP server.
-    2. Run Hielements as usual: `hielements check architecture.hie` — Hielements will use an MCP server when available.
-
--- **Notes:**
-    - The current Hielements MCP server communicates over stdio (not TCP), so no host/port entry is required in `hielements.toml`.
-    - Running an MCP server is useful for caching, expensive analyses, or shared language services across repositories.
 
 ### Detailed Documentation
 

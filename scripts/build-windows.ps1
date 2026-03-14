@@ -1,7 +1,7 @@
 <#
 Build script for Windows (PowerShell).
 
-Runs a release build for the Rust workspace, installs selected crates (including `hielements-mcp`),
+Runs a release build for the Rust workspace, installs selected crates,
 and builds the VS Code extension if present.
 #>
 
@@ -35,8 +35,8 @@ try {
     Write-Host "[hielements] Building Rust workspace (release)..."
     & cargo build --workspace --release
 
-Write-Host "[hielements] Installing selected crates (will include mcp)..."
-$crates = @('crates/hielements-cli','crates/hielements-mcp')
+Write-Host "[hielements] Installing selected crates..."
+$crates = @('crates/hielements-cli')
 foreach ($c in $crates) {
     if (Test-Path $c) {
         Write-Host "[hielements] Installing $c..."
