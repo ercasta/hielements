@@ -6,10 +6,6 @@
 
 Hielements (pronounced *hi-elements*) helps you define, document, and enforce the logical structure of your software systems. Unlike traditional architecture documentation that becomes stale, Hielements specifications are formally checked against your actual code—ensuring your architecture stays aligned with reality.
 
-> 📝 **Note**: This documentation describes Hielements V2, which introduces a clearer separation between **prescriptive** (patterns with rules) and **descriptive** (actual implementations) parts of the language. V2 is incompatible with V1.
-
----
-
 ## Why Hielements?
 
 Modern software systems are complex. As codebases grow, their actual structure diverges from the original design. Architecture diagrams become outdated, and the "mental model" of how components interact exists only in developers' heads (if at all).
@@ -26,11 +22,10 @@ Modern software systems are complex. As codebases grow, their actual structure d
 - 🌐 **Working across languages** (Python, Docker, Terraform, and more)
 - 🤝 **Enabling human-AI collaboration** through structured specifications
 
----
 
 ## Prescriptive vs Descriptive
 
-Hielements V2 separates two key concerns:
+Hielements separates two key concerns:
 
 **🏗️ Prescriptive** — Define the rules and constraints
 - **Patterns** (declared with `pattern`) establish architectural blueprints
@@ -71,8 +66,6 @@ element orders_service:
 ```
 
 Run `hielements check` and Hielements will verify your architecture against the actual code. If someone changes the Dockerfile or renames the module, the checks will fail—keeping your architecture in sync.
-
----
 
 ## Key Features
 
@@ -118,35 +111,6 @@ Hielements includes a comprehensive **pattern library** (`patterns/` directory) 
 This approach ensures patterns are living artifacts that can be validated, tested, and evolved alongside your code.
 
 
-### 🤖 MCP Server — Agent Control Plane
-
-Hielements includes an optional MCP Server (Multi-Client Platform) — a fast, secure, and delightful control plane that makes coordinating AI agents and automating architecture workflows effortless. Spin up sandboxed agent tasks, orchestrate discovery and pattern application, propose safe .hie edits with human-in-the-loop review, and enforce policies with full auditing and authenticated access — all designed to accelerate architecture discovery, governance, and reliable automation.
-
-Key capabilities:
-- Orchestrate multiple agents (MCP clients) via JSON-RPC/HTTP
-- Provide authenticated, audited access to repository specs and pattern catalogs
-- Execute sandboxed analysis tasks (WASM or controlled external plugins)
-- Offer proposal/patch workflows: agents submit suggested .hie edits which can be reviewed and applied
-- Expose telemetry and policy hooks for CI/CD enforcement
-
-Quick start:
-```bash
-# Start server (defaults: port 8765, TLS optional)
-hielements mcp serve --config hielements.toml
-```
-
-Configuration highlights (hielements.toml):
-- enabled = true
-- listen = "0.0.0.0:8765"
-- auth = { type = "api_key" | "oauth" }
-- sandbox = { wasm = true, external_time_limit = "30s" }
-
-Security & best practices:
-- Always enable TLS and strict authentication in shared environments
-- Prefer WASM plugins for untrusted agent tasks
-- Use audit logs and human review for automated patch application
-
-See doc/agent_integration_summary.md for full protocol, message schema, and example agent clients.
 ### 🔒 Type-Safe Connection Points
 
 Explicit type annotations are **required** for all connection points, enabling correct integration across multiple libraries and languages. Below are examples of connection points typing added for better interfacing:
@@ -514,23 +478,6 @@ The pattern library (`patterns/` directory) contains:
 - **Compiler patterns**: Compiler pipeline, visitor
 
 These patterns are not just documentation—they're executable Hielements specifications that you can import and implement in your own projects. The automatic catalog generation ensures patterns stay synchronized with their implementations.
-
----
-
-## Project Status
-
-🚧 **Hielements is in early development.** We are actively building the core interpreter, standard libraries, and tooling.
-
-### Roadmap
-
-- [x] Language design and specification
-- [x] Core interpreter implementation (Rust)
-- [x] Standard libraries (Python, Docker, files)
-- [x] Patterns (formerly "element templates") for reusable architectural constraints
-- [ ] VSCode extension
-- [ ] Language Server Protocol
-- [ ] CI/CD integration templates
-- [ ] Additional language libraries (JavaScript, Go, Terraform)
 
 ---
 
